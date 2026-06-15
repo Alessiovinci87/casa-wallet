@@ -1,0 +1,35 @@
+{
+  "name": "casawallet-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CasaWallet API server — Express + Prisma + WebSocket",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "seed": "node prisma/seed.js"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.2.0",
+    "node-cron": "^4.2.1",
+    "openai": "^6.42.0",
+    "resend": "^6.12.4",
+    "ws": "^8.21.0"
+  },
+  "devDependencies": {
+    "prisma": "^6.19.3"
+  }
+}

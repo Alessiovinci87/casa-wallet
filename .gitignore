@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build output
+dist/
+
+# Prisma generated client
+**/node_modules/.prisma/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log

@@ -1,0 +1,72 @@
+// CasaWallet — Prisma schema
+// DB: PostgreSQL (Railway)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  name         String
+  passwordHash String
+  createdAt    DateTime      @default(now())
+  transactions Transaction[]
+  alerts       Alert[]
+}
+
+model Transaction {
+  id          String      @id @default(cuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id])
+  amount      Float
+  type        TxType
+  category    String
+  subcategory String?
+  method      PayMethod
+  description String?
+  date        DateTime
+  taxPercent  Float?
+  taxAmount   Float?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  taxSaving   TaxSaving?
+}
+
+model TaxSaving {
+  id            String       @id @default(cuid())
+  transactionId String       @unique
+  transaction   Transaction  @relation(fields: [transactionId], references: [id])
+  amount        Float
+  month         Int
+  year          Int
+  transferred   Boolean      @default(false)
+  transferredAt DateTime?
+}
+
+model Alert {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  type      String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+enum TxType {
+  INCOME
+  EXPENSE
+}
+
+enum PayMethod {
+  CASH
+  POS
+  CARD
+  TRANSFER
+}
