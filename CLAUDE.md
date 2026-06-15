@@ -2,6 +2,37 @@
 
 App di gestione economia domestica per 2 utenti fissi (Alessio e moglie).
 
+## Stato avanzamento (aggiornato 15 giugno 2026)
+
+### Completato ✅
+- Setup monorepo /client + /server
+- Schema Prisma: User, Transaction, TaxSaving, Alert
+  - Su `origin/main` (produzione): `provider postgresql` + enum `TxType`/`PayMethod`
+  - Nel working tree locale: `provider sqlite`, `type`/`method` come `String` (gli enum Prisma non sono supportati su SQLite); valori validati lato API. **Modifica non committata.**
+- Backend: auth JWT, CRUD transazioni, tax savings, OCR endpoint (GPT-4o Vision)
+- WebSocket broadcast su ogni modifica transazioni
+- Client React: store Zustand, routing, Login/Dashboard/Transactions/TaxSavings/OCR pages
+- TransactionForm con modal + bottone OCR inline
+- Fix mapping campi OCR (italiano → inglese lato server)
+- **Task 4 — test end-to-end locale (SQLite): ESEGUITO e superato**
+  - `prisma migrate dev --name init` + `seed` eseguiti (2 utenti creati)
+  - Test curl a–f tutti ✅ (health, login, EXPENSE, INCOME @25%, `tax-savings/summary` → `totalPending: 500`, lista transazioni)
+  - Server (:3001) e client (:5173) avviati e funzionanti
+  - Migration SQLite (`prisma/migrations/`) e `dev.db` sono locali/non committati (`*.db` in .gitignore)
+
+### Da fare 📋
+- [ ] Verifica manuale nel browser (login + UI) — ultimo residuo di Task 4
+- [ ] Configurare `OPENAI_API_KEY` (e riavviare il server) per testare l'OCR
+- [ ] Task 5: deploy Railway (PostgreSQL prod) + Vercel (client)
+  - Per la prod: rimettere `provider = "postgresql"` in schema.prisma e rigenerare la migration (quella attuale è SQLite-specifica)
+- [ ] Task 6: cron alert tasse mensile (Resend email)
+- [ ] Task 7: test end-to-end con entrambi gli utenti + WebSocket sync reale
+- [ ] Eventuale debounce filtro anno in TransactionsPage
+
+### Prossima sessione — note di ripartenza
+- Le modifiche locali a `schema.prisma` (SQLite + String) e la migration sono **non committate**: decidere se committarle su un branch dev separato o tenerle solo locali.
+- Per riavviare l'ambiente locale: `cd server && npm run dev` (DB SQLite `dev.db` già migrato e popolato; rieseguire `npx prisma migrate dev` solo se lo schema cambia).
+
 ## Stack
 - /client: React + Vite + Tailwind → Vercel
 - /server: Node + Express + Prisma + PostgreSQL → Railway
