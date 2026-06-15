@@ -1,0 +1,163 @@
+// Transaction routes — all protected. Broadcasts a WebSocket event after
+// every create/update/delete so both users stay in sync in real time.
+import { Router } from "express";
+import { prisma } from "../lib/prisma.js";
+import { authMiddleware } from "../middleware/authMiddleware.js";
+import { broadcast } from "../lib/ws.js";
+
+const router = Router();
+router.use(authMiddleware);
+
+// A TaxSaving is created only for INCOME transactions with a positive taxPercent.
+function taxApplies(type, taxPercent) {
+  return type === "INCOME" && typeof taxPercent === "number" && taxPercent > 0;
+}
+
+function emit(action, transaction) {
+  broadcast({ event: "transaction_update", payload: { action, transaction } });
+}
+
+// POST /api/transactions
+router.post("/", async (req, res) => {
+  const {
+    amount, type, category, subcategory, method, description, date, taxPercent,
+  } = req.body || {};
+
+  if (amount == null || !type || !category || !method || !date) {
+    return res.status(400).json({ error: "Campi obbligatori mancanti (amount, type, category, method, date)" });
+  }
+
+  const when = new Date(date);
+  const applies = taxApplies(type, taxPercent);
+  const taxAmount = applies ? Number((amount * taxPercent) / 100) : null;
+
+  const transaction = await prisma.transaction.create({
+    data: {
+      userId: req.user.id,
+      amount,
+      type,
+      category,
+      subcategory: subcategory ?? null,
+      method,
+      description: description ?? null,
+      date: when,
+      taxPercent: applies ? taxPercent : null,
+      taxAmount,
+      ...(applies && {
+        taxSaving: {
+          create: {
+            amount: taxAmount,
+            month: when.getUTCMonth() + 1,
+            year: when.getUTCFullYear(),
+          },
+        },
+      }),
+    },
+    include: { taxSaving: true },
+  });
+
+  emit("created", transaction);
+  res.status(201).json(transaction);
+});
+
+// GET /api/transactions?month=&year=&type=&category=&method=
+router.get("/", async (req, res) => {
+  const { month, year, type, category, method } = req.query;
+  const where = {};
+
+  if (type) where.type = type;
+  if (category) where.category = category;
+  if (method) where.method = method;
+
+  // Date range filter: requires at least a year. With month, narrows to that month.
+  if (year) {
+    const y = Number(year);
+    if (month) {
+      const m = Number(month) - 1; // 0-indexed
+      where.date = { gte: new Date(Date.UTC(y, m, 1)), lt: new Date(Date.UTC(y, m + 1, 1)) };
+    } else {
+      where.date = { gte: new Date(Date.UTC(y, 0, 1)), lt: new Date(Date.UTC(y + 1, 0, 1)) };
+    }
+  }
+
+  const transactions = await prisma.transaction.findMany({
+    where,
+    include: { taxSaving: true },
+    orderBy: { date: "desc" },
+  });
+  res.json(transactions);
+});
+
+// PUT /api/transactions/:id
+router.put("/:id", async (req, res) => {
+  const { id } = req.params;
+  const existing = await prisma.transaction.findUnique({ where: { id }, include: { taxSaving: true } });
+  if (!existing) {
+    return res.status(404).json({ error: "Transazione non trovata" });
+  }
+
+  const {
+    amount, type, category, subcategory, method, description, date, taxPercent,
+  } = req.body || {};
+
+  const nextAmount = amount ?? existing.amount;
+  const nextType = type ?? existing.type;
+  const nextDate = date ? new Date(date) : existing.date;
+  const nextTaxPercent = taxPercent !== undefined ? taxPercent : existing.taxPercent;
+
+  const applies = taxApplies(nextType, nextTaxPercent);
+  const taxAmount = applies ? Number((nextAmount * nextTaxPercent) / 100) : null;
+
+  const data = {
+    amount: nextAmount,
+    type: nextType,
+    category: category ?? existing.category,
+    subcategory: subcategory !== undefined ? subcategory : existing.subcategory,
+    method: method ?? existing.method,
+    description: description !== undefined ? description : existing.description,
+    date: nextDate,
+    taxPercent: applies ? nextTaxPercent : null,
+    taxAmount,
+  };
+
+  // Keep the linked TaxSaving consistent with the updated transaction.
+  if (applies) {
+    data.taxSaving = {
+      upsert: {
+        create: { amount: taxAmount, month: nextDate.getUTCMonth() + 1, year: nextDate.getUTCFullYear() },
+        update: { amount: taxAmount, month: nextDate.getUTCMonth() + 1, year: nextDate.getUTCFullYear() },
+      },
+    };
+  } else if (existing.taxSaving) {
+    data.taxSaving = { delete: true };
+  }
+
+  const transaction = await prisma.transaction.update({
+    where: { id },
+    data,
+    include: { taxSaving: true },
+  });
+
+  emit("updated", transaction);
+  res.json(transaction);
+});
+
+// DELETE /api/transactions/:id
+router.delete("/:id", async (req, res) => {
+  const { id } = req.params;
+  const existing = await prisma.transaction.findUnique({ where: { id }, include: { taxSaving: true } });
+  if (!existing) {
+    return res.status(404).json({ error: "Transazione non trovata" });
+  }
+
+  // Remove the linked TaxSaving first (FK), then the transaction.
+  if (existing.taxSaving) {
+    await prisma.taxSaving.delete({ where: { id: existing.taxSaving.id } });
+  }
+  await prisma.transaction.delete({ where: { id } });
+
+  emit("deleted", existing);
+  res.json({ ok: true, id });
+});
+
+export default router;

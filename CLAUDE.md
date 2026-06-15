@@ -18,3 +18,29 @@ Solo 2 account fissi, creati via seed. Nessuna registrazione pubblica.
 
 ## Variabili ambiente
 Vedi /server/.env.example e /client/.env.example
+
+## API Routes
+Tutte le route (eccetto login) richiedono header `Authorization: Bearer <token>`.
+
+### Auth (`/api/auth`)
+- `POST /login` → `{ token, user: {id, name, email} }`
+- `POST /refresh` → rinnova il token (richiede token)
+- `GET /me` → utente corrente
+
+### Transactions (`/api/transactions`) — protette
+- `POST /` → crea transazione; se `type=INCOME` e `taxPercent>0` crea anche il TaxSaving collegato
+- `GET /?month=&year=&type=&category=&method=` → lista filtrata (il filtro data richiede almeno `year`)
+- `PUT /:id` → modifica (riallinea il TaxSaving)
+- `DELETE /:id` → elimina (rimuove anche il TaxSaving collegato)
+- Ogni POST/PUT/DELETE → broadcast WebSocket: `{ event: "transaction_update", payload: { action, transaction } }`
+
+### Tax Savings (`/api/tax-savings`) — protette
+- `GET /` → `{ totalPending, items }`
+- `GET /summary` → `{ totalPending, byMonth: [{month, year, amount, transferred}] }`
+- `PUT /:id/transfer` → marca come trasferito
+
+### OCR (`/api/ocr`) — protetta
+- `POST /parse` → `multipart/form-data` campo `image` → GPT-4o Vision → JSON `{ importo, tipo, descrizione, data, metodo }`
+
+## WebSocket
+Endpoint `ws://<host>/ws`. Eventi server→client per il sync real-time delle transazioni.
