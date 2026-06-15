@@ -44,3 +44,20 @@ Tutte le route (eccetto login) richiedono header `Authorization: Bearer <token>`
 
 ## WebSocket
 Endpoint `ws://<host>/ws`. Eventi server→client per il sync real-time delle transazioni.
+
+## Struttura client (`/client/src`)
+- `lib/api.js` — istanza axios (baseURL `VITE_API_URL`), interceptor: aggiunge `Bearer` token, su 401 logout + redirect `/login`
+- `lib/constants.js` — categorie predefinite (INCOME/EXPENSE), metodi pagamento + label
+- `lib/format.js` — formattazione valuta EUR
+- `store/authStore.js` — `{ user, token, login, logout, loadFromStorage }` (zustand)
+- `store/transactionStore.js` — `{ transactions, loading, filters, fetch/add/update/delete }`
+- `store/taxStore.js` — `{ summary, items, fetchSummary, markTransferred }`
+- `hooks/useWebSocket.js` — connessione a `VITE_WS_URL`, refresh su `transaction_update`, riconnessione 3s
+- `components/` — `PrivateRoute`, `Layout` (nav + WS), `TransactionForm` (modal + bottone OCR)
+- `pages/` — `LoginPage`, `Dashboard`, `TransactionsPage`, `TaxSavingsPage`, `OcrPage`
+
+### Routing
+Pubbliche: `/login`. Protette (PrivateRoute → Layout): `/` (Dashboard), `/transactions`, `/tax-savings`, `/ocr`.
+
+### Env client
+`VITE_API_URL`, `VITE_WS_URL` — vedi `/client/.env.example`.
