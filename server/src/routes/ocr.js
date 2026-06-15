@@ -54,7 +54,15 @@ router.post("/parse", upload.single("image"), async (req, res) => {
     } catch {
       return res.status(502).json({ error: "Risposta OCR non in formato JSON", raw });
     }
-    res.json(parsed);
+
+    // Map Italian fields from the model to the English fields used by the form.
+    res.json({
+      amount: parsed.importo,
+      type: parsed.tipo,
+      description: parsed.descrizione,
+      date: parsed.data,
+      method: parsed.metodo,
+    });
   } catch (err) {
     console.error("[ocr] error:", err);
     res.status(502).json({ error: "Errore durante l'analisi OCR", detail: err.message });
