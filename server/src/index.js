@@ -13,6 +13,8 @@ import taxSavingsRouter from "./routes/taxSavings.js";
 import ocrRouter from "./routes/ocr.js";
 import receiptsRouter from "./routes/receipts.js";
 import analyticsRouter from "./routes/analytics.js";
+import shoppingListRouter from "./routes/shoppingList.js";
+import recurringRouter from "./routes/recurring.js";
 
 dotenv.config();
 
@@ -36,6 +38,8 @@ app.use("/api/tax-savings", taxSavingsRouter);
 app.use("/api/ocr", ocrRouter);
 app.use("/api/receipts", receiptsRouter);
 app.use("/api/analytics", analyticsRouter);
+app.use("/api/shopping-list", shoppingListRouter);
+app.use("/api/recurring", recurringRouter);
 
 // --- HTTP + WebSocket server ---
 const server = http.createServer(app);

@@ -19,6 +19,8 @@ model User {
   transactions Transaction[]
   alerts       Alert[]
   receipts     Receipt[]
+  recurringProducts RecurringProduct[]
+  dismissals        ShoppingListDismissal[]
 }
 
 model Transaction {
@@ -99,4 +101,26 @@ model ReceiptItem {
   store         String?
   date          DateTime
   createdAt     DateTime @default(now())
+}
+
+model RecurringProduct {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  canonicalName String
+  intervalDays  Int?     // se impostato manualmente, override del calcolo automatico
+  alwaysBuy     Boolean  @default(false) // "ricorrente fisso": in lista anche con pochi dati
+  createdAt     DateTime @default(now())
+
+  @@unique([userId, canonicalName])
+}
+
+model ShoppingListDismissal {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  canonicalName String
+  dismissedAt   DateTime @default(now())
+
+  @@unique([userId, canonicalName])
 }

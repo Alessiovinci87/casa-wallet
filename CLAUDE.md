@@ -6,7 +6,7 @@ App di gestione economia domestica per 2 utenti fissi (Alessio e moglie).
 
 ### Completato ✅
 - Setup monorepo /client + /server
-- Schema Prisma: User, Transaction, TaxSaving, Alert, Receipt, ReceiptItem
+- Schema Prisma: User, Transaction, TaxSaving, Alert, Receipt, ReceiptItem, RecurringProduct, ShoppingListDismissal
   - Su `origin/main` (produzione): `provider postgresql` + enum `TxType`/`PayMethod`
   - Nel working tree locale: `provider sqlite`, `type`/`method` come `String` (gli enum Prisma non sono supportati su SQLite); valori validati lato API. **Modifica non committata.**
 - Backend: auth JWT, CRUD transazioni, tax savings, OCR endpoint (GPT-4o Vision)
@@ -19,6 +19,11 @@ App di gestione economia domestica per 2 utenti fissi (Alessio e moglie).
   - OCR esteso: il prompt GPT-4o Vision ora restituisce anche `items[]` (prodotti+prezzi) con categoria tra 11 ammesse; categorie non valide normalizzate a "Altro" lato server (`server/src/lib/categories.js`)
   - Endpoint salvataggio scontrino + 4 endpoint analytics (vedi sotto)
   - Frontend = Task 2 (non ancora fatto)
+- **Lista della spesa predittiva (backend, 18 giu 2026)** — impara dallo storico riacquisti
+  - Modelli `RecurringProduct` (prodotto ricorrente fisso: `alwaysBuy`, `intervalDays` opz. override) e `ShoppingListDismissal` (prodotto nascosto fino al prossimo acquisto)
+  - Servizio `server/src/lib/shoppingPredictor.js` → `computeShoppingList(userId)`: raggruppa i `ReceiptItem` per `canonicalName`, intervallo medio semplice tra acquisti (1 acquisto per giorno), data prossimo riacquisto previsto, `isDue` quando scaduto
+  - Endpoint shopping-list + recurring (vedi sotto)
+  - Frontend = task separato (non ancora fatto)
 - **Task 4 — test end-to-end locale (SQLite): ESEGUITO e superato**
   - `prisma migrate dev --name init` + `seed` eseguiti (2 utenti creati)
   - Test curl a–f tutti ✅ (health, login, EXPENSE, INCOME @25%, `tax-savings/summary` → `totalPending: 500`, lista transazioni)
@@ -91,8 +96,19 @@ Tutte le route (eccetto login) richiedono header `Authorization: Bearer <token>`
 - `GET /by-store?from=&to=` → `[{ store, total, receiptCount }]`
 - `GET /top-products?limit=20&from=&to=` → `[{ canonicalName, category, totalSpent, timesBought, avgPrice }]` (prodotti su cui si spende di più)
 
+### Shopping list predittiva (`/api/shopping-list`) — protette
+- `GET /?onlyDue=true` → lista predittiva da `computeShoppingList(userId)`; ogni elemento: `{ canonicalName, category, timesBought, avgIntervalDays, lastPurchase, predictedNextPurchase, daysRemaining, isDue, isRecurring, avgPrice, lastStore }`. Ordinata per urgenza (due prima, poi `daysRemaining` crescente). `?onlyDue=true` filtra solo i prodotti da ricomprare.
+- `POST /dismiss` → body `{ canonicalName }`: upsert di `ShoppingListDismissal` (nasconde il prodotto finché non lo si riacquista). Broadcast WS `shopping_list_update`.
+
+### Recurring products (`/api/recurring`) — protette
+- `GET /` → prodotti ricorrenti dell'utente
+- `POST /` → body `{ canonicalName, alwaysBuy?, intervalDays? }`: upsert `RecurringProduct` (unique su userId+canonicalName)
+- `DELETE /:canonicalName` → rimuove il flag ricorrente
+
+Logica predittiva (dettaglio): per ogni `canonicalName` si prendono le date di acquisto (1 per giorno), si calcola l'intervallo medio semplice in giorni; `predictedNextPurchase = ultimo acquisto + intervallo`; `isDue` quando `daysRemaining <= 0`. Servono ≥2 acquisti per una previsione (con 1 solo acquisto: `isDue=false`, `avgIntervalDays=null`, ma il prodotto resta nella risposta come "non ancora prevedibile"). `RecurringProduct.alwaysBuy` forza `isDue=true` anche con pochi dati; `intervalDays` sovrascrive la media. Una dismissal esclude il prodotto solo se più recente dell'ultimo acquisto.
+
 ## WebSocket
-Endpoint `ws://<host>/ws`. Eventi server→client per il sync real-time: `transaction_update` (transazioni) e `receipt_update` (scontrini).
+Endpoint `ws://<host>/ws`. Eventi server→client per il sync real-time: `transaction_update` (transazioni), `receipt_update` (scontrini), `shopping_list_update` (dismissal lista spesa).
 
 ## Struttura client (`/client/src`)
 - `lib/api.js` — istanza axios (baseURL `VITE_API_URL`), interceptor: aggiunge `Bearer` token, su 401 logout + redirect `/login`
