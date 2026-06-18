@@ -5,17 +5,17 @@
   "steps": {
     "install": {
       "commands": [
-        "npm --prefix server install"
+        "sh -c 'if [ -f server/package.json ]; then cd server; fi; npm install'"
       ]
     },
     "build": {
       "inputs": [{ "step": "install" }],
       "commands": [
-        "npm --prefix server exec prisma generate"
+        "sh -c 'if [ -f server/package.json ]; then cd server; fi; npx prisma generate'"
       ]
     }
   },
   "deploy": {
-    "startCommand": "cd server && npx prisma db push && node prisma/seed.js && node src/index.js"
+    "startCommand": "sh -c 'if [ -f server/package.json ]; then cd server; fi; npx prisma db push && node prisma/seed.js && node src/index.js'"
   }
 }
