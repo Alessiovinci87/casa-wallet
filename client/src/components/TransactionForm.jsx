@@ -13,10 +13,20 @@ const empty = {
   taxPercent: "",
 };
 
-// Modal form to create a transaction. `initial` pre-fills fields (e.g. from OCR).
+// Modal form to create OR edit a transaction. `initial` pre-fills fields
+// (from OCR, or an existing transaction to edit when it carries an `id`).
 export default function TransactionForm({ initial, onClose }) {
   const addTransaction = useTransactionStore((s) => s.addTransaction);
-  const [form, setForm] = useState({ ...empty, ...initial });
+  const updateTransaction = useTransactionStore((s) => s.updateTransaction);
+  const isEdit = Boolean(initial?.id);
+  const [form, setForm] = useState(() => ({
+    ...empty,
+    ...initial,
+    amount: initial?.amount ?? "",
+    date: initial?.date ? String(initial.date).slice(0, 10) : empty.date,
+    taxPercent: initial?.taxPercent ?? "",
+    description: initial?.description ?? "",
+  }));
   const [ocrBusy, setOcrBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -49,16 +59,18 @@ export default function TransactionForm({ initial, onClose }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    const payload = {
+      amount: Number(form.amount),
+      type: form.type,
+      category: form.category,
+      method: form.method,
+      description: form.description || null,
+      date: new Date(form.date).toISOString(),
+      taxPercent: form.type === "INCOME" && form.taxPercent ? Number(form.taxPercent) : null,
+    };
     try {
-      await addTransaction({
-        amount: Number(form.amount),
-        type: form.type,
-        category: form.category,
-        method: form.method,
-        description: form.description || null,
-        date: new Date(form.date).toISOString(),
-        taxPercent: form.type === "INCOME" && form.taxPercent ? Number(form.taxPercent) : null,
-      });
+      if (isEdit) await updateTransaction(initial.id, payload);
+      else await addTransaction(payload);
       onClose();
     } catch (err) {
       setError(err.response?.data?.error || "Errore salvataggio");
@@ -69,7 +81,7 @@ export default function TransactionForm({ initial, onClose }) {
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-10">
       <form onSubmit={handleSubmit} className="bg-white rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">Nuova transazione</h2>
+          <h2 className="text-lg font-semibold">{isEdit ? "Modifica transazione" : "Nuova transazione"}</h2>
           <label className="text-sm text-emerald-600 cursor-pointer hover:underline">
             {ocrBusy ? "Analisi…" : "📷 Foto"}
             <input type="file" accept="image/*" className="hidden" onChange={handleOcr} disabled={ocrBusy} />

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import dayjs from "dayjs";
 import { useTransactionStore } from "../store/transactionStore.js";
-import { CATEGORIES, PAY_METHODS, PAY_METHOD_LABELS } from "../lib/constants.js";
+import { PAY_METHODS, PAY_METHOD_LABELS } from "../lib/constants.js";
 import { eur } from "../lib/format.js";
 import TransactionForm from "../components/TransactionForm.jsx";
 
@@ -14,7 +14,8 @@ export default function TransactionsPage() {
   const [filters, setFilters] = useState({
     month: now.getMonth() + 1,
     year: now.getFullYear(),
-    type: "",
+    // Arriving from a Dashboard card pre-filters by type (INCOME/EXPENSE).
+    type: location.state?.filterType ?? "",
     method: "",
   });
   // If we arrived from the OCR page with prefilled data, open the form on it.
@@ -28,6 +29,7 @@ export default function TransactionsPage() {
   const setFilter = (k, v) => setFilters((f) => ({ ...f, [k]: v }));
 
   const openNew = () => { setFormInitial(null); setShowForm(true); };
+  const openEdit = (t) => { setFormInitial(t); setShowForm(true); };
 
   return (
     <div className="space-y-4">
@@ -77,6 +79,7 @@ export default function TransactionsPage() {
                 <span className={`font-semibold ${t.type === "INCOME" ? "text-emerald-600" : "text-rose-600"}`}>
                   {t.type === "INCOME" ? "+" : "−"}{eur(t.amount)}
                 </span>
+                <button onClick={() => openEdit(t)} className="text-slate-300 hover:text-emerald-600" title="Modifica">✎</button>
                 <button onClick={() => deleteTransaction(t.id)} className="text-slate-300 hover:text-rose-600" title="Elimina">✕</button>
               </div>
             </div>
