@@ -23,7 +23,20 @@ const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
 
 const app = express();
 
-app.use(cors({ origin: CLIENT_URL, credentials: true }));
+// Allow the configured client URL, any Vercel preview deploy (*.vercel.app),
+// and non-browser requests (no Origin header, e.g. curl/health checks).
+function corsOrigin(origin, cb) {
+  if (!origin) return cb(null, true);
+  if (origin === CLIENT_URL) return cb(null, true);
+  try {
+    if (new URL(origin).hostname.endsWith(".vercel.app")) return cb(null, true);
+  } catch {
+    // malformed origin → fall through to rejection
+  }
+  return cb(new Error(`Origin non consentita da CORS: ${origin}`));
+}
+
+app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(express.json());
 
 // --- Health check ---

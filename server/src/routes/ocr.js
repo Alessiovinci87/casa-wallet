@@ -1,8 +1,7 @@
 // OCR route — parse an Italian store receipt (or bank notification) with
-// GPT-4o Vision. Returns the receipt header (store/total/date/method) plus the
-// list of purchased products with prices, categorized for later analytics.
-// The data is returned to the client to pre-fill the form; saving happens via
-// POST /api/receipts. Protected.
+// GPT-4o Vision. Accepts one OR several images (sections of the same long
+// receipt) under the "images" field and reconstructs a single receipt with its
+// product lines, categorized for later analytics. Protected.
 import { Router } from "express";
 import multer from "multer";
 import OpenAI from "openai";
@@ -12,10 +11,10 @@ import { PRODUCT_CATEGORIES, normalizeCategory } from "../lib/categories.js";
 const router = Router();
 router.use(authMiddleware);
 
-// Keep the image in memory; we forward it to OpenAI, never to disk.
+// Keep images in memory; we forward them to OpenAI, never to disk.
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  limits: { fileSize: 10 * 1024 * 1024, files: 12 }, // 10 MB each, up to 12
 });
 
 const SYSTEM_PROMPT =
@@ -39,23 +38,29 @@ const SYSTEM_PROMPT =
   "Categorie ammesse (usa SOLO queste, mai inventarne altre): " +
   PRODUCT_CATEGORIES.join(", ") +
   ".\n" +
+  "Se ricevi PIÙ immagini, sono sezioni sovrapposte dello STESSO scontrino fotografato dall'alto verso il basso: " +
+  "ricostruisci UN unico scontrino, NON duplicare i prodotti che compaiono nella zona di sovrapposizione, e usa il totale stampato (non sommare le sezioni).\n" +
   "Regole: se un campo non è leggibile usa null; canonicalName DEVE essere coerente per lo stesso prodotto " +
   "anche se rawName cambia tra scontrini diversi (stesso prodotto → stesso canonicalName); " +
   "category DEVE essere esattamente una delle categorie ammesse. " +
   "Se l'immagine è una notifica bancaria senza elenco prodotti, restituisci items: []. " +
   "Rispondi SOLO con il JSON, nessun testo aggiuntivo.";
 
-// POST /api/ocr/parse — multipart/form-data, field "image"
-router.post("/parse", upload.single("image"), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: "Immagine mancante (campo 'image')" });
+// POST /api/ocr/parse — multipart/form-data, field "images" (one or many)
+router.post("/parse", upload.array("images", 12), async (req, res) => {
+  const files = req.files || [];
+  if (files.length === 0) {
+    return res.status(400).json({ error: "Nessuna immagine (campo 'images')" });
   }
   if (!process.env.OPENAI_API_KEY) {
     return res.status(500).json({ error: "OPENAI_API_KEY non configurata" });
   }
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const dataUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+  const imageParts = files.map((f) => ({
+    type: "image_url",
+    image_url: { url: `data:${f.mimetype};base64,${f.buffer.toString("base64")}` },
+  }));
 
   try {
     const completion = await openai.chat.completions.create({
@@ -66,8 +71,14 @@ router.post("/parse", upload.single("image"), async (req, res) => {
         {
           role: "user",
           content: [
-            { type: "text", text: "Estrai i dati e l'elenco prodotti da questo scontrino." },
-            { type: "image_url", image_url: { url: dataUrl } },
+            {
+              type: "text",
+              text:
+                files.length > 1
+                  ? `Queste ${files.length} immagini sono sezioni di un unico scontrino: estrai i dati e l'elenco prodotti unendole.`
+                  : "Estrai i dati e l'elenco prodotti da questo scontrino.",
+            },
+            ...imageParts,
           ],
         },
       ],

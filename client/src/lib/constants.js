@@ -7,6 +7,21 @@ export const CATEGORIES = {
   ],
 };
 
+// Fixed product categories for receipt items (must match the server list).
+export const PRODUCT_CATEGORIES = [
+  "Frutta e verdura",
+  "Carne e pesce",
+  "Latticini e uova",
+  "Pane e cereali",
+  "Bevande",
+  "Surgelati",
+  "Dispensa",
+  "Snack e dolci",
+  "Cura casa",
+  "Cura persona",
+  "Altro",
+];
+
 export const PAY_METHODS = ["CASH", "POS", "CARD", "TRANSFER"];
 
 export const PAY_METHOD_LABELS = {

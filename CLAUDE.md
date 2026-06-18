@@ -18,12 +18,19 @@ App di gestione economia domestica per 2 utenti fissi (Alessio e moglie).
   - Modelli `Receipt` (testata scontrino: store, total, date, opz. link a Transaction) e `ReceiptItem` (rawName, canonicalName normalizzato, category da lista fissa, quantity, unitPrice, totalPrice)
   - OCR esteso: il prompt GPT-4o Vision ora restituisce anche `items[]` (prodotti+prezzi) con categoria tra 11 ammesse; categorie non valide normalizzate a "Altro" lato server (`server/src/lib/categories.js`)
   - Endpoint salvataggio scontrino + 4 endpoint analytics (vedi sotto)
-  - Frontend = Task 2 (non ancora fatto)
+  - **Frontend fatto** (18 giu 2026): pagina "Nuova spesa" + "Analisi" (vedi sotto)
 - **Lista della spesa predittiva (backend, 18 giu 2026)** — impara dallo storico riacquisti
   - Modelli `RecurringProduct` (prodotto ricorrente fisso: `alwaysBuy`, `intervalDays` opz. override) e `ShoppingListDismissal` (prodotto nascosto fino al prossimo acquisto)
   - Servizio `server/src/lib/shoppingPredictor.js` → `computeShoppingList(userId)`: raggruppa i `ReceiptItem` per `canonicalName`, intervallo medio semplice tra acquisti (1 acquisto per giorno), data prossimo riacquisto previsto, `isDue` quando scaduto
   - Endpoint shopping-list + recurring (vedi sotto)
-  - Frontend = task separato (non ancora fatto)
+  - **Frontend fatto** (18 giu 2026): pagina "Lista spesa" (vedi sotto)
+- **Frontend completo scontrini + analisi + lista spesa + FIX (18 giu 2026)**
+  - **FIX refresh→login**: `authStore` ora ha flag `hydrated`; `App.jsx` mostra spinner finché non idratato; `PrivateRoute` non redirige durante l'idratazione; l'interceptor 401 sloggia solo se c'era un token (no logout su 401 anonimi/boot)
+  - **FIX CORS**: `server/src/index.js` accetta `CLIENT_URL` + qualsiasi `*.vercel.app` + richieste senza Origin
+  - **OCR multi-immagine**: `POST /api/ocr/parse` ora accetta più file nel campo `images` (modalità "Scontrino lungo") e li unisce in un unico scontrino con una sola chiamata GPT-4o
+  - **`POST /api/receipts` con `createTransaction:true`**: crea la transazione EXPENSE (scala il saldo una volta) + il receipt collegato, atomico; broadcast `transaction_update` + `receipt_update`
+  - Pagine: `OcrPage` (cattura camera/galleria, scontrino lungo, conferma editabile), `AnalyticsPage` (/analytics), `ShoppingListPage` (/shopping-list)
+  - Store: `receiptStore`, `analyticsStore`, `shoppingListStore`; `useWebSocket` aggiorna le viste su `receipt_update`/`shopping_list_update`
 - **Task 4 — test end-to-end locale (SQLite): ESEGUITO e superato**
   - `prisma migrate dev --name init` + `seed` eseguiti (2 utenti creati)
   - Test curl a–f tutti ✅ (health, login, EXPENSE, INCOME @25%, `tax-savings/summary` → `totalPending: 500`, lista transazioni)
@@ -81,13 +88,13 @@ Tutte le route (eccetto login) richiedono header `Authorization: Bearer <token>`
 - `PUT /:id/transfer` → marca come trasferito
 
 ### OCR (`/api/ocr`) — protetta
-- `POST /parse` → `multipart/form-data` campo `image` → GPT-4o Vision → JSON `{ store, total, date, method, items: [{ rawName, canonicalName, category, quantity, unitPrice, totalPrice }], amount, type, description }`
+- `POST /parse` → `multipart/form-data` campo `images` (uno o più file; più file = sezioni di un unico scontrino lungo, unite in una sola chiamata GPT-4o) → JSON `{ store, total, date, method, items: [{ rawName, canonicalName, category, quantity, unitPrice, totalPrice }], amount, type, description }`
   - `amount`/`type`/`description` sono campi di compatibilità per il prefill del form transazione (amount=total, type="EXPENSE", description=store)
   - `category` di ogni item è una delle 11 categorie ammesse; valori imprevisti → "Altro"
   - notifica bancaria senza prodotti → `items: []`
 
 ### Receipts (`/api/receipts`) — protette
-- `POST /` → body `{ store, total, date, method, transactionId?, items: [...] }` → crea `Receipt` + `ReceiptItem` (nested), opz. collega a una Transaction. Broadcast WS `receipt_update`. Gli item ereditano `store`/`date` dalla testata se mancanti; categoria normalizzata.
+- `POST /` → body `{ store, total, date, method, category?, items: [...], createTransaction?, transactionId? }` → crea `Receipt` + `ReceiptItem` (nested). Con `createTransaction:true` crea anche la transazione EXPENSE collegata (scala il saldo una volta, categoria default "Spesa", broadcast `transaction_update` + `receipt_update`, atomico). Altrimenti opz. collega a una Transaction esistente via `transactionId`. Gli item ereditano `store`/`date` dalla testata se mancanti; categoria normalizzata.
 - `GET /?store=&from=&to=` → scontrini con `items`, più recenti prima
 
 ### Analytics (`/api/analytics`) — protette (sugli scontrini)
@@ -111,18 +118,21 @@ Logica predittiva (dettaglio): per ogni `canonicalName` si prendono le date di a
 Endpoint `ws://<host>/ws`. Eventi server→client per il sync real-time: `transaction_update` (transazioni), `receipt_update` (scontrini), `shopping_list_update` (dismissal lista spesa).
 
 ## Struttura client (`/client/src`)
-- `lib/api.js` — istanza axios (baseURL `VITE_API_URL`), interceptor: aggiunge `Bearer` token, su 401 logout + redirect `/login`
-- `lib/constants.js` — categorie predefinite (INCOME/EXPENSE), metodi pagamento + label
+- `lib/api.js` — istanza axios (baseURL `VITE_API_URL`), interceptor: aggiunge `Bearer` token; su 401 logout + redirect `/login` **solo se era presente un token** (no logout su 401 anonimi/boot)
+- `lib/constants.js` — categorie INCOME/EXPENSE, `PRODUCT_CATEGORIES` (11, per gli item scontrino), metodi pagamento + label
 - `lib/format.js` — formattazione valuta EUR
-- `store/authStore.js` — `{ user, token, login, logout, loadFromStorage }` (zustand)
+- `store/authStore.js` — `{ user, token, hydrated, login, logout, loadFromStorage }` (zustand). `hydrated` evita il redirect a login durante il ripristino sessione al refresh
 - `store/transactionStore.js` — `{ transactions, loading, filters, fetch/add/update/delete }`
 - `store/taxStore.js` — `{ summary, items, fetchSummary, markTransferred }`
-- `hooks/useWebSocket.js` — connessione a `VITE_WS_URL`, refresh su `transaction_update`, riconnessione 3s
-- `components/` — `PrivateRoute`, `Layout` (nav + WS), `TransactionForm` (modal + bottone OCR)
-- `pages/` — `LoginPage`, `Dashboard`, `TransactionsPage`, `TaxSavingsPage`, `OcrPage`
+- `store/receiptStore.js` — `{ parsing, saving, parse(files), save(payload) }` (OCR → conferma → salva con createTransaction)
+- `store/analyticsStore.js` — `{ byCategory, byStore, topProducts, trend, range, fetchAll, fetchTrend }`
+- `store/shoppingListStore.js` — `{ list, recurring, fetchList, fetchRecurring, dismiss, setRecurring, removeRecurring }`
+- `hooks/useWebSocket.js` — connessione a `VITE_WS_URL`; refresh su `transaction_update`, `receipt_update` (transazioni + lista spesa + analytics se già caricate), `shopping_list_update`; riconnessione 3s
+- `components/` — `PrivateRoute` (attende `hydrated`), `Layout` (nav + WS), `TransactionForm` (modal + bottone OCR)
+- `pages/` — `LoginPage`, `Dashboard`, `TransactionsPage`, `TaxSavingsPage`, `OcrPage` (nuova spesa da scontrino: camera/galleria, scontrino lungo multi-foto, conferma editabile), `AnalyticsPage`, `ShoppingListPage`
 
 ### Routing
-Pubbliche: `/login`. Protette (PrivateRoute → Layout): `/` (Dashboard), `/transactions`, `/tax-savings`, `/ocr`.
+Pubbliche: `/login`. Protette (PrivateRoute → Layout): `/` (Dashboard), `/transactions`, `/tax-savings`, `/ocr` (Nuova spesa), `/analytics` (Analisi), `/shopping-list` (Lista spesa).
 
 ### Env client
 `VITE_API_URL`, `VITE_WS_URL` — vedi `/client/.env.example`.
