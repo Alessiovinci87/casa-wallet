@@ -6,7 +6,7 @@ App di gestione economia domestica per 2 utenti fissi (Alessio e moglie).
 
 ### Completato ✅
 - Setup monorepo /client + /server
-- Schema Prisma: User, Transaction, TaxSaving, Alert
+- Schema Prisma: User, Transaction, TaxSaving, Alert, Receipt, ReceiptItem
   - Su `origin/main` (produzione): `provider postgresql` + enum `TxType`/`PayMethod`
   - Nel working tree locale: `provider sqlite`, `type`/`method` come `String` (gli enum Prisma non sono supportati su SQLite); valori validati lato API. **Modifica non committata.**
 - Backend: auth JWT, CRUD transazioni, tax savings, OCR endpoint (GPT-4o Vision)
@@ -14,6 +14,11 @@ App di gestione economia domestica per 2 utenti fissi (Alessio e moglie).
 - Client React: store Zustand, routing, Login/Dashboard/Transactions/TaxSavings/OCR pages
 - TransactionForm con modal + bottone OCR inline
 - Fix mapping campi OCR (italiano → inglese lato server)
+- **Estrazione prodotti da scontrini + analisi prezzi (backend, 18 giu 2026)** — Task 1/2
+  - Modelli `Receipt` (testata scontrino: store, total, date, opz. link a Transaction) e `ReceiptItem` (rawName, canonicalName normalizzato, category da lista fissa, quantity, unitPrice, totalPrice)
+  - OCR esteso: il prompt GPT-4o Vision ora restituisce anche `items[]` (prodotti+prezzi) con categoria tra 11 ammesse; categorie non valide normalizzate a "Altro" lato server (`server/src/lib/categories.js`)
+  - Endpoint salvataggio scontrino + 4 endpoint analytics (vedi sotto)
+  - Frontend = Task 2 (non ancora fatto)
 - **Task 4 — test end-to-end locale (SQLite): ESEGUITO e superato**
   - `prisma migrate dev --name init` + `seed` eseguiti (2 utenti creati)
   - Test curl a–f tutti ✅ (health, login, EXPENSE, INCOME @25%, `tax-savings/summary` → `totalPending: 500`, lista transazioni)
@@ -71,10 +76,23 @@ Tutte le route (eccetto login) richiedono header `Authorization: Bearer <token>`
 - `PUT /:id/transfer` → marca come trasferito
 
 ### OCR (`/api/ocr`) — protetta
-- `POST /parse` → `multipart/form-data` campo `image` → GPT-4o Vision → JSON `{ importo, tipo, descrizione, data, metodo }`
+- `POST /parse` → `multipart/form-data` campo `image` → GPT-4o Vision → JSON `{ store, total, date, method, items: [{ rawName, canonicalName, category, quantity, unitPrice, totalPrice }], amount, type, description }`
+  - `amount`/`type`/`description` sono campi di compatibilità per il prefill del form transazione (amount=total, type="EXPENSE", description=store)
+  - `category` di ogni item è una delle 11 categorie ammesse; valori imprevisti → "Altro"
+  - notifica bancaria senza prodotti → `items: []`
+
+### Receipts (`/api/receipts`) — protette
+- `POST /` → body `{ store, total, date, method, transactionId?, items: [...] }` → crea `Receipt` + `ReceiptItem` (nested), opz. collega a una Transaction. Broadcast WS `receipt_update`. Gli item ereditano `store`/`date` dalla testata se mancanti; categoria normalizzata.
+- `GET /?store=&from=&to=` → scontrini con `items`, più recenti prima
+
+### Analytics (`/api/analytics`) — protette (sugli scontrini)
+- `GET /by-category?from=&to=` → `[{ category, total, count }]` (spesa per categoria)
+- `GET /product-trend?canonicalName=&from=&to=` → `[{ date, store, unitPrice, totalPrice }]` ordinato per data (storico prezzo prodotto)
+- `GET /by-store?from=&to=` → `[{ store, total, receiptCount }]`
+- `GET /top-products?limit=20&from=&to=` → `[{ canonicalName, category, totalSpent, timesBought, avgPrice }]` (prodotti su cui si spende di più)
 
 ## WebSocket
-Endpoint `ws://<host>/ws`. Eventi server→client per il sync real-time delle transazioni.
+Endpoint `ws://<host>/ws`. Eventi server→client per il sync real-time: `transaction_update` (transazioni) e `receipt_update` (scontrini).
 
 ## Struttura client (`/client/src`)
 - `lib/api.js` — istanza axios (baseURL `VITE_API_URL`), interceptor: aggiunge `Bearer` token, su 401 logout + redirect `/login`

@@ -18,6 +18,7 @@ model User {
   createdAt    DateTime      @default(now())
   transactions Transaction[]
   alerts       Alert[]
+  receipts     Receipt[]
 }
 
 model Transaction {
@@ -36,6 +37,7 @@ model Transaction {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   taxSaving   TaxSaving?
+  receipt     Receipt?
 }
 
 model TaxSaving {
@@ -69,4 +71,32 @@ enum PayMethod {
   POS
   CARD
   TRANSFER
+}
+
+model Receipt {
+  id            String        @id @default(cuid())
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+  store         String?
+  total         Float
+  date          DateTime
+  transactionId String?       @unique
+  transaction   Transaction?  @relation(fields: [transactionId], references: [id])
+  items         ReceiptItem[]
+  createdAt     DateTime      @default(now())
+}
+
+model ReceiptItem {
+  id            String   @id @default(cuid())
+  receiptId     String
+  receipt       Receipt  @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  rawName       String   // nome come appare sullo scontrino
+  canonicalName String   // nome normalizzato per il raggruppamento nel tempo
+  category      String   // categoria da lista fissa (vedi ALLOWED_CATEGORIES nel backend)
+  quantity      Float    @default(1)
+  unitPrice     Float?
+  totalPrice    Float
+  store         String?
+  date          DateTime
+  createdAt     DateTime @default(now())
 }

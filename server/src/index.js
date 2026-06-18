@@ -11,6 +11,8 @@ import authRouter from "./routes/auth.js";
 import transactionsRouter from "./routes/transactions.js";
 import taxSavingsRouter from "./routes/taxSavings.js";
 import ocrRouter from "./routes/ocr.js";
+import receiptsRouter from "./routes/receipts.js";
+import analyticsRouter from "./routes/analytics.js";
 
 dotenv.config();
 
@@ -32,6 +34,8 @@ app.use("/api/auth", authRouter);
 app.use("/api/transactions", transactionsRouter);
 app.use("/api/tax-savings", taxSavingsRouter);
 app.use("/api/ocr", ocrRouter);
+app.use("/api/receipts", receiptsRouter);
+app.use("/api/analytics", analyticsRouter);
 
 // --- HTTP + WebSocket server ---
 const server = http.createServer(app);
