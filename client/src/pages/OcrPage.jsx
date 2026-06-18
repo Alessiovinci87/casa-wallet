@@ -244,17 +244,17 @@ export default function OcrPage() {
               <button onClick={addItem} className="text-sm text-emerald-600 hover:underline">+ Aggiungi riga</button>
             </div>
             {draft.items.map((it) => (
-              <div key={it.clientId} className="flex gap-2 items-center text-sm">
+              <div key={it.clientId} className="flex flex-wrap gap-2 items-center text-sm border-b border-slate-50 pb-2 sm:border-0 sm:pb-0">
                 <input
                   value={it.rawName}
                   onChange={(e) => setItem(it.clientId, "rawName", e.target.value)}
                   placeholder="Prodotto"
-                  className="flex-1 px-2 py-1 border border-slate-300 rounded"
+                  className="w-full sm:flex-1 px-2 py-1 border border-slate-300 rounded"
                 />
                 <select
                   value={it.category}
                   onChange={(e) => setItem(it.clientId, "category", e.target.value)}
-                  className="px-1 py-1 border border-slate-300 rounded w-32"
+                  className="flex-1 sm:flex-none px-1 py-1 border border-slate-300 rounded sm:w-32"
                 >
                   {PRODUCT_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
@@ -272,7 +272,7 @@ export default function OcrPage() {
                   className="w-20 px-1 py-1 border border-slate-300 rounded"
                   title="Prezzo €"
                 />
-                <button onClick={() => removeItem(it.clientId)} className="text-slate-300 hover:text-rose-600" title="Elimina">✕</button>
+                <button onClick={() => removeItem(it.clientId)} className="text-slate-300 hover:text-rose-600 px-1" title="Elimina">✕</button>
               </div>
             ))}
             {draft.items.length === 0 && <p className="text-xs text-slate-400">Nessun prodotto. Aggiungine uno o registra solo il totale.</p>}

@@ -31,9 +31,9 @@ export default function TransactionsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Transazioni</h1>
-        <button onClick={openNew} className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700">
+        <button onClick={openNew} className="w-full sm:w-auto px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700">
           + Nuova transazione
         </button>
       </div>
