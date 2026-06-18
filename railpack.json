@@ -1,20 +1,11 @@
 {
   "$schema": "https://schema.railpack.com",
   "provider": "node",
-  "buildAptPackages": [],
   "steps": {
-    "install": {
-      "commands": [
-        "cd server && npm install"
-      ]
-    },
-    "build": {
-      "commands": [
-        "cd server && npx prisma generate"
-      ]
-    }
+    "install": { "commands": ["npm install"] },
+    "build": { "commands": ["npx prisma generate"] }
   },
   "deploy": {
-    "startCommand": "cd server && npx prisma db push && node prisma/seed.js && node src/index.js"
+    "startCommand": "npx prisma db push && node prisma/seed.js && node src/index.js"
   }
 }
