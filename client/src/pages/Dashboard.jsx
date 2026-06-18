@@ -10,9 +10,9 @@ const YEAR = now.getFullYear();
 
 function Card({ label, value, accent }) {
   return (
-    <div className="bg-white rounded-xl p-4 shadow-sm">
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className={`text-xl font-bold mt-1 ${accent}`}>{value}</div>
+    <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm text-center sm:text-left">
+      <div className="text-[11px] sm:text-xs text-slate-500 leading-tight">{label}</div>
+      <div className={`text-base sm:text-xl font-bold mt-1 break-words ${accent}`}>{value}</div>
     </div>
   );
 }
@@ -42,10 +42,18 @@ export default function Dashboard() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Riepilogo {String(MONTH).padStart(2, "0")}/{YEAR}</h1>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* Saldo mese in evidenza */}
+      <div className="bg-white rounded-xl p-6 shadow-sm text-center">
+        <div className="text-sm text-slate-500">Saldo mese</div>
+        <div className={`text-4xl sm:text-5xl font-bold mt-1 ${income - expense >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+          {eur(income - expense)}
+        </div>
+      </div>
+
+      {/* Dettaglio in riga orizzontale */}
+      <div className="grid grid-cols-3 gap-3">
         <Card label="Entrate mese" value={eur(income)} accent="text-emerald-600" />
         <Card label="Uscite mese" value={eur(expense)} accent="text-rose-600" />
-        <Card label="Saldo mese" value={eur(income - expense)} accent={income - expense >= 0 ? "text-emerald-600" : "text-rose-600"} />
         <Card label="Salvadanaio tasse" value={eur(summary?.totalPending)} accent="text-amber-600" />
       </div>
 
