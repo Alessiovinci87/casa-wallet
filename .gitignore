@@ -12,6 +12,16 @@ dist/
 # Prisma generated client
 **/node_modules/.prisma/
 
+# Local SQLite dev database
+*.db
+*.db-journal
+
+# Local Prisma migrations (SQLite, dev-only — production initializes via `prisma db push`)
+/server/prisma/migrations/
+
+# Runtime artifacts
+*.pid
+
 # OS / editor
 .DS_Store
 Thumbs.db

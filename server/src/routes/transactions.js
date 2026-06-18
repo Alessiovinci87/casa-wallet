@@ -8,6 +8,10 @@ import { broadcast } from "../lib/ws.js";
 const router = Router();
 router.use(authMiddleware);
 
+// Allowed values (SQLite has no native enums, so we validate here).
+const TX_TYPES = new Set(["INCOME", "EXPENSE"]);
+const PAY_METHODS = new Set(["CASH", "POS", "CARD", "TRANSFER"]);
+
 // A TaxSaving is created only for INCOME transactions with a positive taxPercent.
 function taxApplies(type, taxPercent) {
   return type === "INCOME" && typeof taxPercent === "number" && taxPercent > 0;
@@ -25,6 +29,12 @@ router.post("/", async (req, res) => {
 
   if (amount == null || !type || !category || !method || !date) {
     return res.status(400).json({ error: "Campi obbligatori mancanti (amount, type, category, method, date)" });
+  }
+  if (!TX_TYPES.has(type)) {
+    return res.status(400).json({ error: "type non valido (INCOME | EXPENSE)" });
+  }
+  if (!PAY_METHODS.has(method)) {
+    return res.status(400).json({ error: "method non valido (CASH | POS | CARD | TRANSFER)" });
   }
 
   const when = new Date(date);
@@ -99,6 +109,13 @@ router.put("/:id", async (req, res) => {
   const {
     amount, type, category, subcategory, method, description, date, taxPercent,
   } = req.body || {};
+
+  if (type && !TX_TYPES.has(type)) {
+    return res.status(400).json({ error: "type non valido (INCOME | EXPENSE)" });
+  }
+  if (method && !PAY_METHODS.has(method)) {
+    return res.status(400).json({ error: "method non valido (CASH | POS | CARD | TRANSFER)" });
+  }
 
   const nextAmount = amount ?? existing.amount;
   const nextType = type ?? existing.type;

@@ -2,7 +2,7 @@
 
 App di gestione economia domestica per 2 utenti fissi (Alessio e moglie).
 
-## Stato avanzamento (aggiornato 15 giugno 2026)
+## Stato avanzamento (aggiornato 18 giugno 2026)
 
 ### Completato ✅
 - Setup monorepo /client + /server
@@ -24,7 +24,7 @@ App di gestione economia domestica per 2 utenti fissi (Alessio e moglie).
 - [ ] Verifica manuale nel browser (login + UI) — ultimo residuo di Task 4
 - [ ] Configurare `OPENAI_API_KEY` (e riavviare il server) per testare l'OCR
 - [ ] Task 5: deploy Railway (PostgreSQL prod) + Vercel (client)
-  - Per la prod: rimettere `provider = "postgresql"` in schema.prisma e rigenerare la migration (quella attuale è SQLite-specifica)
+  - **Config preparata (18 giu 2026)** — vedi sezione "Deploy (produzione)" più sotto. Deploy manuale da dashboard ancora da eseguire.
 - [ ] Task 6: cron alert tasse mensile (Resend email)
 - [ ] Task 7: test end-to-end con entrambi gli utenti + WebSocket sync reale
 - [ ] Eventuale debounce filtro anno in TransactionsPage
@@ -92,3 +92,25 @@ Pubbliche: `/login`. Protette (PrivateRoute → Layout): `/` (Dashboard), `/tran
 
 ### Env client
 `VITE_API_URL`, `VITE_WS_URL` — vedi `/client/.env.example`.
+
+## Deploy (produzione)
+
+> Il deploy si fa manualmente dalle dashboard Railway e Vercel. I file di config sono già pronti nel repo.
+
+### Schema / provider — strategia dual-provider
+- **Committato (`origin/main`)**: `schema.prisma` con `provider = "postgresql"` + enum veri `TxType`/`PayMethod`. È la **sorgente di verità per la produzione**.
+- **Locale (dev)**: `schema.prisma` viene tenuto modificato a `provider = "sqlite"` + `type`/`method` come `String` — **modifica non committata** apposta. Idem la cartella `server/prisma/migrations/` e `dev.db`: locali, ignorati da git (`.gitignore`). Non committare l'override sqlite, romperebbe la prod.
+
+### Backend → Railway
+- `server/Procfile`, `server/railway.json` (NIXPACKS, `node src/index.js`, restart ON_FAILURE), `engines.node >=18`.
+- **Init DB al primo deploy**: eseguire `server/prisma/migrate-deploy.sh` →
+  - `npx prisma db push` (crea le tabelle Postgres direttamente dallo schema committato — non servono file di migration)
+  - `node prisma/seed.js` (crea i 2 utenti)
+- Variabili Railway da impostare: `DATABASE_URL` (Postgres del plugin Railway), `JWT_SECRET`, `OPENAI_API_KEY`, `RESEND_API_KEY`, `CLIENT_URL` (URL Vercel), `PORT` (Railway lo inietta), `SEED_USER*`.
+- `.sh` forzato a LF via `.gitattributes` (gira su Linux anche se committato da Windows).
+
+### Frontend → Vercel
+- `client/vercel.json` con rewrite SPA (`/(.*) → /index.html`) per React Router.
+- Variabili Vercel: `VITE_API_URL` (URL Railway), `VITE_WS_URL` (`wss://<railway-host>/ws`).
+
+> Nota: si è scelto `prisma db push` invece di `prisma migrate deploy` perché non esiste un Postgres locale per autorare migration e l'app (2 utenti) non necessita di storico migration. Se in futuro servisse, generare la migration Postgres offline con `prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script` e committarla.

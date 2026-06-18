@@ -5,6 +5,9 @@
   "type": "module",
   "description": "CasaWallet API server — Express + Prisma + WebSocket",
   "main": "src/index.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
