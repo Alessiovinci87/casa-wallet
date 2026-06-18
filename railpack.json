@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "provider": "node",
+  "packages": { "node": "20" },
+  "steps": {
+    "install": {
+      "commands": [
+        "npm --prefix server install"
+      ]
+    },
+    "build": {
+      "inputs": [{ "step": "install" }],
+      "commands": [
+        "npm --prefix server exec prisma generate"
+      ]
+    }
+  },
+  "deploy": {
+    "startCommand": "cd server && npx prisma db push && node prisma/seed.js && node src/index.js"
+  }
+}
