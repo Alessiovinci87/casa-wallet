@@ -5,6 +5,7 @@ import { useTaxStore } from "../store/taxStore.js";
 import { eur } from "../lib/format.js";
 import { PAY_METHOD_LABELS } from "../lib/constants.js";
 import BalanceTrendChart from "../components/BalanceTrendChart.jsx";
+import NotificationsToggle from "../components/NotificationsToggle.jsx";
 
 const now = new Date();
 const MONTH = now.getMonth() + 1;
@@ -55,6 +56,8 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Riepilogo {String(MONTH).padStart(2, "0")}/{YEAR}</h1>
+
+      <NotificationsToggle />
 
       {/* Saldo mese in evidenza (tasse accantonate escluse) */}
       <div className="bg-white rounded-xl p-6 shadow-sm text-center">

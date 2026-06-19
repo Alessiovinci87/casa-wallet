@@ -22,6 +22,7 @@ model User {
   recurringProducts RecurringProduct[]
   dismissals        ShoppingListDismissal[]
   categoryBudgets   CategoryBudget[]
+  pushSubscriptions PushSubscription[]
 }
 
 model Transaction {
@@ -138,4 +139,15 @@ model CategoryBudget {
   updatedAt DateTime @updatedAt
 
   @@unique([userId, category])
+}
+
+// Web Push (VAPID) subscription per device/browser. One user can have several.
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
 }

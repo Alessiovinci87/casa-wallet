@@ -3,6 +3,7 @@
 // TaxSaving table is not per-user), so every user gets the same figure.
 import { prisma } from "./prisma.js";
 import { sendEmail } from "./email.js";
+import { sendPushToAll } from "./push.js";
 
 const eur = (n) =>
   new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(n || 0);
@@ -36,6 +37,13 @@ export async function sendTaxAlert({ force = false } = {}) {
     </div>`;
 
   await sendEmail({ to: recipients, subject, html });
-  console.log(`[taxAlert] inviato a ${recipients.length} utenti, totale ${eur(totalPending)}`);
-  return { totalPending, recipients, sent: true };
+  // Same event also goes out as a Web Push notification to every device.
+  const push = await sendPushToAll({
+    title: "Promemoria tasse",
+    body: `${eur(totalPending)} accantonati da trasferire`,
+    url: "/tax-savings",
+  });
+
+  console.log(`[taxAlert] email a ${recipients.length} utenti, push:`, push, `totale ${eur(totalPending)}`);
+  return { totalPending, recipients, sent: true, push };
 }
