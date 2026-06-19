@@ -1,7 +1,8 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTransactionStore } from "../store/transactionStore.js";
 import { useTaxStore } from "../store/taxStore.js";
+import api from "../lib/api.js";
 import { eur } from "../lib/format.js";
 import { PAY_METHOD_LABELS } from "../lib/constants.js";
 import BalanceTrendChart from "../components/BalanceTrendChart.jsx";
@@ -10,6 +11,27 @@ import NotificationsToggle from "../components/NotificationsToggle.jsx";
 const now = new Date();
 const MONTH = now.getMonth() + 1;
 const YEAR = now.getFullYear();
+
+// Previous calendar month (handles January → December rollover).
+const prevDate = new Date(YEAR, MONTH - 2, 1);
+const PREV_MONTH = prevDate.getMonth() + 1;
+const PREV_YEAR = prevDate.getFullYear();
+
+// Percentage change current vs previous. null = no baseline (prev was 0).
+function pctChange(curr, prev) {
+  if (!prev) return curr ? null : 0;
+  return ((curr - prev) / prev) * 100;
+}
+
+// Colored arrow + percentage. goodWhenUp flips the green/red meaning.
+function Delta({ value, goodWhenUp }) {
+  if (value == null) return <span className="text-slate-400">n.d.</span>;
+  const flat = Math.abs(value) < 0.5;
+  const up = value > 0;
+  const color = flat ? "text-slate-400" : up === goodWhenUp ? "text-emerald-600" : "text-rose-600";
+  const arrow = flat ? "→" : up ? "▲" : "▼";
+  return <span className={`${color} font-medium`}>{arrow} {Math.abs(value).toFixed(0)}%</span>;
+}
 
 function Card({ label, value, accent, onClick }) {
   return (
@@ -28,11 +50,27 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { transactions, fetchTransactions } = useTransactionStore();
   const { summary, fetchSummary } = useTaxStore();
+  // Previous month totals, fetched separately so the store keeps the current month.
+  const [prev, setPrev] = useState(null);
 
   useEffect(() => {
     fetchTransactions({ month: MONTH, year: YEAR });
     fetchSummary();
   }, [fetchTransactions, fetchSummary]);
+
+  useEffect(() => {
+    api
+      .get("/api/transactions", { params: { month: PREV_MONTH, year: PREV_YEAR } })
+      .then(({ data }) => {
+        let income = 0, expense = 0, tax = 0;
+        for (const t of data) {
+          if (t.type === "INCOME") { income += t.amount; tax += t.taxAmount || 0; }
+          else { expense += t.amount; }
+        }
+        setPrev({ income, expense, tax });
+      })
+      .catch(() => setPrev(null));
+  }, []);
 
   const { income, expense, taxSetAside } = useMemo(() => {
     let income = 0, expense = 0, taxSetAside = 0;
@@ -81,6 +119,24 @@ export default function Dashboard() {
         <Card label="Tasse" value={eur(summary?.totalPending)} accent="text-amber-600"
           onClick={() => navigate("/tax-savings")} />
       </div>
+
+      {/* Confronto con il mese precedente */}
+      {prev && (
+        <div className="bg-white rounded-xl p-3 shadow-sm grid grid-cols-3 gap-2 text-center text-xs">
+          <div>
+            <div className="text-slate-400">Entrate vs mese prec.</div>
+            <Delta value={pctChange(income, prev.income)} goodWhenUp />
+          </div>
+          <div>
+            <div className="text-slate-400">Uscite vs mese prec.</div>
+            <Delta value={pctChange(expense, prev.expense)} goodWhenUp={false} />
+          </div>
+          <div>
+            <div className="text-slate-400">Tasse vs mese prec.</div>
+            <Delta value={pctChange(taxSetAside, prev.tax)} goodWhenUp={false} />
+          </div>
+        </div>
+      )}
 
       <BalanceTrendChart transactions={transactions} month={MONTH} year={YEAR} />
 
