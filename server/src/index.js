@@ -7,6 +7,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 
 import { initWebSocket } from "./lib/ws.js";
+import { startCronJobs } from "./jobs/cron.js";
 import authRouter from "./routes/auth.js";
 import transactionsRouter from "./routes/transactions.js";
 import taxSavingsRouter from "./routes/taxSavings.js";
@@ -61,4 +62,5 @@ initWebSocket(server);
 server.listen(PORT, () => {
   console.log(`[http] CasaWallet server listening on http://localhost:${PORT}`);
   console.log(`[ws]   WebSocket endpoint at ws://localhost:${PORT}/ws`);
+  startCronJobs();
 });

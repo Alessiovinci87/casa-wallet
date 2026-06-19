@@ -2,6 +2,7 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
+import { sendTaxAlert } from "../lib/taxAlert.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -57,6 +58,17 @@ router.put("/:id/transfer", async (req, res) => {
     data: { transferred: true, transferredAt: new Date() },
   });
   res.json(updated);
+});
+
+// POST /api/tax-savings/send-alert → invia subito l'email di promemoria tasse
+// (utile per testare il contenuto senza aspettare il cron mensile).
+router.post("/send-alert", async (_req, res) => {
+  try {
+    const result = await sendTaxAlert({ force: true });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message || "Invio alert fallito" });
+  }
 });
 
 export default router;
