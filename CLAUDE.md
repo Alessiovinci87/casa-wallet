@@ -86,6 +86,7 @@ Tutte le route (eccetto login) richiedono header `Authorization: Bearer <token>`
 - `GET /` → `{ totalPending, items }`
 - `GET /summary` → `{ totalPending, byMonth: [{month, year, amount, transferred}] }`
 - `PUT /:id/transfer` → marca come trasferito
+- `POST /send-alert` → invia subito l'email + push di promemoria tasse (per test; il cron lo fa il 1° del mese alle 09:00 Europe/Rome via `node-cron`, `server/src/jobs/cron.js`). Email via Resend (`lib/email.js`), push via VAPID (`lib/push.js`); entrambi no-op se le chiavi non sono configurate.
 
 ### OCR (`/api/ocr`) — protetta
 - `POST /parse` → `multipart/form-data` campo `images` (uno o più file; più file = sezioni di un unico scontrino lungo, unite in una sola chiamata GPT-4o) → JSON `{ store, total, date, method, items: [{ rawName, canonicalName, category, quantity, unitPrice, totalPrice }], amount, type, description }`
@@ -102,6 +103,17 @@ Tutte le route (eccetto login) richiedono header `Authorization: Bearer <token>`
 - `GET /product-trend?canonicalName=&from=&to=` → `[{ date, store, unitPrice, totalPrice }]` ordinato per data (storico prezzo prodotto)
 - `GET /by-store?from=&to=` → `[{ store, total, receiptCount }]`
 - `GET /top-products?limit=20&from=&to=` → `[{ canonicalName, category, totalSpent, timesBought, avgPrice }]` (prodotti su cui si spende di più)
+- `GET /store-comparison?from=&to=` → `[{ category, stores: [{ store, avgUnitPrice, count }], cheapest }]` (prezzo unitario medio per categoria nei vari negozi; solo categorie comprate in ≥2 store; `stores` ordinati dal più conveniente)
+
+### Budget per categoria (`/api/budgets`) — protette
+- `GET /` → `[{ id, category, amount, spent, percent, over }]` (budget dell'utente + spesa del mese corrente calcolata dalle transazioni EXPENSE della famiglia)
+- `POST /` → body `{ category, amount }`: upsert `CategoryBudget` (unique su userId+category)
+- `PUT /:id` → aggiorna `amount`; `DELETE /:id` → elimina
+
+### Push notifications (`/api/push`) — protette (Web Push / VAPID)
+- `GET /public-key` → `{ publicKey }` (chiave VAPID pubblica; `null` se non configurato)
+- `POST /subscribe` → body subscription `{ endpoint, keys: { p256dh, auth } }`: upsert `PushSubscription`
+- `POST /unsubscribe` → body `{ endpoint }`; `POST /test` → invia una push di prova a tutte le subscription
 
 ### Shopping list predittiva (`/api/shopping-list`) — protette
 - `GET /?onlyDue=true` → lista predittiva da `computeShoppingList(userId)`; ogni elemento: `{ canonicalName, category, timesBought, avgIntervalDays, lastPurchase, predictedNextPurchase, daysRemaining, isDue, isRecurring, avgPrice, lastStore }`. Ordinata per urgenza (due prima, poi `daysRemaining` crescente). `?onlyDue=true` filtra solo i prodotti da ricomprare.
@@ -150,7 +162,9 @@ Pubbliche: `/login`. Protette (PrivateRoute → Layout): `/` (Dashboard), `/tran
 - **Init DB al primo deploy**: eseguire `server/prisma/migrate-deploy.sh` →
   - `npx prisma db push` (crea le tabelle Postgres direttamente dallo schema committato — non servono file di migration)
   - `node prisma/seed.js` (crea i 2 utenti)
-- Variabili Railway da impostare: `DATABASE_URL` (Postgres del plugin Railway), `JWT_SECRET`, `OPENAI_API_KEY`, `RESEND_API_KEY`, `CLIENT_URL` (URL Vercel), `PORT` (Railway lo inietta), `SEED_USER*`.
+- Variabili Railway da impostare: `DATABASE_URL` (Postgres del plugin Railway), `JWT_SECRET`, `OPENAI_API_KEY`, `RESEND_API_KEY`, `RESEND_FROM` (mittente, opz.), `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (es. `mailto:...`, per le push), `CLIENT_URL` (URL Vercel), `PORT` (Railway lo inietta), `SEED_USER*`.
+  - Le chiavi VAPID si generano con `node -e "console.log(require('web-push').generateVAPIDKeys())"`.
+  - Al deploy che introduce i modelli `CategoryBudget` e `PushSubscription` rieseguire `npx prisma db push` per crearne le tabelle.
 - `.sh` forzato a LF via `.gitattributes` (gira su Linux anche se committato da Windows).
 
 ### Frontend → Vercel
