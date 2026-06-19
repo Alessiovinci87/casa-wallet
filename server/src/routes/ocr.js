@@ -50,11 +50,12 @@ const SYSTEM_PROMPT =
   "- Le righe che iniziano (o contengono come voce) 'Sconto', 'Sconto Carta', 'C.Insieme', " +
   "'STORNO', 'CORR:', 'SUBTOTALE', 'TOTALE', 'PAGAMENTO', 'RESTO', 'CONTANTE', 'CARTA', 'IVA', " +
   "'NUMERO ARTICOLI', 'PUNTI' NON sono prodotti: escludile dagli items.\n" +
-  "- quantity: di default 1. Metti quantity > 1 SOLO se lo scontrino mostra esplicitamente una " +
-  "moltiplicazione (es. '2 x 1,82'). NON dedurre la quantità dal prezzo.\n" +
-  "- unitPrice: il prezzo unitario solo se mostrato esplicitamente (es. in '2 x 1,82' → 1,82), " +
-  "altrimenti null. totalPrice: il prezzo della riga effettivamente addebitato; se non leggibile " +
-  "con certezza metti null.\n" +
+  "- quantity = 1 SEMPRE, di default. Imposta quantity > 1 SOLO se sullo scontrino c'è una " +
+  "moltiplicazione ESPLICITA scritta (es. '3 x 1,50' oppure 'n.3'). In ogni altro caso quantity = 1. " +
+  "NON dedurre MAI la quantità dal prezzo o dal contesto.\n" +
+  "- unitPrice: il prezzo unitario SOLO se è presente una moltiplicazione esplicita (es. in " +
+  "'3 x 1,50' → 1,50); altrimenti null. totalPrice: il prezzo della riga effettivamente addebitato; " +
+  "se non leggibile con certezza metti null.\n" +
   "- total: il valore stampato accanto a 'TOTALE COMPLESSIVO' (o 'TOTALE') in fondo allo scontrino. " +
   "NON calcolarlo tu sommando le righe.\n" +
   "- canonicalName DEVE essere coerente per lo stesso prodotto anche se rawName cambia (stesso " +
@@ -64,6 +65,93 @@ const SYSTEM_PROMPT =
   "sovrapposizione, e usa il totale stampato (non sommare le sezioni).\n" +
   "- Se l'immagine è una notifica bancaria senza elenco prodotti, restituisci items: [].\n" +
   "Rispondi SOLO con il JSON, nessun testo aggiuntivo.";
+
+// Second-pass prompt: re-read ONLY the prices against the same image, given the
+// first-pass list and the declared total, to catch misread digits.
+const VERIFY_SYSTEM_PROMPT =
+  "Sei un verificatore di prezzi di scontrini italiani. Ricevi l'immagine dello scontrino e una " +
+  "lista di prodotti già estratti, ciascuno con un id, il nome e il prezzo letto.\n" +
+  "Compito: verifica OGNI prezzo confrontandolo con l'immagine, riga per riga. Sullo scontrino i " +
+  "prezzi sono nella colonna a DESTRA di ogni riga prodotto. Correggi i prezzi sbagliati leggendo con " +
+  "attenzione le cifre (occhio a coppie facilmente confuse: 3/8, 5/6, 0/6/8, 1/7, e alla virgola dei " +
+  "decimali).\n" +
+  "La somma dei prezzi dei prodotti (al netto degli sconti) deve AVVICINARSI al TOTALE COMPLESSIVO " +
+  "dichiarato. Se la somma non torna, rileggi con più attenzione le righe dove il prezzo è dubbio.\n" +
+  "Per un prezzo davvero illeggibile usa null, MAI un numero inventato.\n" +
+  "NON aggiungere e NON togliere righe: restituisci esattamente gli stessi id ricevuti.\n" +
+  'Rispondi SOLO con JSON in questo formato: {"items":[{"id":number,"totalPrice":number|null}]}';
+
+// PASS 1 — extract the full receipt (store, total, date, method, items).
+async function extractReceipt(openai, imageParts, multiImage) {
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o",
+    response_format: { type: "json_object" },
+    temperature: 0,
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: multiImage
+              ? "Queste immagini sono sezioni di un unico scontrino: estrai i dati e l'elenco prodotti unendole."
+              : "Estrai i dati e l'elenco prodotti da questo scontrino.",
+          },
+          ...imageParts,
+        ],
+      },
+    ],
+  });
+  return JSON.parse(completion.choices[0]?.message?.content || "{}");
+}
+
+// PASS 2 — re-verify the line prices against the same image. Returns a Map
+// id → corrected totalPrice (number | null). On any failure returns null so the
+// caller keeps the first-pass prices.
+async function verifyPrices(openai, imageParts, items, declaredTotal) {
+  const list = items.map((it, id) => ({ id, name: it.rawName ?? it.canonicalName ?? "", totalPrice: it.totalPrice }));
+  const totalText = typeof declaredTotal === "number" ? `${declaredTotal.toFixed(2)}€` : "non disponibile";
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      response_format: { type: "json_object" },
+      temperature: 0,
+      messages: [
+        { role: "system", content: VERIFY_SYSTEM_PROMPT },
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text:
+                `TOTALE COMPLESSIVO dichiarato: ${totalText}.\n` +
+                `Lista prodotti estratti (id, nome, prezzo letto):\n` +
+                JSON.stringify(list) +
+                `\nVerifica e correggi i prezzi confrontandoli con l'immagine.`,
+            },
+            ...imageParts,
+          ],
+        },
+      ],
+    });
+
+    const parsed = JSON.parse(completion.choices[0]?.message?.content || "{}");
+    if (!Array.isArray(parsed.items)) return null;
+
+    const corrections = new Map();
+    for (const c of parsed.items) {
+      if (typeof c?.id === "number") {
+        corrections.set(c.id, typeof c.totalPrice === "number" ? c.totalPrice : null);
+      }
+    }
+    return corrections;
+  } catch (err) {
+    console.error("[ocr] verify pass failed, keeping pass-1 prices:", err.message);
+    return null;
+  }
+}
 
 // POST /api/ocr/parse — multipart/form-data, field "images" (one or many)
 router.post("/parse", upload.array("images", 12), async (req, res) => {
@@ -88,53 +176,47 @@ router.post("/parse", upload.array("images", 12), async (req, res) => {
   }));
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
-      response_format: { type: "json_object" },
-      temperature: 0, // deterministico: nessuna "creatività" sui numeri
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text:
-                files.length > 1
-                  ? `Queste ${files.length} immagini sono sezioni di un unico scontrino: estrai i dati e l'elenco prodotti unendole.`
-                  : "Estrai i dati e l'elenco prodotti da questo scontrino.",
-            },
-            ...imageParts,
-          ],
-        },
-      ],
-    });
-
-    const raw = completion.choices[0]?.message?.content || "{}";
+    // PASS 1 — extraction.
     let parsed;
     try {
-      parsed = JSON.parse(raw);
+      parsed = await extractReceipt(openai, imageParts, files.length > 1);
     } catch {
-      return res.status(502).json({ error: "Risposta OCR non in formato JSON", raw });
+      return res.status(502).json({ error: "Risposta OCR non in formato JSON" });
     }
 
-    // Normalize items: clamp categories to the allowed list, default quantity,
-    // and PRESERVE null prices (a null is a deliberate "non leggibile", never 0).
-    const items = Array.isArray(parsed.items)
-      ? parsed.items.map((it) => ({
-          rawName: it.rawName ?? null,
-          canonicalName: it.canonicalName ?? it.rawName ?? null,
-          category: normalizeCategory(it.category),
-          quantity: it.quantity ?? 1,
-          unitPrice: typeof it.unitPrice === "number" ? it.unitPrice : null,
-          totalPrice: typeof it.totalPrice === "number" ? it.totalPrice : null,
-        }))
+    // Normalize items: clamp categories, PRESERVE null prices (never 0), and
+    // FIX 1 — force quantity to 1 unless there is an explicit multiplication
+    // (which is the only case the model returns a unitPrice). This kills
+    // invented quantities like acqua "4" / latte "4".
+    let items = Array.isArray(parsed.items)
+      ? parsed.items.map((it) => {
+          const hasExplicitMultiplier =
+            typeof it.unitPrice === "number" && Number(it.quantity) > 1;
+          return {
+            rawName: it.rawName ?? null,
+            canonicalName: it.canonicalName ?? it.rawName ?? null,
+            category: normalizeCategory(it.category),
+            quantity: hasExplicitMultiplier ? Number(it.quantity) : 1,
+            unitPrice: hasExplicitMultiplier ? it.unitPrice : null,
+            totalPrice: typeof it.totalPrice === "number" ? it.totalPrice : null,
+          };
+        })
       : [];
 
     const total = typeof parsed.total === "number" ? parsed.total : null;
 
-    // Reconciliation: sum the readable line prices and flag a likely
-    // incomplete/inaccurate extraction so the UI can warn the user.
+    // PASS 2 — re-verify prices against the same image (only when there are
+    // products to verify). Merge corrections by id; keep pass-1 on failure.
+    if (items.length > 0) {
+      const corrections = await verifyPrices(openai, imageParts, items, total);
+      if (corrections) {
+        items = items.map((it, id) =>
+          corrections.has(id) ? { ...it, totalPrice: corrections.get(id) } : it
+        );
+      }
+    }
+
+    // PASS 3 — reconciliation + confidence scoring.
     const itemsSum = items.reduce(
       (sum, it) => sum + (typeof it.totalPrice === "number" ? it.totalPrice : 0),
       0
@@ -142,12 +224,18 @@ router.post("/parse", upload.array("images", 12), async (req, res) => {
     const computedItemsTotal = Math.round(itemsSum * 100) / 100;
     const nullPriceCount = items.filter((it) => it.totalPrice == null).length;
 
-    let warning = null;
-    if (total && total > 0 && Math.abs(itemsSum - total) / total > 0.1) {
-      warning = "incomplete_or_inaccurate";
-    } else if (nullPriceCount > 0) {
-      warning = "incomplete_or_inaccurate";
+    let confidence = "low";
+    if (total && total > 0) {
+      const ratio = Math.abs(itemsSum - total) / total;
+      if (ratio <= 0.05) confidence = "high";
+      else if (ratio <= 0.15) confidence = "medium";
+      else confidence = "low";
     }
+    // Null prices erode confidence regardless of the sum.
+    if (nullPriceCount > 0 && confidence === "high") confidence = "medium";
+    if (nullPriceCount >= 3) confidence = "low";
+
+    const warning = confidence === "low" ? "incomplete_or_inaccurate" : null;
 
     res.json({
       store: parsed.store ?? null,
@@ -159,6 +247,7 @@ router.post("/parse", upload.array("images", 12), async (req, res) => {
       computedItemsTotal,
       declaredTotal: total,
       nullPriceCount,
+      confidence,
       warning,
       // Backward-compatible fields so the existing transaction form can pre-fill.
       amount: total,

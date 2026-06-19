@@ -8,6 +8,17 @@ import { eur } from "../lib/format.js";
 // A line has no usable price yet (OCR returned null, or the user cleared it).
 const missingPrice = (it) => it.totalPrice == null || it.totalPrice === "";
 
+// A single line costing more than the whole receipt is almost surely a misread.
+const suspiciousPrice = (it, total) =>
+  !missingPrice(it) && total > 0 && Number(it.totalPrice) > total + 0.01;
+
+// Confidence indicator styling from the server's two-pass reconciliation.
+const CONFIDENCE_UI = {
+  high: { cls: "bg-emerald-50 border-emerald-300 text-emerald-800", label: "Lettura affidabile" },
+  medium: { cls: "bg-amber-50 border-amber-300 text-amber-800", label: "Verifica consigliata" },
+  low: { cls: "bg-rose-50 border-rose-300 text-rose-700", label: "Controlla i prezzi, lettura incerta" },
+};
+
 let nextId = 1;
 const newId = () => nextId++;
 
@@ -51,8 +62,9 @@ export default function OcrPage() {
         date: data.date ? dayjs(data.date).format("YYYY-MM-DD") : todayISO(),
         method: data.method && PAY_METHODS.includes(data.method) ? data.method : "CARD",
         category: "Spesa",
-        // Server warning when items don't reconcile with the printed total.
+        // Server warning + two-pass confidence (high | medium | low).
         warning: data.warning ?? null,
+        confidence: data.confidence ?? null,
         items: (data.items || []).map((it) => ({
           clientId: newId(),
           rawName: it.rawName ?? it.canonicalName ?? "",
@@ -226,6 +238,13 @@ export default function OcrPage() {
         <div className="space-y-4">
           <p className="text-sm text-slate-500">Controlla e correggi prima di registrare. Il saldo verrà scalato una sola volta sul <b>Totale</b>.</p>
 
+          {/* Two-pass confidence indicator */}
+          {draft.confidence && CONFIDENCE_UI[draft.confidence] && (
+            <div className={`text-sm rounded-lg p-3 border font-medium ${CONFIDENCE_UI[draft.confidence].cls}`}>
+              {draft.confidence === "high" ? "✓ " : "⚠️ "}{CONFIDENCE_UI[draft.confidence].label}
+            </div>
+          )}
+
           {/* Warning banner when the OCR extraction is likely incomplete/inaccurate */}
           {(draft.warning || missingCount > 0) && (
             <div className="text-sm bg-amber-50 border border-amber-300 text-amber-800 rounded-lg p-3">
@@ -278,10 +297,16 @@ export default function OcrPage() {
             </div>
             {draft.items.map((it) => {
               const noPrice = missingPrice(it);
+              const suspicious = suspiciousPrice(it, totalNum);
+              const rowCls = noPrice
+                ? "bg-amber-50 ring-1 ring-amber-300"
+                : suspicious
+                  ? "bg-rose-50 ring-1 ring-rose-300"
+                  : "border-b border-slate-50 sm:border-0";
               return (
                 <div
                   key={it.clientId}
-                  className={`flex flex-wrap gap-2 items-center text-sm rounded p-1.5 ${noPrice ? "bg-amber-50 ring-1 ring-amber-300" : "border-b border-slate-50 sm:border-0"}`}
+                  className={`flex flex-wrap gap-2 items-center text-sm rounded p-1.5 ${rowCls}`}
                 >
                   <input
                     value={it.rawName}
@@ -308,8 +333,8 @@ export default function OcrPage() {
                     value={it.totalPrice ?? ""}
                     onChange={(e) => setItem(it.clientId, "totalPrice", e.target.value)}
                     placeholder={noPrice ? "da inserire" : "€"}
-                    className={`w-24 px-2 py-1.5 border rounded text-right ${noPrice ? "border-amber-400 bg-white placeholder-amber-500" : "border-slate-300"}`}
-                    title="Prezzo €"
+                    className={`w-24 px-2 py-1.5 border rounded text-right ${noPrice ? "border-amber-400 bg-white placeholder-amber-500" : suspicious ? "border-rose-400 bg-white" : "border-slate-300"}`}
+                    title={suspicious ? "Prezzo sospetto: supera il totale" : "Prezzo €"}
                   />
                   <button onClick={() => removeItem(it.clientId)} className="text-slate-300 hover:text-rose-600 px-1" title="Elimina">✕</button>
                 </div>
