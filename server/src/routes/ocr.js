@@ -205,30 +205,47 @@ router.post("/parse", upload.array("images", 12), async (req, res) => {
 
     const total = typeof parsed.total === "number" ? parsed.total : null;
 
-    // PASS 2 — re-verify prices against the same image (only when there are
-    // products to verify). Merge corrections by id; keep pass-1 on failure.
-    if (items.length > 0) {
+    // Reconciliation snapshot over the current items vs the declared total.
+    const reconcile = () => {
+      const sum = items.reduce(
+        (s, it) => s + (typeof it.totalPrice === "number" ? it.totalPrice : 0),
+        0
+      );
+      const nullCount = items.filter((it) => it.totalPrice == null).length;
+      const ratio = total && total > 0 ? Math.abs(sum - total) / total : null;
+      return { sum, nullCount, ratio };
+    };
+
+    // PASS 2 — re-verify prices, but ONLY when the first pass doesn't already
+    // reconcile within 5% and has no null prices. Cost optimization: skips one
+    // Vision call when pass 1 is already trustworthy.
+    const pass1 = reconcile();
+    const needsVerify =
+      items.length > 0 &&
+      (pass1.ratio === null || pass1.ratio > 0.05 || pass1.nullCount > 0);
+
+    if (needsVerify) {
       const corrections = await verifyPrices(openai, imageParts, items, total);
       if (corrections) {
         items = items.map((it, id) =>
           corrections.has(id) ? { ...it, totalPrice: corrections.get(id) } : it
         );
       }
+      const ratioStr = pass1.ratio === null ? "n/d" : `${(pass1.ratio * 100).toFixed(1)}%`;
+      console.log(`[ocr] PASS 2 eseguito (pass1 scarto ${ratioStr}, null ${pass1.nullCount})`);
+    } else {
+      const ratioStr = pass1.ratio === null ? "n/d" : `${(pass1.ratio * 100).toFixed(1)}%`;
+      console.log(`[ocr] PASS 2 saltato — pass1 riconcilia entro il 5% (scarto ${ratioStr})`);
     }
 
-    // PASS 3 — reconciliation + confidence scoring.
-    const itemsSum = items.reduce(
-      (sum, it) => sum + (typeof it.totalPrice === "number" ? it.totalPrice : 0),
-      0
-    );
+    // PASS 3 — final reconciliation + confidence scoring.
+    const { sum: itemsSum, nullCount: nullPriceCount, ratio: finalRatio } = reconcile();
     const computedItemsTotal = Math.round(itemsSum * 100) / 100;
-    const nullPriceCount = items.filter((it) => it.totalPrice == null).length;
 
     let confidence = "low";
-    if (total && total > 0) {
-      const ratio = Math.abs(itemsSum - total) / total;
-      if (ratio <= 0.05) confidence = "high";
-      else if (ratio <= 0.15) confidence = "medium";
+    if (finalRatio !== null) {
+      if (finalRatio <= 0.05) confidence = "high";
+      else if (finalRatio <= 0.15) confidence = "medium";
       else confidence = "low";
     }
     // Null prices erode confidence regardless of the sum.
