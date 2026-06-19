@@ -4,6 +4,7 @@ import { useTransactionStore } from "../store/transactionStore.js";
 import { useTaxStore } from "../store/taxStore.js";
 import { eur } from "../lib/format.js";
 import { PAY_METHOD_LABELS } from "../lib/constants.js";
+import BalanceTrendChart from "../components/BalanceTrendChart.jsx";
 
 const now = new Date();
 const MONTH = now.getMonth() + 1;
@@ -77,6 +78,8 @@ export default function Dashboard() {
         <Card label="Tasse" value={eur(summary?.totalPending)} accent="text-amber-600"
           onClick={() => navigate("/tax-savings")} />
       </div>
+
+      <BalanceTrendChart transactions={transactions} month={MONTH} year={YEAR} />
 
       <div className="bg-white rounded-xl p-4 shadow-sm">
         <h2 className="text-sm font-semibold text-slate-600 mb-3">Entrate vs Uscite</h2>
