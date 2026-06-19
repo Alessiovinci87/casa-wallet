@@ -11,6 +11,7 @@ import OcrPage from "./pages/OcrPage.jsx";
 import AnalyticsPage from "./pages/AnalyticsPage.jsx";
 import ShoppingListPage from "./pages/ShoppingListPage.jsx";
 import BudgetsPage from "./pages/BudgetsPage.jsx";
+import SummaryPage from "./pages/SummaryPage.jsx";
 
 function App() {
   const loadFromStorage = useAuthStore((s) => s.loadFromStorage);
@@ -49,6 +50,7 @@ function App() {
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/shopping-list" element={<ShoppingListPage />} />
           <Route path="/budgets" element={<BudgetsPage />} />
+          <Route path="/summary" element={<SummaryPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
