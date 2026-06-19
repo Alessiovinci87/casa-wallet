@@ -6,6 +6,7 @@ export const useAnalyticsStore = create((set, get) => ({
   byCategory: [],
   byStore: [],
   topProducts: [],
+  storeComparison: [], // [{ category, stores: [...], cheapest }]
   trend: null, // { canonicalName, rows: [...] }
   loading: false,
   range: {},
@@ -17,15 +18,17 @@ export const useAnalyticsStore = create((set, get) => ({
     );
     set({ loading: true, range: active });
     try {
-      const [byCategory, byStore, topProducts] = await Promise.all([
+      const [byCategory, byStore, topProducts, storeComparison] = await Promise.all([
         api.get("/api/analytics/by-category", { params }),
         api.get("/api/analytics/by-store", { params }),
         api.get("/api/analytics/top-products", { params: { ...params, limit: 30 } }),
+        api.get("/api/analytics/store-comparison", { params }),
       ]);
       set({
         byCategory: byCategory.data,
         byStore: byStore.data,
         topProducts: topProducts.data,
+        storeComparison: storeComparison.data,
       });
     } finally {
       set({ loading: false });

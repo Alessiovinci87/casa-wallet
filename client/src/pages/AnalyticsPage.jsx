@@ -11,7 +11,7 @@ const PRESETS = {
 };
 
 export default function AnalyticsPage() {
-  const { byCategory, byStore, topProducts, trend, loading, fetchAll, fetchTrend, clearTrend } = useAnalyticsStore();
+  const { byCategory, byStore, topProducts, storeComparison, trend, loading, fetchAll, fetchTrend, clearTrend } = useAnalyticsStore();
   const [preset, setPreset] = useState("q");
   const [custom, setCustom] = useState({ from: "", to: "" });
 
@@ -83,6 +83,39 @@ export default function AnalyticsPage() {
           </div>
         )}
       </section>
+
+      {/* Dove conviene comprare (confronto prezzo medio per categoria tra negozi) */}
+      {storeComparison.length > 0 && (
+        <section className="bg-white rounded-xl p-4 shadow-sm">
+          <h2 className="font-semibold mb-1">Dove conviene comprare</h2>
+          <p className="text-xs text-slate-400 mb-3">
+            Prezzo unitario medio per categoria nei vari negozi. In verde il più conveniente.
+          </p>
+          <div className="space-y-4">
+            {storeComparison.map((c) => (
+              <div key={c.category}>
+                <div className="flex items-center justify-between text-sm mb-1">
+                  <span className="font-medium">{c.category}</span>
+                  <span className="text-emerald-600 text-xs">
+                    Conviene: <span className="font-semibold">{c.cheapest}</span>
+                  </span>
+                </div>
+                <div className="divide-y divide-slate-100 text-sm">
+                  {c.stores.map((s, i) => (
+                    <div
+                      key={s.store}
+                      className={`py-1 flex justify-between ${i === 0 ? "text-emerald-600 font-medium" : "text-slate-600"}`}
+                    >
+                      <span>{i === 0 ? "✓ " : ""}{s.store} <span className="text-slate-400 font-normal">· {s.count} acquisti</span></span>
+                      <span>{eur(s.avgUnitPrice)}/u</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Top prodotti */}
       <section className="bg-white rounded-xl p-4 shadow-sm">

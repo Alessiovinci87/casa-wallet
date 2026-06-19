@@ -103,4 +103,40 @@ router.get("/top-products", async (req, res) => {
   res.json(result);
 });
 
+// GET /api/analytics/store-comparison?from=&to=
+//   → [{ category, stores: [{ store, avgUnitPrice, count }], cheapest }]
+//   Solo categorie comprate in ≥2 store (dove un confronto ha senso). Ordina i
+//   negozi dal prezzo unitario medio più basso → indica quale conviene.
+router.get("/store-comparison", async (req, res) => {
+  const range = dateRange(req.query.from, req.query.to);
+  const grouped = await prisma.receiptItem.groupBy({
+    by: ["category", "store"],
+    where: {
+      ...(range ? { date: range } : {}),
+      unitPrice: { not: null },
+      store: { not: null },
+    },
+    _avg: { unitPrice: true },
+    _count: { _all: true },
+  });
+
+  const byCat = new Map();
+  for (const g of grouped) {
+    if (g._avg.unitPrice == null) continue;
+    const list = byCat.get(g.category) || [];
+    list.push({ store: g.store, avgUnitPrice: g._avg.unitPrice, count: g._count._all });
+    byCat.set(g.category, list);
+  }
+
+  const result = [...byCat.entries()]
+    .map(([category, stores]) => {
+      stores.sort((a, b) => a.avgUnitPrice - b.avgUnitPrice);
+      return { category, stores, cheapest: stores[0]?.store ?? null };
+    })
+    .filter((c) => c.stores.length >= 2)
+    .sort((a, b) => a.category.localeCompare(b.category));
+
+  res.json(result);
+});
+
 export default router;
