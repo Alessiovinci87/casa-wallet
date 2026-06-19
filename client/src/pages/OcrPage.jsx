@@ -3,6 +3,10 @@ import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import { useReceiptStore } from "../store/receiptStore.js";
 import { CATEGORIES, PAY_METHODS, PAY_METHOD_LABELS, PRODUCT_CATEGORIES } from "../lib/constants.js";
+import { eur } from "../lib/format.js";
+
+// A line has no usable price yet (OCR returned null, or the user cleared it).
+const missingPrice = (it) => it.totalPrice == null || it.totalPrice === "";
 
 let nextId = 1;
 const newId = () => nextId++;
@@ -47,13 +51,16 @@ export default function OcrPage() {
         date: data.date ? dayjs(data.date).format("YYYY-MM-DD") : todayISO(),
         method: data.method && PAY_METHODS.includes(data.method) ? data.method : "CARD",
         category: "Spesa",
+        // Server warning when items don't reconcile with the printed total.
+        warning: data.warning ?? null,
         items: (data.items || []).map((it) => ({
           clientId: newId(),
           rawName: it.rawName ?? it.canonicalName ?? "",
           canonicalName: it.canonicalName ?? it.rawName ?? "",
           category: PRODUCT_CATEGORIES.includes(it.category) ? it.category : "Altro",
           quantity: it.quantity ?? 1,
-          totalPrice: it.totalPrice ?? 0,
+          // Keep null prices null (highlighted "da inserire"), never silently 0.
+          totalPrice: typeof it.totalPrice === "number" ? it.totalPrice : null,
         })),
       });
       setPhase("confirm");
@@ -76,7 +83,7 @@ export default function OcrPage() {
       ...d,
       items: [
         ...d.items,
-        { clientId: newId(), rawName: "", canonicalName: "", category: "Altro", quantity: 1, totalPrice: 0 },
+        { clientId: newId(), rawName: "", canonicalName: "", category: "Altro", quantity: 1, totalPrice: null },
       ],
     }));
 
@@ -89,14 +96,18 @@ export default function OcrPage() {
         date: draft.date,
         method: draft.method,
         category: draft.category,
-        items: draft.items.map((it) => ({
-          rawName: it.rawName,
-          canonicalName: (it.canonicalName || it.rawName || "").trim().toLowerCase(),
-          category: it.category,
-          quantity: Number(it.quantity) || 1,
-          unitPrice: Number(it.quantity) ? Number(it.totalPrice) / Number(it.quantity) : null,
-          totalPrice: Number(it.totalPrice) || 0,
-        })),
+        items: draft.items.map((it) => {
+          const qty = Number(it.quantity) || 1;
+          const price = missingPrice(it) ? 0 : Number(it.totalPrice) || 0;
+          return {
+            rawName: it.rawName,
+            canonicalName: (it.canonicalName || it.rawName || "").trim().toLowerCase(),
+            category: it.category,
+            quantity: qty,
+            unitPrice: price ? price / qty : null,
+            totalPrice: price,
+          };
+        }),
       });
       shots.forEach((s) => URL.revokeObjectURL(s.url));
       setSuccess(true);
@@ -113,6 +124,12 @@ export default function OcrPage() {
     setPhase("capture");
     setError("");
   };
+
+  // Live reconciliation between the editable product lines and the receipt total.
+  const itemsSum = draft ? draft.items.reduce((s, it) => s + (Number(it.totalPrice) || 0), 0) : 0;
+  const totalNum = Number(draft?.total) || 0;
+  const reconciles = Math.abs(itemsSum - totalNum) <= 0.01;
+  const missingCount = draft ? draft.items.filter(missingPrice).length : 0;
 
   if (success) {
     return (
@@ -207,7 +224,24 @@ export default function OcrPage() {
 
       {phase === "confirm" && draft && (
         <div className="space-y-4">
-          <p className="text-sm text-slate-500">Controlla e correggi prima di registrare. Il saldo verrà scalato una sola volta.</p>
+          <p className="text-sm text-slate-500">Controlla e correggi prima di registrare. Il saldo verrà scalato una sola volta sul <b>Totale</b>.</p>
+
+          {/* Warning banner when the OCR extraction is likely incomplete/inaccurate */}
+          {(draft.warning || missingCount > 0) && (
+            <div className="text-sm bg-amber-50 border border-amber-300 text-amber-800 rounded-lg p-3">
+              ⚠️ Verifica i prodotti: alcuni prezzi o righe potrebbero essere errati o mancanti
+              {missingCount > 0 ? ` (${missingCount} senza prezzo)` : ""}. Il <b>Totale</b> in fondo
+              allo scontrino è affidabile: correggi pure i prodotti con calma, la contabilità usa il Totale.
+            </div>
+          )}
+
+          {/* Live reconciliation: products sum vs receipt total */}
+          <div className={`text-sm rounded-lg p-3 flex flex-wrap items-center justify-between gap-2 ${reconciles ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-700"}`}>
+            <span>Somma prodotti: <b>{eur(itemsSum)}</b> · Totale scontrino: <b>{eur(totalNum)}</b></span>
+            <span className="font-semibold">
+              {reconciles ? "✓ Quadra" : `Differenza ${eur(Math.abs(itemsSum - totalNum))}`}
+            </span>
+          </div>
 
           {/* Header fields */}
           <div className="bg-white rounded-xl p-4 shadow-sm grid grid-cols-2 gap-3 text-sm">
@@ -241,41 +275,55 @@ export default function OcrPage() {
           <div className="bg-white rounded-xl p-4 shadow-sm space-y-2">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-sm">Prodotti ({draft.items.length})</h2>
-              <button onClick={addItem} className="text-sm text-emerald-600 hover:underline">+ Aggiungi riga</button>
             </div>
-            {draft.items.map((it) => (
-              <div key={it.clientId} className="flex flex-wrap gap-2 items-center text-sm border-b border-slate-50 pb-2 sm:border-0 sm:pb-0">
-                <input
-                  value={it.rawName}
-                  onChange={(e) => setItem(it.clientId, "rawName", e.target.value)}
-                  placeholder="Prodotto"
-                  className="w-full sm:flex-1 px-2 py-1 border border-slate-300 rounded"
-                />
-                <select
-                  value={it.category}
-                  onChange={(e) => setItem(it.clientId, "category", e.target.value)}
-                  className="flex-1 sm:flex-none px-1 py-1 border border-slate-300 rounded sm:w-32"
+            {draft.items.map((it) => {
+              const noPrice = missingPrice(it);
+              return (
+                <div
+                  key={it.clientId}
+                  className={`flex flex-wrap gap-2 items-center text-sm rounded p-1.5 ${noPrice ? "bg-amber-50 ring-1 ring-amber-300" : "border-b border-slate-50 sm:border-0"}`}
                 >
-                  {PRODUCT_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-                <input
-                  type="number" step="1" min="0"
-                  value={it.quantity}
-                  onChange={(e) => setItem(it.clientId, "quantity", e.target.value)}
-                  className="w-14 px-1 py-1 border border-slate-300 rounded"
-                  title="Quantità"
-                />
-                <input
-                  type="number" step="0.01" min="0"
-                  value={it.totalPrice}
-                  onChange={(e) => setItem(it.clientId, "totalPrice", e.target.value)}
-                  className="w-20 px-1 py-1 border border-slate-300 rounded"
-                  title="Prezzo €"
-                />
-                <button onClick={() => removeItem(it.clientId)} className="text-slate-300 hover:text-rose-600 px-1" title="Elimina">✕</button>
-              </div>
-            ))}
+                  <input
+                    value={it.rawName}
+                    onChange={(e) => setItem(it.clientId, "rawName", e.target.value)}
+                    placeholder="Prodotto"
+                    className="w-full sm:flex-1 px-2 py-1.5 border border-slate-300 rounded"
+                  />
+                  <select
+                    value={it.category}
+                    onChange={(e) => setItem(it.clientId, "category", e.target.value)}
+                    className="flex-1 sm:flex-none px-1 py-1.5 border border-slate-300 rounded sm:w-32"
+                  >
+                    {PRODUCT_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <input
+                    type="number" step="1" min="0" inputMode="numeric"
+                    value={it.quantity}
+                    onChange={(e) => setItem(it.clientId, "quantity", e.target.value)}
+                    className="w-14 px-1 py-1.5 border border-slate-300 rounded text-center"
+                    title="Quantità"
+                  />
+                  <input
+                    type="number" step="0.01" min="0" inputMode="decimal"
+                    value={it.totalPrice ?? ""}
+                    onChange={(e) => setItem(it.clientId, "totalPrice", e.target.value)}
+                    placeholder={noPrice ? "da inserire" : "€"}
+                    className={`w-24 px-2 py-1.5 border rounded text-right ${noPrice ? "border-amber-400 bg-white placeholder-amber-500" : "border-slate-300"}`}
+                    title="Prezzo €"
+                  />
+                  <button onClick={() => removeItem(it.clientId)} className="text-slate-300 hover:text-rose-600 px-1" title="Elimina">✕</button>
+                </div>
+              );
+            })}
             {draft.items.length === 0 && <p className="text-xs text-slate-400">Nessun prodotto. Aggiungine uno o registra solo il totale.</p>}
+
+            {/* Prominent add-row button for products the OCR skipped */}
+            <button
+              onClick={addItem}
+              className="w-full mt-1 px-4 py-2 border border-dashed border-emerald-400 text-emerald-700 rounded-lg hover:bg-emerald-50"
+            >
+              + Aggiungi riga
+            </button>
           </div>
 
           <div className="flex gap-3">
