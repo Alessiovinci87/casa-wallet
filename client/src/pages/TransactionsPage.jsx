@@ -23,6 +23,16 @@ export default function TransactionsPage() {
   const [formInitial, setFormInitial] = useState(location.state?.prefill ?? null);
   const [showForm, setShowForm] = useState(Boolean(location.state?.prefill));
 
+  // The year is a free-typed number: debounce it (400ms) so we don't refetch on
+  // every keystroke. Other filters commit immediately.
+  const [yearInput, setYearInput] = useState(filters.year);
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setFilters((f) => (String(f.year) === String(yearInput) ? f : { ...f, year: yearInput }));
+    }, 400);
+    return () => clearTimeout(id);
+  }, [yearInput]);
+
   useEffect(() => {
     fetchTransactions(filters);
   }, [filters, fetchTransactions]);
@@ -62,7 +72,7 @@ export default function TransactionsPage() {
             <option key={m} value={m}>{dayjs().month(m - 1).format("MMMM")}</option>
           ))}
         </select>
-        <input type="number" value={filters.year} onChange={(e) => setFilter("year", e.target.value)} className="px-2 py-1 border border-slate-300 rounded w-24" />
+        <input type="number" value={yearInput} onChange={(e) => setYearInput(e.target.value)} className="px-2 py-1 border border-slate-300 rounded w-24" />
         <select value={filters.type} onChange={(e) => setFilter("type", e.target.value)} className="px-2 py-1 border border-slate-300 rounded">
           <option value="">Tutti i tipi</option>
           <option value="INCOME">Entrate</option>
