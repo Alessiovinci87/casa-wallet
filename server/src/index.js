@@ -16,6 +16,7 @@ import receiptsRouter from "./routes/receipts.js";
 import analyticsRouter from "./routes/analytics.js";
 import shoppingListRouter from "./routes/shoppingList.js";
 import recurringRouter from "./routes/recurring.js";
+import budgetsRouter from "./routes/budgets.js";
 
 dotenv.config();
 
@@ -54,6 +55,7 @@ app.use("/api/receipts", receiptsRouter);
 app.use("/api/analytics", analyticsRouter);
 app.use("/api/shopping-list", shoppingListRouter);
 app.use("/api/recurring", recurringRouter);
+app.use("/api/budgets", budgetsRouter);
 
 // --- HTTP + WebSocket server ---
 const server = http.createServer(app);

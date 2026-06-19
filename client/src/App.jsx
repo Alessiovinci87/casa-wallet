@@ -10,6 +10,7 @@ import TaxSavingsPage from "./pages/TaxSavingsPage.jsx";
 import OcrPage from "./pages/OcrPage.jsx";
 import AnalyticsPage from "./pages/AnalyticsPage.jsx";
 import ShoppingListPage from "./pages/ShoppingListPage.jsx";
+import BudgetsPage from "./pages/BudgetsPage.jsx";
 
 function App() {
   const loadFromStorage = useAuthStore((s) => s.loadFromStorage);
@@ -47,6 +48,7 @@ function App() {
           <Route path="/ocr" element={<OcrPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/shopping-list" element={<ShoppingListPage />} />
+          <Route path="/budgets" element={<BudgetsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

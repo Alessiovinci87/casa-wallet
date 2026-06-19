@@ -21,6 +21,7 @@ model User {
   receipts     Receipt[]
   recurringProducts RecurringProduct[]
   dismissals        ShoppingListDismissal[]
+  categoryBudgets   CategoryBudget[]
 }
 
 model Transaction {
@@ -123,4 +124,18 @@ model ShoppingListDismissal {
   dismissedAt   DateTime @default(now())
 
   @@unique([userId, canonicalName])
+}
+
+// Budget mensile per categoria di spesa (uno per utente+categoria). La spesa
+// effettiva del mese corrente viene calcolata a runtime dalle transazioni.
+model CategoryBudget {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  category  String
+  amount    Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, category])
 }

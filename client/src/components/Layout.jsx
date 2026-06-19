@@ -10,6 +10,7 @@ const links = [
   { to: "/ocr", label: "Nuova spesa" },
   { to: "/analytics", label: "Analisi" },
   { to: "/shopping-list", label: "Lista spesa" },
+  { to: "/budgets", label: "Budget" },
 ];
 
 export default function Layout() {
