@@ -91,6 +91,12 @@ export default function Dashboard() {
   const max = Math.max(income, expense, 1);
   const recent = transactions.slice(0, 5);
 
+  // Previsione spesa a fine mese: media giornaliera × giorni del mese.
+  const dayOfMonth = now.getDate();
+  const daysInMonth = new Date(YEAR, MONTH, 0).getDate();
+  const avgDailyExpense = dayOfMonth > 0 ? expense / dayOfMonth : 0;
+  const forecastExpense = avgDailyExpense * daysInMonth;
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Riepilogo {String(MONTH).padStart(2, "0")}/{YEAR}</h1>
@@ -137,6 +143,17 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Previsione spesa a fine mese */}
+      <div className="bg-white rounded-xl p-4 shadow-sm flex items-center justify-between gap-3">
+        <div>
+          <div className="text-sm font-semibold text-slate-600">Previsione spesa fine mese</div>
+          <div className="text-xs text-slate-400 mt-0.5">
+            Media {eur(avgDailyExpense)}/giorno · {dayOfMonth} di {daysInMonth} giorni
+          </div>
+        </div>
+        <div className="text-xl sm:text-2xl font-bold text-rose-600">{eur(forecastExpense)}</div>
+      </div>
 
       <BalanceTrendChart transactions={transactions} month={MONTH} year={YEAR} />
 
