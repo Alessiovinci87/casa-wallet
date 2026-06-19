@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import { useTransactionStore } from "../store/transactionStore.js";
 import { PAY_METHODS, PAY_METHOD_LABELS } from "../lib/constants.js";
 import { eur } from "../lib/format.js";
+import { downloadTransactionsCsv } from "../lib/exportCsv.js";
 import TransactionForm from "../components/TransactionForm.jsx";
 
 const now = new Date();
@@ -31,13 +32,27 @@ export default function TransactionsPage() {
   const openNew = () => { setFormInitial(null); setShowForm(true); };
   const openEdit = (t) => { setFormInitial(t); setShowForm(true); };
 
+  const exportCsv = () => {
+    const name = `transazioni_${filters.year}-${String(filters.month).padStart(2, "0")}.csv`;
+    downloadTransactionsCsv(transactions, name);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Transazioni</h1>
-        <button onClick={openNew} className="w-full sm:w-auto px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700">
-          + Nuova transazione
-        </button>
+        <div className="flex w-full sm:w-auto gap-2">
+          <button
+            onClick={exportCsv}
+            disabled={transactions.length === 0}
+            className="flex-1 sm:flex-none px-4 py-2 border border-slate-300 text-slate-600 rounded hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Esporta CSV
+          </button>
+          <button onClick={openNew} className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700">
+            + Nuova transazione
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
