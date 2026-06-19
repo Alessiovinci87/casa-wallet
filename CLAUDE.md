@@ -2,11 +2,11 @@
 
 App di gestione economia domestica per 2 utenti fissi (Alessio e moglie).
 
-## Stato avanzamento (aggiornato 18 giugno 2026)
+## Stato avanzamento (aggiornato 19 giugno 2026)
 
 ### Completato ✅
 - Setup monorepo /client + /server
-- Schema Prisma: User, Transaction, TaxSaving, Alert, Receipt, ReceiptItem, RecurringProduct, ShoppingListDismissal
+- Schema Prisma: User, Transaction, TaxSaving, Alert, Receipt, ReceiptItem, RecurringProduct, ShoppingListDismissal, CategoryBudget, PushSubscription
   - Su `origin/main` (produzione): `provider postgresql` + enum `TxType`/`PayMethod`
   - Nel working tree locale: `provider sqlite`, `type`/`method` come `String` (gli enum Prisma non sono supportati su SQLite); valori validati lato API. **Modifica non committata.**
 - Backend: auth JWT, CRUD transazioni, tax savings, OCR endpoint (GPT-4o Vision)
@@ -36,15 +36,27 @@ App di gestione economia domestica per 2 utenti fissi (Alessio e moglie).
   - Test curl a–f tutti ✅ (health, login, EXPENSE, INCOME @25%, `tax-savings/summary` → `totalPending: 500`, lista transazioni)
   - Server (:3001) e client (:5173) avviati e funzionanti
   - Migration SQLite (`prisma/migrations/`) e `dev.db` sono locali/non committati (`*.db` in .gitignore)
+- **10 miglioramenti (19 giu 2026)** — pushati su `origin/main` (commit `f378131`..`72cb1f1`). Build client OK, server avvia con tutte le route, endpoint principali testati via curl.
+  1. **Alert tasse mensile** — cron `node-cron` (1° del mese 09:00 Europe/Rome, `server/src/jobs/cron.js`) → email (Resend, `lib/email.js`) + Web Push a entrambi gli utenti con il totale tasse non trasferite. Endpoint test `POST /api/tax-savings/send-alert`. No-op se chiavi assenti.
+  2. **Budget per categoria** — modello `CategoryBudget`, route CRUD `/api/budgets` (spesa mese corrente + percent + flag over), pagina `/budgets` con barra colorata e alert >80%.
+  3. **Grafico andamento saldo** — `recharts`; `components/BalanceTrendChart.jsx` in Dashboard (entrate/uscite giornaliere + saldo cumulativo).
+  4. **Export CSV** — `lib/exportCsv.js` + bottone in TransactionsPage (lista filtrata, `;` + BOM UTF-8, decimali con virgola).
+  5. **Web Push (VAPID)** — modello `PushSubscription`, `lib/push.js` (web-push, pruning 404/410), route `/api/push` (public-key/subscribe/unsubscribe/test), service worker `client/public/sw.js`, helper `client/src/lib/push.js`, toggle "Attiva notifiche" in Dashboard. Sostituisce il vecchio piano "Expo".
+  6. **Debounce filtro anno** — 400ms sul campo anno in TransactionsPage.
+  7. **Confronto mese su mese** — riga in Dashboard con Δ% entrate/uscite/tasse vs mese precedente (verde/rosso).
+  8. **Previsione fine mese** — card in Dashboard: media giornaliera + spesa proiettata a fine mese.
+  9. **Store più conveniente** — endpoint `GET /api/analytics/store-comparison`, sezione "Dove conviene comprare" in AnalyticsPage.
+  10. **Riepilogo rapido** — pagina `/summary` mobile-first (saldo, tasse, prodotti `isDue`).
 
 ### Da fare 📋
 - [ ] Verifica manuale nel browser (login + UI) — ultimo residuo di Task 4
 - [ ] Configurare `OPENAI_API_KEY` (e riavviare il server) per testare l'OCR
 - [ ] Task 5: deploy Railway (PostgreSQL prod) + Vercel (client)
   - **Config preparata (18 giu 2026)** — vedi sezione "Deploy (produzione)" più sotto. Deploy manuale da dashboard ancora da eseguire.
-- [ ] Task 6: cron alert tasse mensile (Resend email)
+  - **Al prossimo deploy**: rieseguire `npx prisma db push` (nuove tabelle `CategoryBudget`, `PushSubscription`) e impostare le env `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` (+ opz. `RESEND_FROM`); senza, push/email restano no-op.
 - [ ] Task 7: test end-to-end con entrambi gli utenti + WebSocket sync reale
-- [ ] Eventuale debounce filtro anno in TransactionsPage
+- [x] ~~Task 6: cron alert tasse mensile (Resend email)~~ — fatto (19 giu 2026, + Web Push)
+- [x] ~~Debounce filtro anno in TransactionsPage~~ — fatto (19 giu 2026)
 
 ### Prossima sessione — note di ripartenza
 - Le modifiche locali a `schema.prisma` (SQLite + String) e la migration sono **non committate**: decidere se committarle su un branch dev separato o tenerle solo locali.
@@ -62,7 +74,8 @@ Solo 2 account fissi, creati via seed. Nessuna registrazione pubblica.
 - Salvadanaio tasse: % su ogni entrata → saldo virtuale separato → alert mensile
 - OCR: upload screenshot notifica banca → GPT-4o Vision → pre-compila form
 - Real-time sync tra i due utenti via WebSocket
-- Alert: email (Resend) + push (Expo, futuro)
+- Alert: email (Resend) + Web Push (VAPID), inviati insieme dal cron mensile tasse
+- Budget mensile per categoria, grafici (recharts), export CSV, confronto mese su mese, previsione fine mese, confronto prezzi tra negozi, riepilogo rapido `/summary`
 
 ## Variabili ambiente
 Vedi /server/.env.example e /client/.env.example
@@ -137,14 +150,17 @@ Endpoint `ws://<host>/ws`. Eventi server→client per il sync real-time: `transa
 - `store/transactionStore.js` — `{ transactions, loading, filters, fetch/add/update/delete }`
 - `store/taxStore.js` — `{ summary, items, fetchSummary, markTransferred }`
 - `store/receiptStore.js` — `{ parsing, saving, parse(files), save(payload) }` (OCR → conferma → salva con createTransaction)
-- `store/analyticsStore.js` — `{ byCategory, byStore, topProducts, trend, range, fetchAll, fetchTrend }`
+- `store/analyticsStore.js` — `{ byCategory, byStore, topProducts, storeComparison, trend, range, fetchAll, fetchTrend }`
 - `store/shoppingListStore.js` — `{ list, recurring, fetchList, fetchRecurring, dismiss, setRecurring, removeRecurring }`
+- `store/budgetStore.js` — `{ budgets, loading, fetchBudgets, saveBudget, removeBudget }`
+- `lib/exportCsv.js` — genera/scarica CSV transazioni; `lib/push.js` — registrazione service worker + subscribe Web Push (VAPID)
 - `hooks/useWebSocket.js` — connessione a `VITE_WS_URL`; refresh su `transaction_update`, `receipt_update` (transazioni + lista spesa + analytics se già caricate), `shopping_list_update`; riconnessione 3s
-- `components/` — `PrivateRoute` (attende `hydrated`), `Layout` (nav + WS), `TransactionForm` (modal + bottone OCR)
-- `pages/` — `LoginPage`, `Dashboard`, `TransactionsPage`, `TaxSavingsPage`, `OcrPage` (nuova spesa da scontrino: camera/galleria, scontrino lungo multi-foto, conferma editabile), `AnalyticsPage`, `ShoppingListPage`
+- `components/` — `PrivateRoute` (attende `hydrated`), `Layout` (nav + WS), `TransactionForm` (modal + bottone OCR), `BalanceTrendChart` (recharts), `NotificationsToggle` (attiva Web Push)
+- `pages/` — `LoginPage`, `Dashboard`, `TransactionsPage`, `TaxSavingsPage`, `OcrPage` (nuova spesa da scontrino: camera/galleria, scontrino lungo multi-foto, conferma editabile), `AnalyticsPage`, `ShoppingListPage`, `BudgetsPage`, `SummaryPage`
+- `public/sw.js` — service worker per le notifiche Web Push (eventi `push` + `notificationclick`)
 
 ### Routing
-Pubbliche: `/login`. Protette (PrivateRoute → Layout): `/` (Dashboard), `/transactions`, `/tax-savings`, `/ocr` (Nuova spesa), `/analytics` (Analisi), `/shopping-list` (Lista spesa).
+Pubbliche: `/login`. Protette (PrivateRoute → Layout): `/` (Dashboard), `/transactions`, `/tax-savings`, `/ocr` (Nuova spesa), `/analytics` (Analisi), `/shopping-list` (Lista spesa), `/budgets` (Budget), `/summary` (Riepilogo rapido).
 
 ### Env client
 `VITE_API_URL`, `VITE_WS_URL` — vedi `/client/.env.example`.
