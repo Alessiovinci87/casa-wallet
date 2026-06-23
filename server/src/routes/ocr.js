@@ -88,7 +88,11 @@ const VERIFY_SYSTEM_PROMPT =
 //   - .trim()        crop automatico dei bordi bianchi uniformi
 //   - .grayscale()   scala di grigi
 //   - .normalize()   aumento contrasto (stretch della gamma tonale)
-//   - .threshold()   binarizzazione (soglia bianco/nero) per stampe sbiadite
+//   - .sharpen()     nitidezza bordi per i testi piccoli
+//   - .resize(1800)  upscaling per far leggere meglio a GPT-4o la colonna prezzi
+// NB: niente binarizzazione a soglia fissa (.threshold): elimina le sfumature
+// che GPT-4o usa per distinguere cifre simili (3/8, 0/6, 1/7) e rovina le
+// stampe sbiadite o chiare.
 // Restituisce { buffer, mimetype }. In caso di errore si torna all'immagine
 // originale, così l'OCR non si rompe mai per colpa del pre-processing.
 async function preprocessImage(file) {
@@ -98,7 +102,8 @@ async function preprocessImage(file) {
       .trim({ threshold: 25 })
       .grayscale()
       .normalize()
-      .threshold(140)
+      .sharpen({ sigma: 1.2, m1: 0.5, m2: 3 })
+      .resize({ width: 1800, withoutEnlargement: false, kernel: "lanczos3" })
       .png()
       .toBuffer();
     return { buffer, mimetype: "image/png" };
