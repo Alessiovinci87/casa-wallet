@@ -96,8 +96,11 @@ const VERIFY_SYSTEM_PROMPT =
 // Restituisce { buffer, mimetype }. In caso di errore si torna all'immagine
 // originale, così l'OCR non si rompe mai per colpa del pre-processing.
 async function preprocessImage(file) {
+  const kb = (n) => Math.round(n / 1024);
   try {
-    const buffer = await sharp(file.buffer)
+    const t0 = Date.now();
+    const meta = await sharp(file.buffer).metadata();
+    const { data, info } = await sharp(file.buffer)
       .rotate()
       .trim({ threshold: 25 })
       .grayscale()
@@ -105,8 +108,13 @@ async function preprocessImage(file) {
       .sharpen({ sigma: 1.2, m1: 0.5, m2: 3 })
       .resize({ width: 1800, withoutEnlargement: false, kernel: "lanczos3" })
       .png()
-      .toBuffer();
-    return { buffer, mimetype: "image/png" };
+      .toBuffer({ resolveWithObject: true });
+    const ms = Date.now() - t0;
+    console.log(
+      `[ocr] preprocess: ${meta.width ?? "?"}x${meta.height ?? "?"} ${kb(file.buffer.length)}KB ` +
+        `-> ${info.width}x${info.height} ${kb(info.size)}KB in ${ms}ms`
+    );
+    return { buffer: data, mimetype: "image/png" };
   } catch (err) {
     console.error("[ocr] preprocess fallito, uso immagine originale:", err.message);
     return { buffer: file.buffer, mimetype: file.mimetype };
@@ -287,6 +295,12 @@ router.post("/parse", upload.array("images", 12), async (req, res) => {
     if (nullPriceCount >= 3) confidence = "low";
 
     const warning = confidence === "low" ? "incomplete_or_inaccurate" : null;
+
+    // Riepilogo diagnostico della scansione (per benchmark dai log di Railway).
+    console.log(
+      `[ocr] scan: ${files.length} img | prodotti ${items.length} | confidence ${confidence} | ` +
+        `computedItemsTotal ${computedItemsTotal} vs declaredTotal ${total ?? "n/d"} | nullPrice ${nullPriceCount}`
+    );
 
     res.json({
       store: parsed.store ?? null,
