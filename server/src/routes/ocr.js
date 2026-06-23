@@ -5,6 +5,7 @@
 import { Router } from "express";
 import multer from "multer";
 import OpenAI from "openai";
+import sharp from "sharp";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { PRODUCT_CATEGORIES, normalizeCategory } from "../lib/categories.js";
 
@@ -80,6 +81,32 @@ const VERIFY_SYSTEM_PROMPT =
   "Per un prezzo davvero illeggibile usa null, MAI un numero inventato.\n" +
   "NON aggiungere e NON togliere righe: restituisci esattamente gli stessi id ricevuti.\n" +
   'Rispondi SOLO con JSON in questo formato: {"items":[{"id":number,"totalPrice":number|null}]}';
+
+// Pre-processing — migliora la leggibilità dei testi piccoli sugli scontrini
+// PRIMA di inviarli a GPT-4o Vision:
+//   - .rotate()      rispetta l'orientamento EXIF della foto
+//   - .trim()        crop automatico dei bordi bianchi uniformi
+//   - .grayscale()   scala di grigi
+//   - .normalize()   aumento contrasto (stretch della gamma tonale)
+//   - .threshold()   binarizzazione (soglia bianco/nero) per stampe sbiadite
+// Restituisce { buffer, mimetype }. In caso di errore si torna all'immagine
+// originale, così l'OCR non si rompe mai per colpa del pre-processing.
+async function preprocessImage(file) {
+  try {
+    const buffer = await sharp(file.buffer)
+      .rotate()
+      .trim({ threshold: 25 })
+      .grayscale()
+      .normalize()
+      .threshold(140)
+      .png()
+      .toBuffer();
+    return { buffer, mimetype: "image/png" };
+  } catch (err) {
+    console.error("[ocr] preprocess fallito, uso immagine originale:", err.message);
+    return { buffer: file.buffer, mimetype: file.mimetype };
+  }
+}
 
 // PASS 1 — extract the full receipt (store, total, date, method, items).
 async function extractReceipt(openai, imageParts, multiImage) {
@@ -164,10 +191,12 @@ router.post("/parse", upload.array("images", 12), async (req, res) => {
   }
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  // Pre-processing lato server (sharp): contrasto + binarizzazione + crop bordi
+  // bianchi, per rendere più leggibili i testi piccoli prima di GPT-4o.
+  const processed = await Promise.all(files.map(preprocessImage));
   // detail: "high" è decisivo sugli scontrini densi: senza, GPT-4o fa
-  // downsampling dell'immagine e legge male i numeri / salta righe. Inoltriamo
-  // sempre il buffer ORIGINALE (multer memoryStorage non lo tocca).
-  const imageParts = files.map((f) => ({
+  // downsampling dell'immagine e legge male i numeri / salta righe.
+  const imageParts = processed.map((f) => ({
     type: "image_url",
     image_url: {
       url: `data:${f.mimetype};base64,${f.buffer.toString("base64")}`,
