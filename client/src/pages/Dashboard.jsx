@@ -40,6 +40,8 @@ export default function Dashboard() {
   const { summary, fetchSummary } = useTaxStore();
   // Previous month totals, fetched separately so the store keeps the current month.
   const [prev, setPrev] = useState(null);
+  // Prossima scadenza fiscale entro 60 giorni (incluse quelle scadute).
+  const [nextDeadline, setNextDeadline] = useState(null);
 
   useEffect(() => {
     fetchTransactions({ month: MONTH, year: YEAR });
@@ -58,6 +60,16 @@ export default function Dashboard() {
         setPrev({ income, expense, tax });
       })
       .catch(() => setPrev(null));
+  }, []);
+
+  useEffect(() => {
+    api
+      .get("/api/deadlines", { params: { includePaid: "false" } })
+      .then(({ data }) => {
+        const upcoming = data.find((d) => d.daysUntil <= 60);
+        setNextDeadline(upcoming || null);
+      })
+      .catch(() => setNextDeadline(null));
   }, []);
 
   const { income, expense, taxSetAside } = useMemo(() => {
@@ -139,6 +151,27 @@ export default function Dashboard() {
           </span>
         )}
       </button>
+
+      {/* Prossima scadenza fiscale (entro 60 giorni) */}
+      {nextDeadline && (
+        <button
+          type="button"
+          onClick={() => navigate("/treasury")}
+          className="card w-full p-4 flex items-center justify-between hover:border-brand-200 transition text-left"
+        >
+          <div>
+            <div className="text-sm text-ink-600">Prossima scadenza · {nextDeadline.name}</div>
+            <div className={`text-xs mt-0.5 ${nextDeadline.overdue ? "text-rose-600 font-semibold" : "text-ink-400"}`}>
+              {nextDeadline.overdue
+                ? `Scaduta da ${Math.abs(nextDeadline.daysUntil)} giorni`
+                : `Tra ${nextDeadline.daysUntil} giorni`}
+            </div>
+          </div>
+          <span className={`text-lg font-bold nums ${nextDeadline.overdue ? "text-rose-600" : nextDeadline.daysUntil <= 30 ? "text-tax-600" : "text-ink-900"}`}>
+            {eur(nextDeadline.expectedAmount)}
+          </span>
+        </button>
+      )}
 
       {/* Confronto con il mese precedente */}
       {prev && (

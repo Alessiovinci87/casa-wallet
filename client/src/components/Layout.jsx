@@ -7,6 +7,7 @@ const links = [
   { to: "/", label: "Dashboard", end: true },
   { to: "/transactions", label: "Transazioni" },
   { to: "/tax-savings", label: "Salvadanaio" },
+  { to: "/treasury", label: "Tesoreria" },
   { to: "/ocr", label: "Nuova spesa" },
   { to: "/analytics", label: "Analisi" },
   { to: "/shopping-list", label: "Lista spesa" },

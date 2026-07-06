@@ -5,6 +5,11 @@ App di gestione economia domestica **multi-tenant** (famiglie/household). Nata p
 ## Stato avanzamento (aggiornato 6 luglio 2026)
 
 ### Completato ✅
+- **Motore di Tesoreria (6 lug 2026)** — feature chiave P.IVA, testato E2E (32/32 PASS)
+  - Modelli `TaxDeadline` (scadenza fiscale PERSONALE: name, type String IRPEF_SALDO|IRPEF_ACCONTO|IVA|INPS|ALTRO, dueDate, expectedAmount, paid/paidAt) e `FiscalProfile` (1:1 User: regime String FORFETTARIO|ORDINARIO|ALTRO, coeffRedditivita, aliquotaImposta, aliquotaInps, defaultTaxPercent)
+  - `server/src/lib/treasury.js`: `buildFinancialProfile` (finestra 12 mesi pieni, bucket mensili, percentili p25/p50/p75 della capacità = entrate − tasse accantonate − quota spese, buffer sicurezza 10%, rilevamento spese ricorrenti ≥75% mesi + CV≤0.35, aliquota effettiva) e `simulateSelfFinancing` (fondo disponibile, 3 scenari, verdetti OK/RISCHIO/NO vs prossima scadenza: OK se rientro ≤ dueDate, RISCHIO entro +1 mese). Scope "user" (default: quota equa spese famiglia = /n membri) o "household". `computeSuggestedMinPercent` = ceil(coeff × (imposta+INPS)); warning NON bloccante se defaultTaxPercent < minima. Matematica deterministica, no AI. <3 mesi dati → `{ok:false, reason:"DATI_INSUFFICIENTI"}` (200)
+  - `lib/deadlineReminder.js` + cron giornaliero 08:00 Europe/Rome: promemoria email+push a 30/7/1 giorni (day-match stateless, no duplicati); trigger test `POST /api/deadlines/send-reminders {force?}`
+  - Client: pagina `/treasury` "Tesoreria" (scadenze CRUD, profilo finanziario con toggle Solo io/Famiglia, simulatore con verdetti colorati, profilo fiscale con warning % minima), `treasuryStore` (fiscalProfile cached), prefill `taxPercent` nel TransactionForm da `defaultTaxPercent` (solo creazione, mai sovrascrive), card "Prossima scadenza" in Dashboard (entro 60 gg)
 - **Multi-tenant / Household (6 lug 2026)** — refactoring completo, testato E2E (36/36 PASS + 3/3 WS)
   - Modello `Household` (name, inviteCode univoco 8 char); `User.householdId` + `role` String ("OWNER"|"MEMBER", validato in API — niente enum per il vincolo dual-provider)
   - `Transaction`/`Receipt`: `householdId` denormalizzato + `@@index([householdId, date])`; `RecurringProduct`/`ShoppingListDismissal`/`CategoryBudget`: scoped per famiglia (`userId` → `householdId`); `TaxSaving` PERSONALE via `transaction.userId`; modello `Alert` rimosso (dead code)
@@ -143,6 +148,18 @@ Tutte le route (eccetto login) richiedono header `Authorization: Bearer <token>`
 - `POST /` → body `{ category, amount }`: upsert `CategoryBudget` (unique su userId+category)
 - `PUT /:id` → aggiorna `amount`; `DELETE /:id` → elimina
 
+### Scadenze fiscali (`/api/deadlines`) — protette, PERSONALI
+- `GET /?includePaid=false` → scadenze dell'utente ordinate per data, arricchite con `daysUntil` e `overdue`
+- `POST /` body `{ name, type, dueDate, expectedAmount }` → 201 (400 su type fuori set / amount ≤0; data passata ammessa)
+- `PUT /:id` → update parziale + `paid` (true → `paidAt`); `DELETE /:id`; ownership 404
+- `POST /send-reminders` body `{ force? }` → invia subito i promemoria del chiamante (test; il cron giornaliero 08:00 li manda a 30/7/1 giorni)
+
+### Tesoreria (`/api/treasury`) — protette
+- `GET /profile?scope=user|household&months=3..24&buffer=0..0.5` → profilo finanziario (percentili capacità, spese ricorrenti, aliquota effettiva) o `{ok:false, reason:"DATI_INSUFFICIENTI"}`
+- `POST /simulate` body `{ amount, scope? }` → fondo disponibile, 3 scenari (pessimista/realistico/ottimista) con verdetti OK/RISCHIO/NO vs prossima scadenza, `overallVerdict`, disclaimer
+- `GET /fiscal-profile` → `{ profile, suggestedMinPercent, belowSuggested }`
+- `PUT /fiscal-profile` body `{ regime, coeffRedditivita?, aliquotaImposta?, aliquotaInps?, defaultTaxPercent? }` → upsert, stesso shape del GET (warning % mai bloccante)
+
 ### Push notifications (`/api/push`) — protette (Web Push / VAPID)
 - `GET /public-key` → `{ publicKey }` (chiave VAPID pubblica; `null` se non configurato)
 - `POST /subscribe` → body subscription `{ endpoint, keys: { p256dh, auth } }`: upsert `PushSubscription`
@@ -180,7 +197,7 @@ Endpoint `ws://<host>/ws?token=<jwt>` — connessione autenticata (senza/invalid
 - `public/sw.js` — service worker per le notifiche Web Push (eventi `push` + `notificationclick`)
 
 ### Routing
-Pubbliche: `/login`, `/register`. Protette (PrivateRoute → Layout): `/` (Dashboard), `/transactions`, `/tax-savings`, `/ocr` (Nuova spesa), `/analytics` (Analisi), `/shopping-list` (Lista spesa), `/budgets` (Budget), `/summary` (Riepilogo rapido), `/settings` (Impostazioni famiglia).
+Pubbliche: `/login`, `/register`. Protette (PrivateRoute → Layout): `/` (Dashboard), `/transactions`, `/tax-savings`, `/treasury` (Tesoreria), `/ocr` (Nuova spesa), `/analytics` (Analisi), `/shopping-list` (Lista spesa), `/budgets` (Budget), `/summary` (Riepilogo rapido), `/settings` (Impostazioni famiglia).
 
 ### Env client
 `VITE_API_URL`, `VITE_WS_URL` — vedi `/client/.env.example`.
@@ -194,7 +211,7 @@ Pubbliche: `/login`, `/register`. Protette (PrivateRoute → Layout): `/` (Dashb
 - **Locale (dev)**: `schema.prisma` viene tenuto modificato a `provider = "sqlite"` + `type`/`method` come `String` — **modifica non committata** apposta. Idem la cartella `server/prisma/migrations/` e `dev.db`: locali, ignorati da git (`.gitignore`). Non committare l'override sqlite, romperebbe la prod.
 
 ### Backend → Railway
-- `server/Procfile`, `server/railway.json` (NIXPACKS, `node src/index.js`, restart ON_FAILURE), `engines.node >=18`.
+- **ATTENZIONE: Railway builda col `Dockerfile` alla RADICE del repo** (non Nixpacks: `server/Procfile` e `server/railway.json` sono vestigiali) e fa **AUTO-DEPLOY a ogni push su `main`**. Il CMD esegue `prisma db push && seed && node src/index.js` → uno schema con modifiche breaking (colonne required su tabelle piene) BLOCCA la prod in loop (successo il 6 lug 2026 col multi-tenant: risolto con reset del DB prod). In futuro valutare `migrate deploy`.
 - **Init DB al primo deploy**: eseguire `server/prisma/migrate-deploy.sh` →
   - `npx prisma db push` (crea le tabelle Postgres direttamente dallo schema committato — non servono file di migration)
   - `node prisma/seed.js` (crea i 2 utenti)

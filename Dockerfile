@@ -15,4 +15,5 @@ WORKDIR /app/server
 
 EXPOSE 3001
 
-CMD npx prisma db push && node prisma/seed.js && node src/index.js
+# JSON form + exec: node diventa PID 1 e riceve correttamente SIGTERM da Railway.
+CMD ["sh", "-c", "npx prisma db push && node prisma/seed.js && exec node src/index.js"]

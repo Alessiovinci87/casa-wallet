@@ -38,6 +38,8 @@ model User {
   transactions Transaction[]
   receipts     Receipt[]
   pushSubscriptions PushSubscription[]
+  taxDeadlines  TaxDeadline[]
+  fiscalProfile FiscalProfile?
 }
 
 model Transaction {
@@ -163,4 +165,35 @@ model PushSubscription {
   p256dh    String
   auth      String
   createdAt DateTime @default(now())
+}
+
+// Scadenza fiscale PERSONALE (le tasse sono per-utente, come il salvadanaio).
+model TaxDeadline {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id])
+  name           String    // es. "Saldo IRPEF 2025"
+  type           String    // IRPEF_SALDO | IRPEF_ACCONTO | IVA | INPS | ALTRO — validato in API (dual-provider)
+  dueDate        DateTime
+  expectedAmount Float
+  paid           Boolean   @default(false)
+  paidAt         DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([userId, dueDate])
+}
+
+// Profilo fiscale PERSONALE (1:1 con User). Stima, non consulenza fiscale.
+model FiscalProfile {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id])
+  regime            String   @default("FORFETTARIO") // FORFETTARIO | ORDINARIO | ALTRO — validato in API
+  coeffRedditivita  Float?   // es. 0.78 (forfettario)
+  aliquotaImposta   Float?   // es. 15 (%)
+  aliquotaInps      Float?   // es. 26.23 (%)
+  defaultTaxPercent Float?   // % prefill nel form entrate (scelta libera dell'utente)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }

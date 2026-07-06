@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import api from "../lib/api.js";
 import { useTransactionStore } from "../store/transactionStore.js";
+import { useTreasuryStore } from "../store/treasuryStore.js";
 import { CATEGORIES, PAY_METHODS, PAY_METHOD_LABELS } from "../lib/constants.js";
 import Segmented from "./Segmented.jsx";
 
@@ -32,6 +33,20 @@ export default function TransactionForm({ initial, onClose }) {
   const [error, setError] = useState("");
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  // Prefill % tasse dal profilo fiscale: solo in creazione, solo se il campo è
+  // vuoto — mai sovrascrivere una scelta dell'utente o una modifica.
+  const fiscalProfile = useTreasuryStore((s) => s.fiscalProfile);
+  const fetchFiscalProfile = useTreasuryStore((s) => s.fetchFiscalProfile);
+  useEffect(() => {
+    fetchFiscalProfile(); // cached: no-op dopo la prima chiamata
+  }, [fetchFiscalProfile]);
+  useEffect(() => {
+    if (!isEdit && form.type === "INCOME" && form.taxPercent === "" && fiscalProfile?.defaultTaxPercent != null) {
+      set("taxPercent", fiscalProfile.defaultTaxPercent);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.type, fiscalProfile]);
 
   const handleOcr = async (e) => {
     const file = e.target.files?.[0];

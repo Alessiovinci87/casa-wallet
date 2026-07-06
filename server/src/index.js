@@ -19,6 +19,8 @@ import shoppingListRouter from "./routes/shoppingList.js";
 import recurringRouter from "./routes/recurring.js";
 import budgetsRouter from "./routes/budgets.js";
 import pushRouter from "./routes/push.js";
+import deadlinesRouter from "./routes/deadlines.js";
+import treasuryRouter from "./routes/treasury.js";
 
 dotenv.config();
 
@@ -60,6 +62,8 @@ app.use("/api/shopping-list", shoppingListRouter);
 app.use("/api/recurring", recurringRouter);
 app.use("/api/budgets", budgetsRouter);
 app.use("/api/push", pushRouter);
+app.use("/api/deadlines", deadlinesRouter);
+app.use("/api/treasury", treasuryRouter);
 
 // --- HTTP + WebSocket server ---
 const server = http.createServer(app);
