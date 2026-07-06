@@ -1,1 +1,46 @@
 @import "tailwindcss";
+
+/* CasaWallet — design "Conto Chiaro" (stile home banking)
+   Verde bosco come primario, fondo grigio-verde chiarissimo, card bianche
+   con bordo tenue, ambra riservata alle tasse, numeri tabulari. */
+@theme {
+  /* Primario: verde bosco (sostituisce emerald) */
+  --color-brand-50: #eef5f1;
+  --color-brand-100: #e3efe9;
+  --color-brand-200: #c2ded1;
+  --color-brand-400: #4c9c7b;
+  --color-brand-500: #2f9a6e;
+  --color-brand-600: #0a6847;
+  --color-brand-700: #085539;
+  --color-brand-800: #06422d;
+
+  /* Inchiostro e superfici */
+  --color-ink-900: #17211d;
+  --color-ink-600: #5b6864;
+  --color-ink-400: #8b9691;
+  --color-paper: #f4f6f5;
+  --color-card-line: #e4e9e6;
+
+  /* Ambra: solo per il salvadanaio tasse */
+  --color-tax-600: #b3701a;
+  --color-tax-50: #fdf3e3;
+}
+
+/* Base */
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink-900);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Importi e cifre: sempre tabulari (innesto dalla direzione "Registro") */
+.nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Card standard dell'app */
+.card {
+  background-color: #fff;
+  border: 1px solid var(--color-card-line);
+  border-radius: 0.875rem; /* 14px */
+}

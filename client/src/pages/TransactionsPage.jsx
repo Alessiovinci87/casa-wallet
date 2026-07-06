@@ -6,6 +6,7 @@ import { PAY_METHODS, PAY_METHOD_LABELS } from "../lib/constants.js";
 import { eur } from "../lib/format.js";
 import { downloadTransactionsCsv } from "../lib/exportCsv.js";
 import TransactionForm from "../components/TransactionForm.jsx";
+import Segmented from "../components/Segmented.jsx";
 
 const now = new Date();
 
@@ -55,62 +56,74 @@ export default function TransactionsPage() {
           <button
             onClick={exportCsv}
             disabled={transactions.length === 0}
-            className="flex-1 sm:flex-none px-4 py-2 border border-slate-300 text-slate-600 rounded hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex-1 sm:flex-none px-4 py-2 border border-card-line text-ink-600 rounded hover:bg-paper disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Esporta CSV
           </button>
-          <button onClick={openNew} className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700">
+          <button onClick={openNew} className="flex-1 sm:flex-none px-4 py-2 bg-brand-600 text-white rounded hover:bg-brand-700">
             + Nuova transazione
           </button>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-xl p-3 shadow-sm flex flex-wrap gap-3 text-sm">
-        <select value={filters.month} onChange={(e) => setFilter("month", e.target.value)} className="px-2 py-1 border border-slate-300 rounded">
-          {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-            <option key={m} value={m}>{dayjs().month(m - 1).format("MMMM")}</option>
-          ))}
-        </select>
-        <input type="number" value={yearInput} onChange={(e) => setYearInput(e.target.value)} className="px-2 py-1 border border-slate-300 rounded w-24" />
-        <select value={filters.type} onChange={(e) => setFilter("type", e.target.value)} className="px-2 py-1 border border-slate-300 rounded">
-          <option value="">Tutti i tipi</option>
-          <option value="INCOME">Entrate</option>
-          <option value="EXPENSE">Uscite</option>
-        </select>
-        <select value={filters.method} onChange={(e) => setFilter("method", e.target.value)} className="px-2 py-1 border border-slate-300 rounded">
-          <option value="">Tutti i metodi</option>
-          {PAY_METHODS.map((m) => <option key={m} value={m}>{PAY_METHOD_LABELS[m]}</option>)}
-        </select>
+      {/* Filters — mesi a tendina (in italiano), il resto a pulsanti */}
+      <div className="card p-3 space-y-3 text-sm">
+        <div className="flex flex-wrap gap-2">
+          <select value={filters.month} onChange={(e) => setFilter("month", e.target.value)} className="px-2 py-1.5 border border-card-line rounded-lg capitalize">
+            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+              <option key={m} value={m} className="capitalize">{dayjs().month(m - 1).format("MMMM")}</option>
+            ))}
+          </select>
+          <input type="number" value={yearInput} onChange={(e) => setYearInput(e.target.value)} className="px-2 py-1.5 border border-card-line rounded-lg w-24 nums" />
+        </div>
+        <Segmented
+          size="sm"
+          value={filters.type}
+          onChange={(v) => setFilter("type", v)}
+          options={[
+            { value: "", label: "Tutte" },
+            { value: "INCOME", label: "Entrate" },
+            { value: "EXPENSE", label: "Uscite" },
+          ]}
+        />
+        <Segmented
+          size="sm"
+          value={filters.method}
+          onChange={(v) => setFilter("method", v)}
+          options={[
+            { value: "", label: "Tutti i metodi" },
+            ...PAY_METHODS.map((m) => ({ value: m, label: PAY_METHOD_LABELS[m] })),
+          ]}
+        />
       </div>
 
       {/* List */}
-      <div className="bg-white rounded-xl shadow-sm divide-y divide-slate-100">
+      <div className="card divide-y divide-card-line">
         {loading ? (
-          <p className="p-4 text-sm text-slate-400">Caricamento…</p>
+          <p className="p-4 text-sm text-ink-400">Caricamento…</p>
         ) : transactions.length === 0 ? (
-          <p className="p-4 text-sm text-slate-400">Nessuna transazione.</p>
+          <p className="p-4 text-sm text-ink-400">Nessuna transazione.</p>
         ) : (
           transactions.map((t) => (
             <div key={t.id} className="p-3 flex items-center justify-between">
               <div className="text-sm">
                 <div className="font-medium">{t.category}{t.subcategory ? ` · ${t.subcategory}` : ""}</div>
-                <div className="text-slate-400">
+                <div className="text-ink-400">
                   {PAY_METHOD_LABELS[t.method]} · {dayjs(t.date).format("DD/MM/YYYY")}
                   {t.description ? ` · ${t.description}` : ""}
                   {t.user?.name ? (
-                    <span className="ml-1 inline-block px-1.5 py-0.5 text-xs rounded-full bg-slate-100 text-slate-500 align-middle">
+                    <span className="ml-1 inline-block px-1.5 py-0.5 text-xs rounded-full bg-paper text-ink-600 align-middle">
                       {t.user.name}
                     </span>
                   ) : null}
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <span className={`font-semibold ${t.type === "INCOME" ? "text-emerald-600" : "text-rose-600"}`}>
+                <span className={`font-semibold nums ${t.type === "INCOME" ? "text-brand-600" : "text-ink-900"}`}>
                   {t.type === "INCOME" ? "+" : "−"}{eur(t.amount)}
                 </span>
-                <button onClick={() => openEdit(t)} className="text-slate-300 hover:text-emerald-600" title="Modifica">✎</button>
-                <button onClick={() => deleteTransaction(t.id)} className="text-slate-300 hover:text-rose-600" title="Elimina">✕</button>
+                <button onClick={() => openEdit(t)} className="text-ink-400 hover:text-brand-600" title="Modifica">✎</button>
+                <button onClick={() => deleteTransaction(t.id)} className="text-ink-400 hover:text-rose-600" title="Elimina">✕</button>
               </div>
             </div>
           ))

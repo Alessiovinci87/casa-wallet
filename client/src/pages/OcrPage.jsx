@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import { useReceiptStore } from "../store/receiptStore.js";
 import { CATEGORIES, PAY_METHODS, PAY_METHOD_LABELS, PRODUCT_CATEGORIES } from "../lib/constants.js";
 import { eur } from "../lib/format.js";
+import Segmented from "../components/Segmented.jsx";
 
 // A line has no usable price yet (OCR returned null, or the user cleared it).
 const missingPrice = (it) => it.totalPrice == null || it.totalPrice === "";
@@ -14,7 +15,7 @@ const suspiciousPrice = (it, total) =>
 
 // Confidence indicator styling from the server's two-pass reconciliation.
 const CONFIDENCE_UI = {
-  high: { cls: "bg-emerald-50 border-emerald-300 text-emerald-800", label: "Lettura affidabile" },
+  high: { cls: "bg-brand-50 border-brand-200 text-brand-800", label: "Lettura affidabile" },
   medium: { cls: "bg-amber-50 border-amber-300 text-amber-800", label: "Verifica consigliata" },
   low: { cls: "bg-rose-50 border-rose-300 text-rose-700", label: "Controlla i prezzi, lettura incerta" },
 };
@@ -148,7 +149,7 @@ export default function OcrPage() {
       <div className="max-w-xl mx-auto text-center py-16">
         <div className="text-4xl mb-2">✅</div>
         <p className="text-lg font-semibold">Spesa registrata!</p>
-        <p className="text-sm text-slate-500">Reindirizzamento…</p>
+        <p className="text-sm text-ink-600">Reindirizzamento…</p>
       </div>
     );
   }
@@ -161,7 +162,7 @@ export default function OcrPage() {
       {phase === "capture" && (
         <div className="space-y-4">
           {/* Long-receipt toggle (set BEFORE shooting) */}
-          <label className="flex items-center gap-3 bg-white rounded-xl p-3 shadow-sm cursor-pointer">
+          <label className="flex items-center gap-3 card p-3 cursor-pointer">
             <input
               type="checkbox"
               checked={longMode}
@@ -169,7 +170,7 @@ export default function OcrPage() {
                 setLongMode(e.target.checked);
                 if (!e.target.checked && shots.length > 1) setShots((p) => p.slice(0, 1));
               }}
-              className="h-4 w-4 accent-emerald-600"
+              className="h-4 w-4 accent-brand-600"
             />
             <span className="text-sm">
               <b>Scontrino lungo</b> — più foto per un unico scontrino
@@ -177,14 +178,14 @@ export default function OcrPage() {
           </label>
 
           {longMode && (
-            <p className="text-xs text-slate-500 bg-amber-50 rounded p-2">
+            <p className="text-xs text-ink-600 bg-amber-50 rounded p-2">
               Fotografa lo scontrino dall'alto verso il basso, sovrapponendo leggermente le sezioni.
             </p>
           )}
 
           {/* Capture buttons */}
           <div className="flex gap-3">
-            <label className="flex-1 text-center px-4 py-3 bg-emerald-600 text-white rounded-lg cursor-pointer hover:bg-emerald-700">
+            <label className="flex-1 text-center px-4 py-3 bg-brand-600 text-white rounded-lg cursor-pointer hover:bg-brand-700">
               📷 Scatta foto
               <input
                 type="file"
@@ -194,7 +195,7 @@ export default function OcrPage() {
                 onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }}
               />
             </label>
-            <label className="flex-1 text-center px-4 py-3 bg-white border border-slate-300 rounded-lg cursor-pointer hover:border-emerald-400">
+            <label className="flex-1 text-center px-4 py-3 bg-white border border-card-line rounded-lg cursor-pointer hover:border-brand-400">
               🖼️ Carica da galleria
               <input
                 type="file"
@@ -211,7 +212,7 @@ export default function OcrPage() {
             <div className="grid grid-cols-3 gap-2">
               {shots.map((s, i) => (
                 <div key={s.id} className="relative">
-                  <img src={s.url} alt={`foto ${i + 1}`} className="w-full h-28 object-cover rounded-lg border border-slate-200" />
+                  <img src={s.url} alt={`foto ${i + 1}`} className="w-full h-28 object-cover rounded-lg border border-card-line" />
                   <button
                     onClick={() => removeShot(s.id)}
                     className="absolute top-1 right-1 bg-black/60 text-white rounded-full w-6 h-6 text-xs"
@@ -226,7 +227,7 @@ export default function OcrPage() {
             <button
               onClick={analyze}
               disabled={parsing}
-              className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50"
+              className="px-4 py-2 bg-brand-600 text-white rounded hover:bg-brand-700 disabled:opacity-50"
             >
               {parsing ? "Analisi…" : `Analizza ${shots.length > 1 ? `(${shots.length} foto)` : ""}`}
             </button>
@@ -236,7 +237,7 @@ export default function OcrPage() {
 
       {phase === "confirm" && draft && (
         <div className="space-y-4">
-          <p className="text-sm text-slate-500">Controlla e correggi prima di registrare. Il saldo verrà scalato una sola volta sul <b>Totale</b>.</p>
+          <p className="text-sm text-ink-600">Controlla e correggi prima di registrare. Il saldo verrà scalato una sola volta sul <b>Totale</b>.</p>
 
           {/* Two-pass confidence indicator */}
           {draft.confidence && CONFIDENCE_UI[draft.confidence] && (
@@ -255,7 +256,7 @@ export default function OcrPage() {
           )}
 
           {/* Live reconciliation: products sum vs receipt total */}
-          <div className={`text-sm rounded-lg p-3 flex flex-wrap items-center justify-between gap-2 ${reconciles ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-700"}`}>
+          <div className={`text-sm rounded-lg p-3 flex flex-wrap items-center justify-between gap-2 ${reconciles ? "bg-brand-50 text-brand-800" : "bg-rose-50 text-rose-700"}`}>
             <span>Somma prodotti: <b>{eur(itemsSum)}</b> · Totale scontrino: <b>{eur(totalNum)}</b></span>
             <span className="font-semibold">
               {reconciles ? "✓ Quadra" : `Differenza ${eur(Math.abs(itemsSum - totalNum))}`}
@@ -263,35 +264,43 @@ export default function OcrPage() {
           </div>
 
           {/* Header fields */}
-          <div className="bg-white rounded-xl p-4 shadow-sm grid grid-cols-2 gap-3 text-sm">
+          <div className="card p-4 grid grid-cols-2 gap-3 text-sm">
             <label className="col-span-1">
-              <span className="text-slate-500">Totale €</span>
-              <input type="number" step="0.01" value={draft.total} onChange={(e) => setField("total", e.target.value)} className="w-full px-2 py-1 border border-slate-300 rounded" />
+              <span className="text-ink-600">Totale €</span>
+              <input type="number" step="0.01" value={draft.total} onChange={(e) => setField("total", e.target.value)} className="w-full px-2 py-1 border border-card-line rounded" />
             </label>
             <label className="col-span-1">
-              <span className="text-slate-500">Data</span>
-              <input type="date" value={draft.date} onChange={(e) => setField("date", e.target.value)} className="w-full px-2 py-1 border border-slate-300 rounded" />
+              <span className="text-ink-600">Data</span>
+              <input type="date" value={draft.date} onChange={(e) => setField("date", e.target.value)} className="w-full px-2 py-1 border border-card-line rounded" />
             </label>
             <label className="col-span-2">
-              <span className="text-slate-500">Negozio</span>
-              <input value={draft.store} onChange={(e) => setField("store", e.target.value)} className="w-full px-2 py-1 border border-slate-300 rounded" />
+              <span className="text-ink-600">Negozio</span>
+              <input value={draft.store} onChange={(e) => setField("store", e.target.value)} className="w-full px-2 py-1 border border-card-line rounded" />
             </label>
-            <label className="col-span-1">
-              <span className="text-slate-500">Metodo</span>
-              <select value={draft.method} onChange={(e) => setField("method", e.target.value)} className="w-full px-2 py-1 border border-slate-300 rounded">
-                {PAY_METHODS.map((m) => <option key={m} value={m}>{PAY_METHOD_LABELS[m]}</option>)}
-              </select>
-            </label>
-            <label className="col-span-1">
-              <span className="text-slate-500">Categoria spesa</span>
-              <select value={draft.category} onChange={(e) => setField("category", e.target.value)} className="w-full px-2 py-1 border border-slate-300 rounded">
-                {CATEGORIES.EXPENSE.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </label>
+            <div className="col-span-2">
+              <span className="text-ink-600">Metodo</span>
+              <Segmented
+                size="sm"
+                className="mt-1"
+                value={draft.method}
+                onChange={(v) => setField("method", v)}
+                options={PAY_METHODS.map((m) => ({ value: m, label: PAY_METHOD_LABELS[m] }))}
+              />
+            </div>
+            <div className="col-span-2">
+              <span className="text-ink-600">Categoria spesa</span>
+              <Segmented
+                size="sm"
+                className="mt-1"
+                value={draft.category}
+                onChange={(v) => setField("category", v)}
+                options={CATEGORIES.EXPENSE.map((c) => ({ value: c, label: c }))}
+              />
+            </div>
           </div>
 
           {/* Items */}
-          <div className="bg-white rounded-xl p-4 shadow-sm space-y-2">
+          <div className="card p-4 space-y-2">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-sm">Prodotti ({draft.items.length})</h2>
             </div>
@@ -302,7 +311,7 @@ export default function OcrPage() {
                 ? "bg-amber-50 ring-1 ring-amber-300"
                 : suspicious
                   ? "bg-rose-50 ring-1 ring-rose-300"
-                  : "border-b border-slate-50 sm:border-0";
+                  : "border-b border-card-line sm:border-0";
               return (
                 <div
                   key={it.clientId}
@@ -312,12 +321,12 @@ export default function OcrPage() {
                     value={it.rawName}
                     onChange={(e) => setItem(it.clientId, "rawName", e.target.value)}
                     placeholder="Prodotto"
-                    className="w-full sm:flex-1 px-2 py-1.5 border border-slate-300 rounded"
+                    className="w-full sm:flex-1 px-2 py-1.5 border border-card-line rounded"
                   />
                   <select
                     value={it.category}
                     onChange={(e) => setItem(it.clientId, "category", e.target.value)}
-                    className="flex-1 sm:flex-none px-1 py-1.5 border border-slate-300 rounded sm:w-32"
+                    className="flex-1 sm:flex-none px-1 py-1.5 border border-card-line rounded sm:w-32"
                   >
                     {PRODUCT_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
@@ -325,7 +334,7 @@ export default function OcrPage() {
                     type="number" step="1" min="0" inputMode="numeric"
                     value={it.quantity}
                     onChange={(e) => setItem(it.clientId, "quantity", e.target.value)}
-                    className="w-14 px-1 py-1.5 border border-slate-300 rounded text-center"
+                    className="w-14 px-1 py-1.5 border border-card-line rounded text-center nums"
                     title="Quantità"
                   />
                   <input
@@ -333,29 +342,29 @@ export default function OcrPage() {
                     value={it.totalPrice ?? ""}
                     onChange={(e) => setItem(it.clientId, "totalPrice", e.target.value)}
                     placeholder={noPrice ? "da inserire" : "€"}
-                    className={`w-24 px-2 py-1.5 border rounded text-right ${noPrice ? "border-amber-400 bg-white placeholder-amber-500" : suspicious ? "border-rose-400 bg-white" : "border-slate-300"}`}
+                    className={`w-24 px-2 py-1.5 border rounded text-right nums ${noPrice ? "border-amber-400 bg-white placeholder-amber-500" : suspicious ? "border-rose-400 bg-white" : "border-card-line"}`}
                     title={suspicious ? "Prezzo sospetto: supera il totale" : "Prezzo €"}
                   />
-                  <button onClick={() => removeItem(it.clientId)} className="text-slate-300 hover:text-rose-600 px-1" title="Elimina">✕</button>
+                  <button onClick={() => removeItem(it.clientId)} className="text-ink-400 hover:text-rose-600 px-1" title="Elimina">✕</button>
                 </div>
               );
             })}
-            {draft.items.length === 0 && <p className="text-xs text-slate-400">Nessun prodotto. Aggiungine uno o registra solo il totale.</p>}
+            {draft.items.length === 0 && <p className="text-xs text-ink-400">Nessun prodotto. Aggiungine uno o registra solo il totale.</p>}
 
             {/* Prominent add-row button for products the OCR skipped */}
             <button
               onClick={addItem}
-              className="w-full mt-1 px-4 py-2 border border-dashed border-emerald-400 text-emerald-700 rounded-lg hover:bg-emerald-50"
+              className="w-full mt-1 px-4 py-2 border border-dashed border-brand-400 text-brand-700 rounded-lg hover:bg-brand-50"
             >
               + Aggiungi riga
             </button>
           </div>
 
           <div className="flex gap-3">
-            <button onClick={confirm} disabled={saving} className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50">
+            <button onClick={confirm} disabled={saving} className="px-4 py-2 bg-brand-600 text-white rounded hover:bg-brand-700 disabled:opacity-50">
               {saving ? "Salvataggio…" : "Conferma e registra spesa"}
             </button>
-            <button onClick={cancel} disabled={saving} className="px-4 py-2 bg-white border border-slate-300 rounded hover:bg-slate-50">
+            <button onClick={cancel} disabled={saving} className="px-4 py-2 bg-white border border-card-line rounded hover:bg-paper">
               Annulla
             </button>
           </div>

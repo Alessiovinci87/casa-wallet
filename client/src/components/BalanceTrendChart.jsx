@@ -36,22 +36,22 @@ export default function BalanceTrendChart({ transactions, month, year }) {
   }, [transactions, month, year]);
 
   return (
-    <div className="bg-white rounded-xl p-4 shadow-sm">
-      <h2 className="text-sm font-semibold text-slate-600 mb-3">Andamento del mese</h2>
+    <div className="card p-4">
+      <h2 className="text-sm font-semibold text-ink-600 mb-3">Andamento del mese</h2>
       <ResponsiveContainer width="100%" height={240}>
         <LineChart data={data} margin={{ top: 5, right: 8, left: -8, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-          <XAxis dataKey="day" tick={{ fontSize: 11 }} stroke="#94a3b8" />
-          <YAxis tick={{ fontSize: 11 }} stroke="#94a3b8" width={48} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#E4E9E6" />
+          <XAxis dataKey="day" tick={{ fontSize: 11, fill: "#8B9691" }} stroke="#E4E9E6" />
+          <YAxis tick={{ fontSize: 11, fill: "#8B9691" }} stroke="#E4E9E6" width={48} />
           <Tooltip
             formatter={(value, name) => [eur(value), name]}
             labelFormatter={(d) => `Giorno ${d}`}
             contentStyle={{ fontSize: 12, borderRadius: 8 }}
           />
           <Legend wrapperStyle={{ fontSize: 12 }} />
-          <Line type="monotone" dataKey="Entrate" stroke="#10b981" dot={false} strokeWidth={2} />
-          <Line type="monotone" dataKey="Uscite" stroke="#f43f5e" dot={false} strokeWidth={2} />
-          <Line type="monotone" dataKey="Saldo" stroke="#0ea5e9" dot={false} strokeWidth={2} />
+          <Line type="monotone" dataKey="Entrate" stroke="#2F9A6E" dot={false} strokeWidth={2} />
+          <Line type="monotone" dataKey="Uscite" stroke="#8B9691" dot={false} strokeWidth={2} />
+          <Line type="monotone" dataKey="Saldo" stroke="#0A6847" dot={false} strokeWidth={2} />
         </LineChart>
       </ResponsiveContainer>
     </div>

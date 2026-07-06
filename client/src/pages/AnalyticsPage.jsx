@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import { useAnalyticsStore } from "../store/analyticsStore.js";
 import { eur } from "../lib/format.js";
+import Segmented from "../components/Segmented.jsx";
 
 const PRESETS = {
   month: { label: "Mese corrente", range: () => ({ from: dayjs().startOf("month").format("YYYY-MM-DD"), to: dayjs().endOf("month").format("YYYY-MM-DD") }) },
@@ -26,27 +27,30 @@ export default function AnalyticsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-bold">Analisi spese</h1>
-        <div className="flex items-center gap-2 text-sm">
-          <select value={preset} onChange={(e) => setPreset(e.target.value)} className="px-2 py-1 border border-slate-300 rounded">
-            {Object.entries(PRESETS).map(([k, p]) => <option key={k} value={k}>{p.label}</option>)}
-          </select>
+        <div className="flex items-center gap-2 text-sm flex-wrap">
+          <Segmented
+            size="sm"
+            value={preset}
+            onChange={setPreset}
+            options={Object.entries(PRESETS).map(([k, p]) => ({ value: k, label: p.label }))}
+          />
           {preset === "custom" && (
             <>
-              <input type="date" value={custom.from} onChange={(e) => setCustom((c) => ({ ...c, from: e.target.value }))} className="px-2 py-1 border border-slate-300 rounded" />
+              <input type="date" value={custom.from} onChange={(e) => setCustom((c) => ({ ...c, from: e.target.value }))} className="px-2 py-1 border border-card-line rounded" />
               <span>→</span>
-              <input type="date" value={custom.to} onChange={(e) => setCustom((c) => ({ ...c, to: e.target.value }))} className="px-2 py-1 border border-slate-300 rounded" />
+              <input type="date" value={custom.to} onChange={(e) => setCustom((c) => ({ ...c, to: e.target.value }))} className="px-2 py-1 border border-card-line rounded" />
             </>
           )}
         </div>
       </div>
 
-      {loading && <p className="text-sm text-slate-400">Caricamento…</p>}
+      {loading && <p className="text-sm text-ink-400">Caricamento…</p>}
 
       {/* Spesa per categoria */}
-      <section className="bg-white rounded-xl p-4 shadow-sm">
+      <section className="card p-4">
         <h2 className="font-semibold mb-3">Spesa per categoria</h2>
         {byCategory.length === 0 ? (
-          <p className="text-sm text-slate-400">Nessun dato nel periodo.</p>
+          <p className="text-sm text-ink-400">Nessun dato nel periodo.</p>
         ) : (
           <div className="space-y-2">
             {byCategory.map((c) => {
@@ -54,11 +58,11 @@ export default function AnalyticsPage() {
               return (
                 <div key={c.category} className="text-sm">
                   <div className="flex justify-between mb-0.5">
-                    <span>{c.category} <span className="text-slate-400">({c.count})</span></span>
-                    <span className="font-medium">{eur(c.total)} · {pct.toFixed(0)}%</span>
+                    <span>{c.category} <span className="text-ink-400">({c.count})</span></span>
+                    <span className="font-medium nums">{eur(c.total)} · {pct.toFixed(0)}%</span>
                   </div>
-                  <div className="h-2 bg-slate-100 rounded">
-                    <div className="h-2 bg-emerald-500 rounded" style={{ width: `${pct}%` }} />
+                  <div className="h-2 bg-paper rounded">
+                    <div className="h-2 bg-brand-500 rounded" style={{ width: `${pct}%` }} />
                   </div>
                 </div>
               );
@@ -68,16 +72,16 @@ export default function AnalyticsPage() {
       </section>
 
       {/* Spesa per negozio */}
-      <section className="bg-white rounded-xl p-4 shadow-sm">
+      <section className="card p-4">
         <h2 className="font-semibold mb-3">Spesa per negozio</h2>
         {byStore.length === 0 ? (
-          <p className="text-sm text-slate-400">Nessun dato nel periodo.</p>
+          <p className="text-sm text-ink-400">Nessun dato nel periodo.</p>
         ) : (
-          <div className="divide-y divide-slate-100 text-sm">
+          <div className="divide-y divide-card-line text-sm">
             {byStore.map((s) => (
               <div key={s.store ?? "—"} className="py-2 flex justify-between">
-                <span>{s.store ?? "Sconosciuto"} <span className="text-slate-400">· {s.receiptCount} scontrini</span></span>
-                <span className="font-medium">{eur(s.total)}</span>
+                <span>{s.store ?? "Sconosciuto"} <span className="text-ink-400">· {s.receiptCount} scontrini</span></span>
+                <span className="font-medium nums">{eur(s.total)}</span>
               </div>
             ))}
           </div>
@@ -86,9 +90,9 @@ export default function AnalyticsPage() {
 
       {/* Dove conviene comprare (confronto prezzo medio per categoria tra negozi) */}
       {storeComparison.length > 0 && (
-        <section className="bg-white rounded-xl p-4 shadow-sm">
+        <section className="card p-4">
           <h2 className="font-semibold mb-1">Dove conviene comprare</h2>
-          <p className="text-xs text-slate-400 mb-3">
+          <p className="text-xs text-ink-400 mb-3">
             Prezzo unitario medio per categoria nei vari negozi. In verde il più conveniente.
           </p>
           <div className="space-y-4">
@@ -96,18 +100,18 @@ export default function AnalyticsPage() {
               <div key={c.category}>
                 <div className="flex items-center justify-between text-sm mb-1">
                   <span className="font-medium">{c.category}</span>
-                  <span className="text-emerald-600 text-xs">
+                  <span className="text-brand-600 text-xs">
                     Conviene: <span className="font-semibold">{c.cheapest}</span>
                   </span>
                 </div>
-                <div className="divide-y divide-slate-100 text-sm">
+                <div className="divide-y divide-card-line text-sm">
                   {c.stores.map((s, i) => (
                     <div
                       key={s.store}
-                      className={`py-1 flex justify-between ${i === 0 ? "text-emerald-600 font-medium" : "text-slate-600"}`}
+                      className={`py-1 flex justify-between ${i === 0 ? "text-brand-600 font-medium" : "text-ink-600"}`}
                     >
-                      <span>{i === 0 ? "✓ " : ""}{s.store} <span className="text-slate-400 font-normal">· {s.count} acquisti</span></span>
-                      <span>{eur(s.avgUnitPrice)}/u</span>
+                      <span>{i === 0 ? "✓ " : ""}{s.store} <span className="text-ink-400 font-normal">· {s.count} acquisti</span></span>
+                      <span className="nums">{eur(s.avgUnitPrice)}/u</span>
                     </div>
                   ))}
                 </div>
@@ -118,14 +122,14 @@ export default function AnalyticsPage() {
       )}
 
       {/* Top prodotti */}
-      <section className="bg-white rounded-xl p-4 shadow-sm">
+      <section className="card p-4">
         <h2 className="font-semibold mb-3">Prodotti su cui spendi di più</h2>
         {topProducts.length === 0 ? (
-          <p className="text-sm text-slate-400">Nessun dato nel periodo.</p>
+          <p className="text-sm text-ink-400">Nessun dato nel periodo.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="text-slate-400 text-left">
+              <thead className="text-ink-400 text-left">
                 <tr>
                   <th className="py-1">Prodotto</th>
                   <th>Categoria</th>
@@ -135,16 +139,16 @@ export default function AnalyticsPage() {
                   <th></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-card-line">
                 {topProducts.map((p) => (
                   <tr key={p.canonicalName}>
                     <td className="py-1.5 capitalize">{p.canonicalName}</td>
-                    <td className="text-slate-500">{p.category}</td>
-                    <td className="text-right font-medium">{eur(p.totalSpent)}</td>
-                    <td className="text-right">{p.timesBought}</td>
-                    <td className="text-right">{p.avgPrice != null ? eur(p.avgPrice) : "—"}</td>
+                    <td className="text-ink-600">{p.category}</td>
+                    <td className="text-right font-medium nums">{eur(p.totalSpent)}</td>
+                    <td className="text-right nums">{p.timesBought}</td>
+                    <td className="text-right nums">{p.avgPrice != null ? eur(p.avgPrice) : "—"}</td>
                     <td className="text-right">
-                      <button onClick={() => fetchTrend(p.canonicalName)} className="text-emerald-600 hover:underline text-xs">trend</button>
+                      <button onClick={() => fetchTrend(p.canonicalName)} className="text-brand-600 hover:underline text-xs">trend</button>
                     </td>
                   </tr>
                 ))}
@@ -156,13 +160,13 @@ export default function AnalyticsPage() {
 
       {/* Trend prezzo prodotto */}
       {trend && (
-        <section className="bg-white rounded-xl p-4 shadow-sm">
+        <section className="card p-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold capitalize">Andamento prezzo · {trend.canonicalName}</h2>
-            <button onClick={clearTrend} className="text-slate-400 hover:text-slate-700 text-sm">✕ chiudi</button>
+            <button onClick={clearTrend} className="text-ink-400 hover:text-ink-900 text-sm">✕ chiudi</button>
           </div>
           {trend.rows.length === 0 ? (
-            <p className="text-sm text-slate-400">Nessuno storico per questo prodotto.</p>
+            <p className="text-sm text-ink-400">Nessuno storico per questo prodotto.</p>
           ) : (
             <PriceTrend rows={trend.rows} />
           )}
@@ -188,21 +192,21 @@ function PriceTrend({ rows }) {
           return (
             <div
               key={i}
-              className="flex-1 bg-emerald-400 rounded-t"
+              className="flex-1 bg-brand-400 rounded-t"
               style={{ height: `${(v / max) * 100}%` }}
               title={`${dayjs(r.date).format("DD/MM/YY")} · ${eur(v)}${r.store ? " · " + r.store : ""}`}
             />
           );
         })}
       </div>
-      <p className={`text-sm ${delta > 0 ? "text-rose-600" : delta < 0 ? "text-emerald-600" : "text-slate-500"}`}>
+      <p className={`text-sm nums ${delta > 0 ? "text-rose-600" : delta < 0 ? "text-brand-600" : "text-ink-600"}`}>
         Variazione dal primo all'ultimo acquisto: {delta > 0 ? "+" : ""}{delta.toFixed(0)}%
       </p>
-      <div className="divide-y divide-slate-100 text-sm">
+      <div className="divide-y divide-card-line text-sm">
         {rows.map((r, i) => (
           <div key={i} className="py-1 flex justify-between">
-            <span className="text-slate-500">{dayjs(r.date).format("DD/MM/YYYY")}{r.store ? ` · ${r.store}` : ""}</span>
-            <span className="font-medium">{eur(r.unitPrice ?? r.totalPrice ?? 0)}</span>
+            <span className="text-ink-600">{dayjs(r.date).format("DD/MM/YYYY")}{r.store ? ` · ${r.store}` : ""}</span>
+            <span className="font-medium nums">{eur(r.unitPrice ?? r.totalPrice ?? 0)}</span>
           </div>
         ))}
       </div>

@@ -25,36 +25,36 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50">
-      <form onSubmit={handleSubmit} className="bg-white p-8 rounded-xl shadow-sm w-full max-w-sm">
-        <h1 className="text-2xl font-bold text-emerald-600 mb-6">CasaWallet</h1>
+    <div className="min-h-screen flex items-center justify-center bg-paper">
+      <form onSubmit={handleSubmit} className="card p-8 w-full max-w-sm">
+        <h1 className="text-2xl font-bold text-brand-600 mb-6">CasaWallet</h1>
         {error && <div className="mb-4 text-sm text-rose-600 bg-rose-50 rounded p-2">{error}</div>}
-        <label className="block text-sm text-slate-600 mb-1">Email</label>
+        <label className="block text-sm text-ink-600 mb-1">Email</label>
         <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="w-full mb-4 px-3 py-2 border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-emerald-400"
+          className="w-full mb-4 px-3 py-2 border border-card-line rounded focus:outline-none focus:ring-2 focus:ring-brand-400"
         />
-        <label className="block text-sm text-slate-600 mb-1">Password</label>
+        <label className="block text-sm text-ink-600 mb-1">Password</label>
         <input
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          className="w-full mb-6 px-3 py-2 border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-emerald-400"
+          className="w-full mb-6 px-3 py-2 border border-card-line rounded focus:outline-none focus:ring-2 focus:ring-brand-400"
         />
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-emerald-600 text-white py-2 rounded hover:bg-emerald-700 disabled:opacity-50"
+          className="w-full bg-brand-600 text-white py-2 rounded hover:bg-brand-700 disabled:opacity-50"
         >
           {loading ? "Accesso…" : "Accedi"}
         </button>
-        <p className="mt-4 text-sm text-slate-500 text-center">
+        <p className="mt-4 text-sm text-ink-600 text-center">
           Non hai un account?{" "}
-          <Link to="/register" className="text-emerald-600 hover:underline">
+          <Link to="/register" className="text-brand-600 hover:underline">
             Registrati
           </Link>
         </p>

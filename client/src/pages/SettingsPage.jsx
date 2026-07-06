@@ -61,18 +61,18 @@ export default function SettingsPage() {
   };
 
   if (loading && !household) {
-    return <div className="p-6 text-slate-500">Caricamento…</div>;
+    return <div className="p-6 text-ink-600">Caricamento…</div>;
   }
 
   return (
     <div className="max-w-2xl mx-auto p-4 space-y-6">
-      <h1 className="text-xl font-bold text-slate-800">Impostazioni</h1>
+      <h1 className="text-xl font-bold text-ink-900">Impostazioni</h1>
 
       {error && <div className="text-sm text-rose-600 bg-rose-50 rounded p-2">{error}</div>}
 
       {/* Famiglia */}
-      <section className="bg-white rounded-xl shadow-sm p-5">
-        <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">
+      <section className="card p-5">
+        <h2 className="text-sm font-semibold text-ink-600 uppercase tracking-wide mb-3">
           Famiglia
         </h2>
         {isOwner ? (
@@ -81,38 +81,38 @@ export default function SettingsPage() {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="flex-1 px-3 py-2 border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              className="flex-1 px-3 py-2 border border-card-line rounded focus:outline-none focus:ring-2 focus:ring-brand-400"
             />
             <button
               type="submit"
               disabled={saving || !name.trim() || name.trim() === household?.name}
-              className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50"
+              className="px-4 py-2 bg-brand-600 text-white rounded hover:bg-brand-700 disabled:opacity-50"
             >
               {saving ? "…" : "Salva"}
             </button>
           </form>
         ) : (
-          <p className="text-lg font-medium text-slate-800">{household?.name}</p>
+          <p className="text-lg font-medium text-ink-900">{household?.name}</p>
         )}
       </section>
 
       {/* Codice invito */}
-      <section className="bg-white rounded-xl shadow-sm p-5">
-        <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-1">
+      <section className="card p-5">
+        <h2 className="text-sm font-semibold text-ink-600 uppercase tracking-wide mb-1">
           Codice invito
         </h2>
-        <p className="text-sm text-slate-500 mb-3">
+        <p className="text-sm text-ink-600 mb-3">
           Condividilo con chi vuoi far entrare nella famiglia: lo inserirà in fase di
           registrazione.
         </p>
         <div className="flex items-center gap-2">
-          <span className="font-mono text-lg tracking-widest bg-slate-100 rounded px-3 py-2">
+          <span className="font-mono text-lg tracking-widest bg-paper rounded px-3 py-2 nums">
             {household?.inviteCode}
           </span>
           <button
             type="button"
             onClick={handleCopy}
-            className="px-3 py-2 text-sm bg-slate-100 rounded hover:bg-slate-200"
+            className="px-3 py-2 text-sm bg-paper rounded hover:bg-brand-50"
           >
             {copied ? "Copiato ✓" : "Copia"}
           </button>
@@ -129,23 +129,23 @@ export default function SettingsPage() {
       </section>
 
       {/* Membri */}
-      <section className="bg-white rounded-xl shadow-sm p-5">
-        <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">
+      <section className="card p-5">
+        <h2 className="text-sm font-semibold text-ink-600 uppercase tracking-wide mb-3">
           Membri
         </h2>
-        <ul className="divide-y divide-slate-100">
+        <ul className="divide-y divide-card-line">
           {household?.members?.map((m) => (
             <li key={m.id} className="py-2 flex items-center justify-between">
               <div>
-                <span className="font-medium text-slate-800">{m.name}</span>
-                {m.id === user?.id && <span className="text-slate-400"> (tu)</span>}
-                <div className="text-sm text-slate-500">{m.email}</div>
+                <span className="font-medium text-ink-900">{m.name}</span>
+                {m.id === user?.id && <span className="text-ink-400"> (tu)</span>}
+                <div className="text-sm text-ink-600">{m.email}</div>
               </div>
               <span
                 className={`text-xs px-2 py-1 rounded-full ${
                   m.role === "OWNER"
-                    ? "bg-emerald-50 text-emerald-700"
-                    : "bg-slate-100 text-slate-600"
+                    ? "bg-brand-50 text-brand-700"
+                    : "bg-paper text-ink-600"
                 }`}
               >
                 {m.role === "OWNER" ? "Proprietario" : "Membro"}
@@ -156,11 +156,11 @@ export default function SettingsPage() {
       </section>
 
       {/* Account */}
-      <section className="bg-white rounded-xl shadow-sm p-5">
-        <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">
+      <section className="card p-5">
+        <h2 className="text-sm font-semibold text-ink-600 uppercase tracking-wide mb-3">
           Account
         </h2>
-        <p className="text-sm text-slate-600 mb-3">
+        <p className="text-sm text-ink-600 mb-3">
           Connesso come <strong>{user?.name}</strong> ({user?.email})
         </p>
         <button

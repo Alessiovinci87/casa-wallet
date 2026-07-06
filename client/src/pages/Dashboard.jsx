@@ -11,6 +11,7 @@ import NotificationsToggle from "../components/NotificationsToggle.jsx";
 const now = new Date();
 const MONTH = now.getMonth() + 1;
 const YEAR = now.getFullYear();
+const MONTH_NAME = new Intl.DateTimeFormat("it-IT", { month: "long" }).format(now);
 
 // Previous calendar month (handles January → December rollover).
 const prevDate = new Date(YEAR, MONTH - 2, 1);
@@ -25,25 +26,12 @@ function pctChange(curr, prev) {
 
 // Colored arrow + percentage. goodWhenUp flips the green/red meaning.
 function Delta({ value, goodWhenUp }) {
-  if (value == null) return <span className="text-slate-400">n.d.</span>;
+  if (value == null) return <span className="text-ink-400">n.d.</span>;
   const flat = Math.abs(value) < 0.5;
   const up = value > 0;
-  const color = flat ? "text-slate-400" : up === goodWhenUp ? "text-emerald-600" : "text-rose-600";
+  const color = flat ? "text-ink-400" : up === goodWhenUp ? "text-brand-600" : "text-rose-600";
   const arrow = flat ? "→" : up ? "▲" : "▼";
-  return <span className={`${color} font-medium`}>{arrow} {Math.abs(value).toFixed(0)}%</span>;
-}
-
-function Card({ label, value, accent, onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="bg-white rounded-xl p-3 sm:p-4 shadow-sm text-center sm:text-left w-full hover:shadow-md hover:ring-1 hover:ring-emerald-200 transition"
-    >
-      <div className="text-[11px] sm:text-xs text-slate-500 leading-tight">{label}</div>
-      <div className={`text-base sm:text-xl font-bold mt-1 break-words ${accent}`}>{value}</div>
-    </button>
-  );
+  return <span className={`${color} font-medium nums`}>{arrow} {Math.abs(value).toFixed(0)}%</span>;
 }
 
 export default function Dashboard() {
@@ -98,99 +86,126 @@ export default function Dashboard() {
   const forecastExpense = avgDailyExpense * daysInMonth;
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Riepilogo {String(MONTH).padStart(2, "0")}/{YEAR}</h1>
-
+    <div className="space-y-4">
       <NotificationsToggle />
 
-      {/* Saldo mese in evidenza (tasse accantonate escluse) */}
-      <div className="bg-white rounded-xl p-6 shadow-sm text-center">
-        <div className="text-sm text-slate-500">Saldo mese</div>
-        <div className={`text-4xl sm:text-5xl font-bold mt-1 ${saldo >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+      {/* Hero: saldo disponibile del mese (tasse accantonate escluse) */}
+      <div className="bg-brand-600 text-white rounded-2xl p-6 shadow-sm">
+        <div className="text-[11px] uppercase tracking-widest text-white/70">
+          Disponibile a {MONTH_NAME}
+        </div>
+        <div className="text-4xl sm:text-5xl font-bold tracking-tight mt-1 nums">
           {eur(saldo)}
         </div>
-        {taxSetAside > 0 && (
-          <div className="text-xs text-slate-400 mt-2">
-            {eur(taxSetAside)} accantonati per le tasse (esclusi dal saldo)
-          </div>
-        )}
+        <div className="flex gap-6 mt-4 text-sm text-white/85">
+          <button
+            type="button"
+            className="text-left hover:text-white transition"
+            onClick={() => navigate("/transactions", { state: { filterType: "INCOME" } })}
+          >
+            <span className="block text-xs text-white/60">Entrate</span>
+            <span className="font-semibold nums">+ {eur(income)}</span>
+          </button>
+          <button
+            type="button"
+            className="text-left hover:text-white transition"
+            onClick={() => navigate("/transactions", { state: { filterType: "EXPENSE" } })}
+          >
+            <span className="block text-xs text-white/60">Uscite</span>
+            <span className="font-semibold nums">− {eur(expense)}</span>
+          </button>
+          {taxSetAside > 0 && (
+            <div className="text-left">
+              <span className="block text-xs text-white/60">Accantonate</span>
+              <span className="font-semibold nums">{eur(taxSetAside)}</span>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Dettaglio in riga orizzontale — clic per lo storico */}
-      <div className="grid grid-cols-3 gap-3">
-        <Card label="Entrate mese" value={eur(income)} accent="text-emerald-600"
-          onClick={() => navigate("/transactions", { state: { filterType: "INCOME" } })} />
-        <Card label="Uscite mese" value={eur(expense)} accent="text-rose-600"
-          onClick={() => navigate("/transactions", { state: { filterType: "EXPENSE" } })} />
-        <Card label="Tasse" value={eur(summary?.totalPending)} accent="text-amber-600"
-          onClick={() => navigate("/tax-savings")} />
-      </div>
+      {/* Salvadanaio tasse: l'ambra è il suo colore riservato */}
+      <button
+        type="button"
+        onClick={() => navigate("/tax-savings")}
+        className="card w-full p-4 flex items-center justify-between hover:border-brand-200 transition text-left"
+      >
+        <div>
+          <div className="text-sm text-ink-600">Salvadanaio tasse</div>
+          <div className="text-lg font-bold text-tax-600 nums">{eur(summary?.totalPending)}</div>
+        </div>
+        {(summary?.totalPending ?? 0) > 0 && (
+          <span className="text-[11px] font-semibold bg-tax-50 text-tax-600 px-2.5 py-1 rounded-full">
+            Da trasferire
+          </span>
+        )}
+      </button>
 
       {/* Confronto con il mese precedente */}
       {prev && (
-        <div className="bg-white rounded-xl p-3 shadow-sm grid grid-cols-3 gap-2 text-center text-xs">
+        <div className="card p-3 grid grid-cols-3 gap-2 text-center text-xs">
           <div>
-            <div className="text-slate-400">Entrate vs mese prec.</div>
+            <div className="text-ink-400">Entrate vs mese prec.</div>
             <Delta value={pctChange(income, prev.income)} goodWhenUp />
           </div>
           <div>
-            <div className="text-slate-400">Uscite vs mese prec.</div>
+            <div className="text-ink-400">Uscite vs mese prec.</div>
             <Delta value={pctChange(expense, prev.expense)} goodWhenUp={false} />
           </div>
           <div>
-            <div className="text-slate-400">Tasse vs mese prec.</div>
+            <div className="text-ink-400">Tasse vs mese prec.</div>
             <Delta value={pctChange(taxSetAside, prev.tax)} goodWhenUp={false} />
           </div>
         </div>
       )}
 
       {/* Previsione spesa a fine mese */}
-      <div className="bg-white rounded-xl p-4 shadow-sm flex items-center justify-between gap-3">
+      <div className="card p-4 flex items-center justify-between gap-3">
         <div>
-          <div className="text-sm font-semibold text-slate-600">Previsione spesa fine mese</div>
-          <div className="text-xs text-slate-400 mt-0.5">
+          <div className="text-sm font-semibold text-ink-600">Previsione spesa fine mese</div>
+          <div className="text-xs text-ink-400 mt-0.5 nums">
             Media {eur(avgDailyExpense)}/giorno · {dayOfMonth} di {daysInMonth} giorni
           </div>
         </div>
-        <div className="text-xl sm:text-2xl font-bold text-rose-600">{eur(forecastExpense)}</div>
+        <div className="text-xl sm:text-2xl font-bold text-ink-900 nums">{eur(forecastExpense)}</div>
       </div>
 
       <BalanceTrendChart transactions={transactions} month={MONTH} year={YEAR} />
 
-      <div className="bg-white rounded-xl p-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-600 mb-3">Entrate vs Uscite</h2>
+      <div className="card p-4">
+        <h2 className="text-sm font-semibold text-ink-600 mb-3">Entrate vs Uscite</h2>
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <span className="w-16 text-xs text-slate-500">Entrate</span>
-            <div className="flex-1 bg-slate-100 rounded h-4">
-              <div className="bg-emerald-500 h-4 rounded" style={{ width: `${(income / max) * 100}%` }} />
+            <span className="w-16 text-xs text-ink-600">Entrate</span>
+            <div className="flex-1 bg-paper rounded-full h-3">
+              <div className="bg-brand-500 h-3 rounded-full" style={{ width: `${(income / max) * 100}%` }} />
             </div>
-            <span className="w-24 text-right text-xs">{eur(income)}</span>
+            <span className="w-24 text-right text-xs nums">{eur(income)}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-16 text-xs text-slate-500">Uscite</span>
-            <div className="flex-1 bg-slate-100 rounded h-4">
-              <div className="bg-rose-500 h-4 rounded" style={{ width: `${(expense / max) * 100}%` }} />
+            <span className="w-16 text-xs text-ink-600">Uscite</span>
+            <div className="flex-1 bg-paper rounded-full h-3">
+              <div className="bg-ink-400 h-3 rounded-full" style={{ width: `${(expense / max) * 100}%` }} />
             </div>
-            <span className="w-24 text-right text-xs">{eur(expense)}</span>
+            <span className="w-24 text-right text-xs nums">{eur(expense)}</span>
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl p-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-600 mb-3">Ultime transazioni</h2>
+      <div className="card p-4">
+        <h2 className="text-sm font-semibold text-ink-600 mb-3">Ultime transazioni</h2>
         {recent.length === 0 ? (
-          <p className="text-sm text-slate-400">Nessuna transazione questo mese.</p>
+          <p className="text-sm text-ink-400">Nessuna transazione questo mese.</p>
         ) : (
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-card-line">
             {recent.map((t) => (
-              <li key={t.id} className="py-2 flex items-center justify-between text-sm">
+              <li key={t.id} className="py-2.5 flex items-center justify-between text-sm">
                 <div>
                   <span className="font-medium">{t.category}</span>
-                  <span className="text-slate-400 ml-2">{PAY_METHOD_LABELS[t.method]}</span>
+                  <span className="text-ink-400 ml-2">{PAY_METHOD_LABELS[t.method]}</span>
+                  {t.user?.name && <span className="text-ink-400 ml-2 text-xs">· {t.user.name}</span>}
                 </div>
-                <span className={t.type === "INCOME" ? "text-emerald-600" : "text-rose-600"}>
-                  {t.type === "INCOME" ? "+" : "−"}{eur(t.amount)}
+                <span className={`font-semibold nums ${t.type === "INCOME" ? "text-brand-600" : "text-ink-900"}`}>
+                  {t.type === "INCOME" ? "+ " : "− "}{eur(t.amount)}
                 </span>
               </li>
             ))}

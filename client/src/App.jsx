@@ -28,8 +28,8 @@ function App() {
   // so a refresh never redirects an authenticated user to /login.
   if (!hydrated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="h-8 w-8 rounded-full border-2 border-slate-300 border-t-emerald-600 animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-paper">
+        <div className="h-8 w-8 rounded-full border-2 border-card-line border-t-brand-600 animate-spin" />
       </div>
     );
   }
