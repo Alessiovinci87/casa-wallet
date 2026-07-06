@@ -7,6 +7,7 @@ import LoginPage from "./pages/LoginPage.jsx";
 import RegisterPage from "./pages/RegisterPage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
 import TreasuryPage from "./pages/TreasuryPage.jsx";
+import InvoicesPage from "./pages/InvoicesPage.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import TransactionsPage from "./pages/TransactionsPage.jsx";
 import TaxSavingsPage from "./pages/TaxSavingsPage.jsx";
@@ -51,6 +52,7 @@ function App() {
           <Route path="/transactions" element={<TransactionsPage />} />
           <Route path="/tax-savings" element={<TaxSavingsPage />} />
           <Route path="/treasury" element={<TreasuryPage />} />
+          <Route path="/invoices" element={<InvoicesPage />} />
           <Route path="/ocr" element={<OcrPage />} />
           <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/shopping-list" element={<ShoppingListPage />} />

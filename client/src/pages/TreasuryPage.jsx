@@ -35,7 +35,7 @@ export default function TreasuryPage() {
   const [form, setForm] = useState(emptyDeadline);
   const [simAmount, setSimAmount] = useState("");
   const [fiscal, setFiscal] = useState({
-    regime: "FORFETTARIO", coeffRedditivita: "", aliquotaImposta: "", aliquotaInps: "", defaultTaxPercent: "",
+    regime: "FORFETTARIO", partitaIva: "", coeffRedditivita: "", aliquotaImposta: "", aliquotaInps: "", defaultTaxPercent: "",
   });
   const [fiscalSaved, setFiscalSaved] = useState(false);
   const [error, setError] = useState("");
@@ -53,6 +53,7 @@ export default function TreasuryPage() {
     if (fiscalProfile) {
       setFiscal({
         regime: fiscalProfile.regime ?? "FORFETTARIO",
+        partitaIva: fiscalProfile.partitaIva ?? "",
         coeffRedditivita: fiscalProfile.coeffRedditivita ?? "",
         aliquotaImposta: fiscalProfile.aliquotaImposta ?? "",
         aliquotaInps: fiscalProfile.aliquotaInps ?? "",
@@ -99,6 +100,7 @@ export default function TreasuryPage() {
     try {
       await saveFiscalProfile({
         regime: fiscal.regime,
+        partitaIva: fiscal.partitaIva.trim() || null,
         coeffRedditivita: fiscal.coeffRedditivita === "" ? null : Number(fiscal.coeffRedditivita),
         aliquotaImposta: fiscal.aliquotaImposta === "" ? null : Number(fiscal.aliquotaImposta),
         aliquotaInps: fiscal.aliquotaInps === "" ? null : Number(fiscal.aliquotaInps),
@@ -377,6 +379,15 @@ export default function TreasuryPage() {
                 { value: "ORDINARIO", label: "Ordinario" },
                 { value: "ALTRO", label: "Altro" },
               ]}
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-ink-600 mb-1">Partita IVA (per l'import fatture)</label>
+            <input
+              type="text" inputMode="numeric" maxLength={11} placeholder="11 cifre"
+              value={fiscal.partitaIva}
+              onChange={(e) => setFiscal((f) => ({ ...f, partitaIva: e.target.value.replace(/\D/g, "") }))}
+              className="w-44 px-2 py-1.5 border border-card-line rounded-lg nums"
             />
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

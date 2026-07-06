@@ -1,6 +1,6 @@
 // Predefined categories used in the transaction form select.
 export const CATEGORIES = {
-  INCOME: ["Stipendio", "Freelance", "Vendite Amazon", "Rimborso", "Altro"],
+  INCOME: ["Stipendio", "Freelance", "Fatture", "Vendite Amazon", "Rimborso", "Altro"],
   EXPENSE: [
     "Casa", "Spesa", "Ristorante", "Trasporti", "Salute",
     "Abbigliamento", "Bollette", "Tasse", "Svago", "Altro",

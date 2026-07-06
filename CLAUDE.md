@@ -5,6 +5,14 @@ App di gestione economia domestica **multi-tenant** (famiglie/household). Nata p
 ## Stato avanzamento (aggiornato 6 luglio 2026)
 
 ### Completato ✅
+- **Fatture elettroniche: import FatturaPA XML + connettore Aruba (6 lug 2026)** — testato E2E (parser 33/33, route 17/17)
+  - Modelli `Invoice` (PERSONALE: numero+year dedupe `@@unique([userId,numero,year])`, importi imponibile/iva/ritenuta/cassa/bollo/grossTotal/netToPay, status EMESSA|INCASSATA, link 1:1 a Transaction) e `ArubaConnection` (credenziali cifrate AES-256-GCM, chiave env `INVOICE_CRED_SECRET`); `FiscalProfile.partitaIva` (verifica proprietà fatture)
+  - `lib/fatturapa.js`: parser puro namespace-agnostic (fast-xml-parser, aritmetica in centesimi), multi-body (lotto), totali SEMPRE da DatiRiepilogo (`ImportoTotaleDocumento` è opzionale), netto = imponibile+iva+bollo−ritenuta, cross-check pagamenti→warning; `sniffP7m` (p7m rifiutati in v1); TD04/divisa≠EUR → skip
+  - **Regime di cassa**: l'import crea la fattura "in attesa"; l'entrata (+TaxSaving con % dal profilo fiscale) nasce solo al `PUT /collect`; `uncollect` reverte tutto atomicamente
+  - Blocco P.IVA: fattura con emittente ≠ partitaIva utente → errore (evita import di fatture ricevute)
+  - `lib/arubaClient.js`: signin con token cache 25min (rate limit 1/min!), list v2 invoices-out paginata + incrementale via modifiedStartDate, XML base64 da getByFilename → stesso parser. Sync manuale (cron v2)
+  - **Fattura24 (gestionale moglie): API solo scrittura → connettore impossibile (ricerca 6 lug)** — lei usa l'upload XML; in futuro valutare Fatture in Cloud (API completa con stato incassi)
+  - Client: pagina `/invoices` "Fatture" (upload multiplo, lista con badge/warning, modal incasso con anteprima accantonamento, card connettore Aruba), `invoiceStore`, categoria INCOME "Fatture", campo P.IVA in TreasuryPage, evento WS `invoice_update`
 - **Motore di Tesoreria (6 lug 2026)** — feature chiave P.IVA, testato E2E (32/32 PASS)
   - Modelli `TaxDeadline` (scadenza fiscale PERSONALE: name, type String IRPEF_SALDO|IRPEF_ACCONTO|IVA|INPS|ALTRO, dueDate, expectedAmount, paid/paidAt) e `FiscalProfile` (1:1 User: regime String FORFETTARIO|ORDINARIO|ALTRO, coeffRedditivita, aliquotaImposta, aliquotaInps, defaultTaxPercent)
   - `server/src/lib/treasury.js`: `buildFinancialProfile` (finestra 12 mesi pieni, bucket mensili, percentili p25/p50/p75 della capacità = entrate − tasse accantonate − quota spese, buffer sicurezza 10%, rilevamento spese ricorrenti ≥75% mesi + CV≤0.35, aliquota effettiva) e `simulateSelfFinancing` (fondo disponibile, 3 scenari, verdetti OK/RISCHIO/NO vs prossima scadenza: OK se rientro ≤ dueDate, RISCHIO entro +1 mese). Scope "user" (default: quota equa spese famiglia = /n membri) o "household". `computeSuggestedMinPercent` = ceil(coeff × (imposta+INPS)); warning NON bloccante se defaultTaxPercent < minima. Matematica deterministica, no AI. <3 mesi dati → `{ok:false, reason:"DATI_INSUFFICIENTI"}` (200)
@@ -160,6 +168,14 @@ Tutte le route (eccetto login) richiedono header `Authorization: Bearer <token>`
 - `GET /fiscal-profile` → `{ profile, suggestedMinPercent, belowSuggested }`
 - `PUT /fiscal-profile` body `{ regime, coeffRedditivita?, aliquotaImposta?, aliquotaInps?, defaultTaxPercent? }` → upsert, stesso shape del GET (warning % mai bloccante)
 
+### Fatture elettroniche (`/api/invoices`) — protette, PERSONALI
+- `POST /import-xml` → multipart campo `files` (1..20 XML FatturaPA) → `{ imported[], skipped[{file,numero?,reason}], errors[{file,error}], warning? }`. p7m → error; TD∉{TD01,TD06,TD24,TD25} o divisa≠EUR → skip; P.IVA emittente ≠ `fiscalProfile.partitaIva` → error bloccante; dedupe su userId+numero+year → skip
+- `GET /?status=&year=` → fatture dell'utente (include transaction leggera)
+- `PUT /:id/collect` body `{ taxPercent?, method?, date? }` → crea l'entrata INCOME (amount=netToPay, categoria "Fatture", % dal body o dal profilo fiscale, TaxSaving nested) + stato INCASSATA, atomico; 409 se già incassata
+- `PUT /:id/uncollect` → elimina transazione+TaxSaving e torna EMESSA; `DELETE /:id` solo su EMESSA (409 altrimenti)
+- `GET /aruba` (stato), `POST /aruba/connect {username,password}` (valida con signin reale, salva cifrato), `DELETE /aruba/connect`, `POST /aruba/sync` (incrementale da lastSyncAt, skip Scartata) → `{ imported, skipped, errors }`
+- Env richiesta per il connettore: `INVOICE_CRED_SECRET`
+
 ### Push notifications (`/api/push`) — protette (Web Push / VAPID)
 - `GET /public-key` → `{ publicKey }` (chiave VAPID pubblica; `null` se non configurato)
 - `POST /subscribe` → body subscription `{ endpoint, keys: { p256dh, auth } }`: upsert `PushSubscription`
@@ -197,7 +213,7 @@ Endpoint `ws://<host>/ws?token=<jwt>` — connessione autenticata (senza/invalid
 - `public/sw.js` — service worker per le notifiche Web Push (eventi `push` + `notificationclick`)
 
 ### Routing
-Pubbliche: `/login`, `/register`. Protette (PrivateRoute → Layout): `/` (Dashboard), `/transactions`, `/tax-savings`, `/treasury` (Tesoreria), `/ocr` (Nuova spesa), `/analytics` (Analisi), `/shopping-list` (Lista spesa), `/budgets` (Budget), `/summary` (Riepilogo rapido), `/settings` (Impostazioni famiglia).
+Pubbliche: `/login`, `/register`. Protette (PrivateRoute → Layout): `/` (Dashboard), `/transactions`, `/tax-savings`, `/treasury` (Tesoreria), `/invoices` (Fatture), `/ocr` (Nuova spesa), `/analytics` (Analisi), `/shopping-list` (Lista spesa), `/budgets` (Budget), `/summary` (Riepilogo rapido), `/settings` (Impostazioni famiglia).
 
 ### Env client
 `VITE_API_URL`, `VITE_WS_URL` — vedi `/client/.env.example`.

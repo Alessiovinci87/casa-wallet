@@ -21,6 +21,7 @@ import budgetsRouter from "./routes/budgets.js";
 import pushRouter from "./routes/push.js";
 import deadlinesRouter from "./routes/deadlines.js";
 import treasuryRouter from "./routes/treasury.js";
+import invoicesRouter from "./routes/invoices.js";
 
 dotenv.config();
 
@@ -64,6 +65,7 @@ app.use("/api/budgets", budgetsRouter);
 app.use("/api/push", pushRouter);
 app.use("/api/deadlines", deadlinesRouter);
 app.use("/api/treasury", treasuryRouter);
+app.use("/api/invoices", invoicesRouter);
 
 // --- HTTP + WebSocket server ---
 const server = http.createServer(app);

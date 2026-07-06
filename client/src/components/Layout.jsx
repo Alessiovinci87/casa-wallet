@@ -8,6 +8,7 @@ const links = [
   { to: "/transactions", label: "Transazioni" },
   { to: "/tax-savings", label: "Salvadanaio" },
   { to: "/treasury", label: "Tesoreria" },
+  { to: "/invoices", label: "Fatture" },
   { to: "/ocr", label: "Nuova spesa" },
   { to: "/analytics", label: "Analisi" },
   { to: "/shopping-list", label: "Lista spesa" },

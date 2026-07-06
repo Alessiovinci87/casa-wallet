@@ -40,6 +40,8 @@ model User {
   pushSubscriptions PushSubscription[]
   taxDeadlines  TaxDeadline[]
   fiscalProfile FiscalProfile?
+  invoices        Invoice[]
+  arubaConnection ArubaConnection?
 }
 
 model Transaction {
@@ -61,6 +63,7 @@ model Transaction {
   updatedAt   DateTime    @updatedAt
   taxSaving   TaxSaving?
   receipt     Receipt?
+  invoice     Invoice?
 
   @@index([householdId, date])
 }
@@ -190,10 +193,60 @@ model FiscalProfile {
   userId            String   @unique
   user              User     @relation(fields: [userId], references: [id])
   regime            String   @default("FORFETTARIO") // FORFETTARIO | ORDINARIO | ALTRO — validato in API
+  partitaIva        String?  // P.IVA dell'utente: verifica proprietà delle fatture importate
   coeffRedditivita  Float?   // es. 0.78 (forfettario)
   aliquotaImposta   Float?   // es. 15 (%)
   aliquotaInps      Float?   // es. 26.23 (%)
   defaultTaxPercent Float?   // % prefill nel form entrate (scelta libera dell'utente)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+}
+
+// Fattura elettronica emessa (PERSONALE, come TaxDeadline). L'entrata nel
+// bilancio si crea SOLO al momento dell'incasso (regime di cassa).
+// status: EMESSA | INCASSATA — source: XML | ARUBA (validati in API)
+model Invoice {
+  id            String       @id @default(cuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id])
+  source        String       // "XML" | "ARUBA"
+  filename      String?      // nome file caricato / filename Aruba (informativo)
+  numero        String
+  year          Int          // anno della Data documento (chiave dedupe + filtro)
+  date          DateTime
+  tipoDocumento String       @default("TD01")
+  customerName  String
+  customerVat   String?
+  imponibile    Float        // Σ DatiRiepilogo.ImponibileImporto (include cassa)
+  iva           Float        // Σ DatiRiepilogo.Imposta
+  ritenuta      Float        // Σ DatiRitenuta.ImportoRitenuta
+  cassa         Float        // Σ DatiCassaPrevidenziale.ImportoContributoCassa (informativo)
+  bollo         Float        // DatiBollo.ImportoBollo || 0
+  grossTotal    Float        // imponibile + iva + bollo
+  netToPay      Float        // grossTotal - ritenuta → importo dell'entrata all'incasso
+  dueDate       DateTime?    // prima DataScadenzaPagamento (se presente)
+  sdiStatus     String?      // solo Aruba: Inviata | Consegnata | Non consegnata
+  warning       String?      // es. PAGAMENTI_NON_COINCIDONO, TOTALE_DOCUMENTO_DIVERSO
+  status        String       @default("EMESSA") // EMESSA | INCASSATA
+  collectedAt   DateTime?
+  transactionId String?      @unique
+  transaction   Transaction? @relation(fields: [transactionId], references: [id])
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@unique([userId, numero, year])
+  @@index([userId, date])
+}
+
+// Connessione Aruba Fatturazione Elettronica (credenziali cifrate AES-256-GCM,
+// chiave da env INVOICE_CRED_SECRET — mai in chiaro, mai nelle response).
+model ArubaConnection {
+  id                String    @id @default(cuid())
+  userId            String    @unique
+  user              User      @relation(fields: [userId], references: [id])
+  username          String
+  encryptedPassword String    // formato iv:tag:ciphertext (base64)
+  lastSyncAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }

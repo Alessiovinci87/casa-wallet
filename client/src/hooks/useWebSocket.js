@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useTransactionStore } from "../store/transactionStore.js";
 import { useShoppingListStore } from "../store/shoppingListStore.js";
 import { useAnalyticsStore } from "../store/analyticsStore.js";
+import { useInvoiceStore } from "../store/invoiceStore.js";
 
 const WS_URL = import.meta.env.VITE_WS_URL || "ws://localhost:3001/ws";
 
@@ -39,6 +40,12 @@ export function useWebSocket() {
           if (msg.event === "transaction_update") refreshTransactions();
           else if (msg.event === "receipt_update") refreshReceiptViews();
           else if (msg.event === "shopping_list_update") useShoppingListStore.getState().fetchList();
+          else if (msg.event === "invoice_update") {
+            // Refresh della pagina Fatture solo se già caricata (fatture personali:
+            // il GET è comunque scoped per utente lato server).
+            const s = useInvoiceStore.getState();
+            if (s.invoices.length) s.fetchInvoices();
+          }
         } catch {
           // ignore non-JSON frames
         }

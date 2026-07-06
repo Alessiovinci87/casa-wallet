@@ -68,13 +68,16 @@ router.get("/fiscal-profile", async (req, res) => {
 });
 
 // PUT /api/treasury/fiscal-profile
-// body: { regime, coeffRedditivita?, aliquotaImposta?, aliquotaInps?, defaultTaxPercent? }
+// body: { regime, partitaIva?, coeffRedditivita?, aliquotaImposta?, aliquotaInps?, defaultTaxPercent? }
 router.put("/fiscal-profile", async (req, res) => {
-  const { regime, coeffRedditivita, aliquotaImposta, aliquotaInps, defaultTaxPercent } =
+  const { regime, partitaIva, coeffRedditivita, aliquotaImposta, aliquotaInps, defaultTaxPercent } =
     req.body || {};
 
   if (!regime || !REGIMES.has(regime)) {
     return res.status(400).json({ error: "regime non valido (FORFETTARIO | ORDINARIO | ALTRO)" });
+  }
+  if (partitaIva != null && partitaIva !== "" && !/^\d{11}$/.test(String(partitaIva))) {
+    return res.status(400).json({ error: "partitaIva deve essere di 11 cifre" });
   }
   const inRange = (v, min, max, minExclusive = false) =>
     v == null || (Number.isFinite(Number(v)) && (minExclusive ? v > min : v >= min) && v <= max);
@@ -87,6 +90,7 @@ router.put("/fiscal-profile", async (req, res) => {
 
   const data = {
     regime,
+    partitaIva: partitaIva || null,
     coeffRedditivita: coeffRedditivita ?? null,
     aliquotaImposta: aliquotaImposta ?? null,
     aliquotaInps: aliquotaInps ?? null,
