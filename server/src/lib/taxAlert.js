@@ -1,49 +1,70 @@
-// Monthly "salvadanaio tasse" reminder: emails both users the total amount of
-// tax savings set aside but not yet transferred. Shared piggy bank (the
-// TaxSaving table is not per-user), so every user gets the same figure.
+// Monthly "salvadanaio tasse" reminder. Il salvadanaio è PERSONALE: ogni
+// utente riceve email + push con il SOLO proprio totale non trasferito.
 import { prisma } from "./prisma.js";
 import { sendEmail } from "./email.js";
-import { sendPushToAll } from "./push.js";
+import { sendPushToUser } from "./push.js";
 
 const eur = (n) =>
   new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(n || 0);
 
 /**
- * Compute the pending tax total and notify both users by email.
+ * Compute one user's pending tax total and notify them by email + push.
+ * @param {string} userId
  * @param {{ force?: boolean }} [opts] force=true sends even when the total is 0.
- * @returns {Promise<{ totalPending: number, recipients: string[], sent: boolean }>}
+ * @returns {Promise<{ userId: string, email: string, totalPending: number, sent: boolean }>}
  */
-export async function sendTaxAlert({ force = false } = {}) {
-  const pending = await prisma.taxSaving.findMany({ where: { transferred: false } });
+export async function sendTaxAlertForUser(userId, { force = false } = {}) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, name: true },
+  });
+  if (!user) throw new Error("Utente non trovato");
+
+  const pending = await prisma.taxSaving.findMany({
+    where: { transferred: false, transaction: { userId } },
+  });
   const totalPending = pending.reduce((sum, t) => sum + t.amount, 0);
 
-  const users = await prisma.user.findMany({ select: { email: true, name: true } });
-  const recipients = users.map((u) => u.email);
-
   if (totalPending <= 0 && !force) {
-    console.log("[taxAlert] nessun importo pendente, email non inviata");
-    return { totalPending, recipients, sent: false };
+    return { userId, email: user.email, totalPending, sent: false };
   }
 
   const subject = `CasaWallet — Tasse da accantonare: ${eur(totalPending)}`;
   const html = `
     <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto;">
       <h2 style="color:#059669;">Promemoria salvadanaio tasse</h2>
-      <p>Al momento risultano <strong>${eur(totalPending)}</strong> accantonati per le tasse
-      e non ancora trasferiti sul conto dedicato.</p>
+      <p>Ciao ${user.name}, al momento risultano <strong>${eur(totalPending)}</strong>
+      accantonati per le tue tasse e non ancora trasferiti sul conto dedicato.</p>
       <p style="color:#64748b;font-size:14px;">
         Ricordati di effettuare il bonifico e segnare gli importi come trasferiti in CasaWallet.
       </p>
     </div>`;
 
-  await sendEmail({ to: recipients, subject, html });
-  // Same event also goes out as a Web Push notification to every device.
-  const push = await sendPushToAll({
+  await sendEmail({ to: [user.email], subject, html });
+  const push = await sendPushToUser(userId, {
     title: "Promemoria tasse",
     body: `${eur(totalPending)} accantonati da trasferire`,
     url: "/tax-savings",
   });
 
-  console.log(`[taxAlert] email a ${recipients.length} utenti, push:`, push, `totale ${eur(totalPending)}`);
-  return { totalPending, recipients, sent: true, push };
+  console.log(`[taxAlert] ${user.email}: ${eur(totalPending)}, push:`, push);
+  return { userId, email: user.email, totalPending, sent: true, push };
+}
+
+/**
+ * Run the monthly reminder for every user (each gets their own figure).
+ * @param {{ force?: boolean }} [opts]
+ */
+export async function sendTaxAlerts({ force = false } = {}) {
+  const users = await prisma.user.findMany({ select: { id: true } });
+  const results = [];
+  for (const u of users) {
+    try {
+      results.push(await sendTaxAlertForUser(u.id, { force }));
+    } catch (err) {
+      console.error(`[taxAlert] fallito per ${u.id}:`, err.message);
+      results.push({ userId: u.id, error: err.message });
+    }
+  }
+  return results;
 }

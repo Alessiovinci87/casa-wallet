@@ -98,6 +98,11 @@ export default function TransactionsPage() {
                 <div className="text-slate-400">
                   {PAY_METHOD_LABELS[t.method]} · {dayjs(t.date).format("DD/MM/YYYY")}
                   {t.description ? ` · ${t.description}` : ""}
+                  {t.user?.name ? (
+                    <span className="ml-1 inline-block px-1.5 py-0.5 text-xs rounded-full bg-slate-100 text-slate-500 align-middle">
+                      {t.user.name}
+                    </span>
+                  ) : null}
                 </div>
               </div>
               <div className="flex items-center gap-3">

@@ -4,7 +4,7 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
-import { getPublicKey, sendPushToAll } from "../lib/push.js";
+import { getPublicKey, sendPushToUser } from "../lib/push.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -29,16 +29,20 @@ router.post("/subscribe", async (req, res) => {
   res.status(201).json({ ok: true, id: sub.id });
 });
 
-// POST /api/push/unsubscribe → remove a subscription by endpoint.
+// POST /api/push/unsubscribe → remove one of OWN subscriptions by endpoint.
 router.post("/unsubscribe", async (req, res) => {
   const { endpoint } = req.body || {};
-  if (endpoint) await prisma.pushSubscription.deleteMany({ where: { endpoint } });
+  if (endpoint) {
+    await prisma.pushSubscription.deleteMany({
+      where: { endpoint, userId: req.user.id },
+    });
+  }
   res.json({ ok: true });
 });
 
-// POST /api/push/test → send a test notification to all subscriptions.
-router.post("/test", async (_req, res) => {
-  const result = await sendPushToAll({
+// POST /api/push/test → send a test notification to the caller's devices.
+router.post("/test", async (req, res) => {
+  const result = await sendPushToUser(req.user.id, {
     title: "CasaWallet",
     body: "Notifica di prova ✅",
     url: "/",

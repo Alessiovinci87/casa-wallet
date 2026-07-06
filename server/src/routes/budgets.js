@@ -1,6 +1,6 @@
-// Monthly per-category budgets — protected. CRUD on CategoryBudget plus the
-// current-month spending computed from EXPENSE transactions (shared household
-// total, like the dashboard) so the UI can show progress and an over-80% alert.
+// Monthly per-category budgets — protected. Un budget per famiglia+categoria;
+// la spesa del mese corrente è il totale EXPENSE della famiglia, così la UI
+// mostra il progresso e l'alert oltre l'80%.
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
@@ -9,12 +9,13 @@ const router = Router();
 router.use(authMiddleware);
 
 // Sum of household EXPENSE for each category in the current calendar month.
-async function spentByCategoryThisMonth() {
+async function spentByCategoryThisMonth(householdId) {
   const now = new Date();
   const y = now.getUTCFullYear();
   const m = now.getUTCMonth();
   const expenses = await prisma.transaction.findMany({
     where: {
+      householdId,
       type: "EXPENSE",
       date: { gte: new Date(Date.UTC(y, m, 1)), lt: new Date(Date.UTC(y, m + 1, 1)) },
     },
@@ -31,10 +32,10 @@ async function spentByCategoryThisMonth() {
 // GET /api/budgets → [{ id, category, amount, spent, percent, over }]
 router.get("/", async (req, res) => {
   const budgets = await prisma.categoryBudget.findMany({
-    where: { userId: req.user.id },
+    where: { householdId: req.user.householdId },
     orderBy: { category: "asc" },
   });
-  const spent = await spentByCategoryThisMonth();
+  const spent = await spentByCategoryThisMonth(req.user.householdId);
 
   const items = budgets.map((b) => {
     const used = spent.get(b.category) || 0;
@@ -44,7 +45,7 @@ router.get("/", async (req, res) => {
   res.json(items);
 });
 
-// POST /api/budgets → upsert budget for { category, amount } (unique per user+category).
+// POST /api/budgets → upsert budget for { category, amount } (unique per famiglia+categoria).
 router.post("/", async (req, res) => {
   const { category, amount } = req.body || {};
   if (!category || amount == null || Number(amount) <= 0) {
@@ -52,8 +53,8 @@ router.post("/", async (req, res) => {
   }
 
   const budget = await prisma.categoryBudget.upsert({
-    where: { userId_category: { userId: req.user.id, category } },
-    create: { userId: req.user.id, category, amount: Number(amount) },
+    where: { householdId_category: { householdId: req.user.householdId, category } },
+    create: { householdId: req.user.householdId, category, amount: Number(amount) },
     update: { amount: Number(amount) },
   });
   res.status(201).json(budget);
@@ -68,7 +69,7 @@ router.put("/:id", async (req, res) => {
   }
 
   const existing = await prisma.categoryBudget.findUnique({ where: { id } });
-  if (!existing || existing.userId !== req.user.id) {
+  if (!existing || existing.householdId !== req.user.householdId) {
     return res.status(404).json({ error: "Budget non trovato" });
   }
 
@@ -83,7 +84,7 @@ router.put("/:id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   const { id } = req.params;
   const existing = await prisma.categoryBudget.findUnique({ where: { id } });
-  if (!existing || existing.userId !== req.user.id) {
+  if (!existing || existing.householdId !== req.user.householdId) {
     return res.status(404).json({ error: "Budget non trovato" });
   }
   await prisma.categoryBudget.delete({ where: { id } });

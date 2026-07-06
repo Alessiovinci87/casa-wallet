@@ -27,7 +27,10 @@ export function useWebSocket() {
     };
 
     const connect = () => {
-      const ws = new WebSocket(WS_URL);
+      // Il server autentica la connessione e scopa i broadcast per famiglia.
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      const ws = new WebSocket(`${WS_URL}?token=${encodeURIComponent(token)}`);
       wsRef.current = ws;
 
       ws.onmessage = (e) => {
@@ -41,8 +44,10 @@ export function useWebSocket() {
         }
       };
 
-      ws.onclose = () => {
-        if (!closed) retryRef.current = setTimeout(connect, 3000);
+      ws.onclose = (e) => {
+        // 4401 = token rifiutato dal server: inutile ritentare, al prossimo 401
+        // HTTP l'interceptor axios farà comunque il redirect al login.
+        if (!closed && e.code !== 4401) retryRef.current = setTimeout(connect, 3000);
       };
     };
 

@@ -17,8 +17,8 @@ function taxApplies(type, taxPercent) {
   return type === "INCOME" && typeof taxPercent === "number" && taxPercent > 0;
 }
 
-function emit(action, transaction) {
-  broadcast({ event: "transaction_update", payload: { action, transaction } });
+function emit(householdId, action, transaction) {
+  broadcast(householdId, { event: "transaction_update", payload: { action, transaction } });
 }
 
 // POST /api/transactions
@@ -44,6 +44,7 @@ router.post("/", async (req, res) => {
   const transaction = await prisma.transaction.create({
     data: {
       userId: req.user.id,
+      householdId: req.user.householdId,
       amount,
       type,
       category,
@@ -63,17 +64,17 @@ router.post("/", async (req, res) => {
         },
       }),
     },
-    include: { taxSaving: true },
+    include: { taxSaving: true, user: { select: { id: true, name: true } } },
   });
 
-  emit("created", transaction);
+  emit(req.user.householdId, "created", transaction);
   res.status(201).json(transaction);
 });
 
 // GET /api/transactions?month=&year=&type=&category=&method=
 router.get("/", async (req, res) => {
   const { month, year, type, category, method } = req.query;
-  const where = {};
+  const where = { householdId: req.user.householdId };
 
   if (type) where.type = type;
   if (category) where.category = category;
@@ -92,7 +93,7 @@ router.get("/", async (req, res) => {
 
   const transactions = await prisma.transaction.findMany({
     where,
-    include: { taxSaving: true },
+    include: { taxSaving: true, user: { select: { id: true, name: true } } },
     orderBy: { date: "desc" },
   });
   res.json(transactions);
@@ -101,7 +102,11 @@ router.get("/", async (req, res) => {
 // PUT /api/transactions/:id
 router.put("/:id", async (req, res) => {
   const { id } = req.params;
-  const existing = await prisma.transaction.findUnique({ where: { id }, include: { taxSaving: true } });
+  // Scoped alla famiglia: 404 se la transazione appartiene a un'altra famiglia.
+  const existing = await prisma.transaction.findFirst({
+    where: { id, householdId: req.user.householdId },
+    include: { taxSaving: true },
+  });
   if (!existing) {
     return res.status(404).json({ error: "Transazione non trovata" });
   }
@@ -152,17 +157,21 @@ router.put("/:id", async (req, res) => {
   const transaction = await prisma.transaction.update({
     where: { id },
     data,
-    include: { taxSaving: true },
+    include: { taxSaving: true, user: { select: { id: true, name: true } } },
   });
 
-  emit("updated", transaction);
+  emit(req.user.householdId, "updated", transaction);
   res.json(transaction);
 });
 
 // DELETE /api/transactions/:id
 router.delete("/:id", async (req, res) => {
   const { id } = req.params;
-  const existing = await prisma.transaction.findUnique({ where: { id }, include: { taxSaving: true } });
+  // Scoped alla famiglia: 404 se la transazione appartiene a un'altra famiglia.
+  const existing = await prisma.transaction.findFirst({
+    where: { id, householdId: req.user.householdId },
+    include: { taxSaving: true },
+  });
   if (!existing) {
     return res.status(404).json({ error: "Transazione non trovata" });
   }
@@ -173,7 +182,7 @@ router.delete("/:id", async (req, res) => {
   }
   await prisma.transaction.delete({ where: { id } });
 
-  emit("deleted", existing);
+  emit(req.user.householdId, "deleted", existing);
   res.json({ ok: true, id });
 });
 

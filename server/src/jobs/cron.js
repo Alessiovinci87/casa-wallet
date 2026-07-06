@@ -1,6 +1,6 @@
 // Scheduled background jobs. Started once from index.js after the server boots.
 import cron from "node-cron";
-import { sendTaxAlert } from "../lib/taxAlert.js";
+import { sendTaxAlerts } from "../lib/taxAlert.js";
 
 export function startCronJobs() {
   // Tax reminder: 1st day of every month at 09:00 Europe/Rome.
@@ -8,7 +8,7 @@ export function startCronJobs() {
     "0 9 1 * *",
     async () => {
       try {
-        const result = await sendTaxAlert();
+        const result = await sendTaxAlerts();
         console.log("[cron] tax alert:", result);
       } catch (err) {
         console.error("[cron] tax alert fallito:", err);

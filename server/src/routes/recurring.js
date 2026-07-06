@@ -7,10 +7,10 @@ import { authMiddleware } from "../middleware/authMiddleware.js";
 const router = Router();
 router.use(authMiddleware);
 
-// GET /api/recurring → recurring products for the user.
+// GET /api/recurring → recurring products for the family.
 router.get("/", async (req, res) => {
   const items = await prisma.recurringProduct.findMany({
-    where: { userId: req.user.id },
+    where: { householdId: req.user.householdId },
     orderBy: { canonicalName: "asc" },
   });
   res.json(items);
@@ -28,10 +28,11 @@ router.post("/", async (req, res) => {
     intervalDays: intervalDays ?? null,
   };
 
+  const householdId = req.user.householdId;
   const item = await prisma.recurringProduct.upsert({
-    where: { userId_canonicalName: { userId: req.user.id, canonicalName } },
+    where: { householdId_canonicalName: { householdId, canonicalName } },
     update: data,
-    create: { userId: req.user.id, canonicalName, ...data },
+    create: { householdId, canonicalName, ...data },
   });
   res.json(item);
 });
@@ -40,7 +41,7 @@ router.post("/", async (req, res) => {
 router.delete("/:canonicalName", async (req, res) => {
   const canonicalName = decodeURIComponent(req.params.canonicalName);
   await prisma.recurringProduct.deleteMany({
-    where: { userId: req.user.id, canonicalName },
+    where: { householdId: req.user.householdId, canonicalName },
   });
   res.json({ ok: true, canonicalName });
 });

@@ -21,7 +21,10 @@ router.get("/by-category", async (req, res) => {
   const range = dateRange(req.query.from, req.query.to);
   const grouped = await prisma.receiptItem.groupBy({
     by: ["category"],
-    where: range ? { date: range } : undefined,
+    where: {
+      receipt: { householdId: req.user.householdId },
+      ...(range ? { date: range } : {}),
+    },
     _sum: { totalPrice: true },
     _count: { _all: true },
   });
@@ -47,7 +50,11 @@ router.get("/product-trend", async (req, res) => {
   const range = dateRange(req.query.from, req.query.to);
 
   const rows = await prisma.receiptItem.findMany({
-    where: { canonicalName, ...(range ? { date: range } : {}) },
+    where: {
+      canonicalName,
+      receipt: { householdId: req.user.householdId },
+      ...(range ? { date: range } : {}),
+    },
     select: { date: true, store: true, unitPrice: true, totalPrice: true },
     orderBy: { date: "asc" },
   });
@@ -59,7 +66,10 @@ router.get("/by-store", async (req, res) => {
   const range = dateRange(req.query.from, req.query.to);
   const grouped = await prisma.receipt.groupBy({
     by: ["store"],
-    where: range ? { date: range } : undefined,
+    where: {
+      householdId: req.user.householdId,
+      ...(range ? { date: range } : {}),
+    },
     _sum: { total: true },
     _count: { _all: true },
   });
@@ -83,7 +93,10 @@ router.get("/top-products", async (req, res) => {
 
   const grouped = await prisma.receiptItem.groupBy({
     by: ["canonicalName", "category"],
-    where: range ? { date: range } : undefined,
+    where: {
+      receipt: { householdId: req.user.householdId },
+      ...(range ? { date: range } : {}),
+    },
     _sum: { totalPrice: true },
     _count: { _all: true },
     _avg: { unitPrice: true },
@@ -112,6 +125,7 @@ router.get("/store-comparison", async (req, res) => {
   const grouped = await prisma.receiptItem.groupBy({
     by: ["category", "store"],
     where: {
+      receipt: { householdId: req.user.householdId },
       ...(range ? { date: range } : {}),
       unitPrice: { not: null },
       store: { not: null },

@@ -18,16 +18,17 @@ function diffDays(a, b) {
 }
 
 /**
- * Compute the predictive shopping list for a user.
- * @param {string} userId
+ * Compute the predictive shopping list for a household (una lista per famiglia:
+ * gli acquisti di tutti i membri concorrono allo stesso storico).
+ * @param {string} householdId
  * @returns {Promise<Array>} products ordered by urgency (most overdue first)
  */
-export async function computeShoppingList(userId) {
+export async function computeShoppingList(householdId) {
   const now = new Date();
 
   const [items, recurringRows, dismissalRows] = await Promise.all([
     prisma.receiptItem.findMany({
-      where: { receipt: { userId } },
+      where: { receipt: { householdId } },
       select: {
         canonicalName: true,
         category: true,
@@ -38,8 +39,8 @@ export async function computeShoppingList(userId) {
         store: true,
       },
     }),
-    prisma.recurringProduct.findMany({ where: { userId } }),
-    prisma.shoppingListDismissal.findMany({ where: { userId } }),
+    prisma.recurringProduct.findMany({ where: { householdId } }),
+    prisma.shoppingListDismissal.findMany({ where: { householdId } }),
   ]);
 
   const recurringByName = new Map(recurringRows.map((r) => [r.canonicalName, r]));

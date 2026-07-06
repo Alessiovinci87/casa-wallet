@@ -1,10 +1,22 @@
 # CasaWallet — Context
 
-App di gestione economia domestica per 2 utenti fissi (Alessio e moglie).
+App di gestione economia domestica **multi-tenant** (famiglie/household). Nata per 2 utenti (Alessio e moglie), ora con registrazione pubblica in ottica commercializzazione (store Android/iOS via Capacitor in futuro).
 
-## Stato avanzamento (aggiornato 19 giugno 2026)
+## Stato avanzamento (aggiornato 6 luglio 2026)
 
 ### Completato ✅
+- **Multi-tenant / Household (6 lug 2026)** — refactoring completo, testato E2E (36/36 PASS + 3/3 WS)
+  - Modello `Household` (name, inviteCode univoco 8 char); `User.householdId` + `role` String ("OWNER"|"MEMBER", validato in API — niente enum per il vincolo dual-provider)
+  - `Transaction`/`Receipt`: `householdId` denormalizzato + `@@index([householdId, date])`; `RecurringProduct`/`ShoppingListDismissal`/`CategoryBudget`: scoped per famiglia (`userId` → `householdId`); `TaxSaving` PERSONALE via `transaction.userId`; modello `Alert` rimosso (dead code)
+  - `POST /api/auth/register`: crea famiglia (OWNER) XOR join con codice invito (MEMBER); JWT con claim `householdId`+`role`; token vecchi senza claim → 401
+  - Route `/api/household`: GET info+membri, PUT rename e POST regenerate-invite (solo OWNER)
+  - Tutte le query scoped per famiglia; mutazioni `:id` con ownership check (404 fuori famiglia). Chiuse 4 falle: mutazioni cross-user, link transactionId arbitrario, unsubscribe push altrui, WS senza auth
+  - WS autenticato (`/ws?token=`, close 4401), `broadcast(householdId, msg)` solo alla famiglia; relay client→client rimosso
+  - Push: `sendPushToUser`/`sendPushToHousehold` (via `user.householdId`); alert tasse per-utente (`sendTaxAlertForUser`/`sendTaxAlerts`), cron aggiornato
+  - Client: `RegisterPage` (tab crea/unisciti), `SettingsPage` (/settings: nome famiglia, membri, codice invito copia/rigenera), `householdStore`, WS con token, chip nome membro sulle transazioni
+  - Seed: household "Casa" + 2 utenti (user1 OWNER, user2 MEMBER), idempotente
+  - `server/package.json` dev script: `--watch-path=./src` (il watch su tutta la cartella riavviava il server a ogni scrittura SQLite)
+  - Decisioni prodotto confermate: codice invito (no email), verifica email pre-lancio store, dati condivisi in famiglia MA salvadanaio tasse personale
 - Setup monorepo /client + /server
 - Schema Prisma: User, Transaction, TaxSaving, Alert, Receipt, ReceiptItem, RecurringProduct, ShoppingListDismissal, CategoryBudget, PushSubscription
   - Su `origin/main` (produzione): `provider postgresql` + enum `TxType`/`PayMethod`
@@ -59,15 +71,16 @@ App di gestione economia domestica per 2 utenti fissi (Alessio e moglie).
 - [x] ~~Debounce filtro anno in TransactionsPage~~ — fatto (19 giu 2026)
 
 ### Prossima sessione — note di ripartenza
-- Le modifiche locali a `schema.prisma` (SQLite + String) e la migration sono **non committate**: decidere se committarle su un branch dev separato o tenerle solo locali.
-- Per riavviare l'ambiente locale: `cd server && npm run dev` (DB SQLite `dev.db` già migrato e popolato; rieseguire `npx prisma migrate dev` solo se lo schema cambia).
+- Working tree locale: `schema.prisma` in versione SQLite (provider sqlite + `type`/`method` String) — override **non committato**, come da strategia dual-provider. La versione committata è postgres+enum CON le modifiche household.
+- Per riavviare l'ambiente locale: `cd server && npm run dev` (DB SQLite `dev.db` migrato con household e popolato dal seed).
+- Roadmap concordata (6 lug 2026): ① redesign UI stile home banking (task in corso) → ② motore di tesoreria (scadenze fiscali, simulatore auto-finanziamento, % minima suggerita con avviso se la % utente è sotto) → ③ import FatturaPA XML + connettori Aruba e Fattura24 (gestionale della moglie) → ④ Capacitor per store Android/iOS + in-app purchase → ⑤ home banking (open banking PSD2, es. GoCardless).
 
 ## Stack
 - /client: React + Vite + Tailwind → Vercel
 - /server: Node + Express + Prisma + PostgreSQL → Railway
 
-## Utenti
-Solo 2 account fissi, creati via seed. Nessuna registrazione pubblica.
+## Utenti / Tenancy
+Registrazione pubblica: chi si registra crea una famiglia (diventa OWNER) o entra in una esistente col codice invito (MEMBER). Tutti i dati sono condivisi dentro la famiglia, tranne il salvadanaio tasse (personale per utente). Il seed crea la famiglia "Casa" con i 2 account storici.
 
 ## Funzionalità core
 - Entrate/uscite con categoria, metodo pagamento (contanti/POS/carta/bonifico)
@@ -84,9 +97,16 @@ Vedi /server/.env.example e /client/.env.example
 Tutte le route (eccetto login) richiedono header `Authorization: Bearer <token>`.
 
 ### Auth (`/api/auth`)
-- `POST /login` → `{ token, user: {id, name, email} }`
-- `POST /refresh` → rinnova il token (richiede token)
+- `POST /register` → body `{ name, email, password, householdName? XOR inviteCode? }` → 201 `{ token, user, household: {id, name, inviteCode} }`. Errori: 400 (campi/password<8/XOR), 409 (email esistente), 404 (codice invito)
+- `POST /login` → `{ token, user: {id, name, email, householdId, role} }`
+- `POST /refresh` → rinnova il token rileggendo l'utente dal DB (claims freschi)
 - `GET /me` → utente corrente
+- JWT payload: `{ sub, email, name, householdId, role }`; token senza `householdId` → 401 ovunque
+
+### Household (`/api/household`) — protette
+- `GET /` → `{ id, name, inviteCode, createdAt, members: [{id, name, email, role, createdAt}] }`
+- `PUT /` body `{ name }` → rename (403 se non OWNER)
+- `POST /regenerate-invite` → nuovo codice, il vecchio muore (403 se non OWNER)
 
 ### Transactions (`/api/transactions`) — protette
 - `POST /` → crea transazione; se `type=INCOME` e `taxPercent>0` crea anche il TaxSaving collegato
@@ -95,7 +115,7 @@ Tutte le route (eccetto login) richiedono header `Authorization: Bearer <token>`
 - `DELETE /:id` → elimina (rimuove anche il TaxSaving collegato)
 - Ogni POST/PUT/DELETE → broadcast WebSocket: `{ event: "transaction_update", payload: { action, transaction } }`
 
-### Tax Savings (`/api/tax-savings`) — protette
+### Tax Savings (`/api/tax-savings`) — protette, PERSONALI (solo i propri, via transaction.userId)
 - `GET /` → `{ totalPending, items }`
 - `GET /summary` → `{ totalPending, byMonth: [{month, year, amount, transferred}] }`
 - `PUT /:id/transfer` → marca come trasferito
@@ -140,7 +160,7 @@ Tutte le route (eccetto login) richiedono header `Authorization: Bearer <token>`
 Logica predittiva (dettaglio): per ogni `canonicalName` si prendono le date di acquisto (1 per giorno), si calcola l'intervallo medio semplice in giorni; `predictedNextPurchase = ultimo acquisto + intervallo`; `isDue` quando `daysRemaining <= 0`. Servono ≥2 acquisti per una previsione (con 1 solo acquisto: `isDue=false`, `avgIntervalDays=null`, ma il prodotto resta nella risposta come "non ancora prevedibile"). `RecurringProduct.alwaysBuy` forza `isDue=true` anche con pochi dati; `intervalDays` sovrascrive la media. Una dismissal esclude il prodotto solo se più recente dell'ultimo acquisto.
 
 ## WebSocket
-Endpoint `ws://<host>/ws`. Eventi server→client per il sync real-time: `transaction_update` (transazioni), `receipt_update` (scontrini), `shopping_list_update` (dismissal lista spesa).
+Endpoint `ws://<host>/ws?token=<jwt>` — connessione autenticata (senza/invalid token → close 4401). Eventi server→client scoped per famiglia: `transaction_update`, `receipt_update`, `shopping_list_update`.
 
 ## Struttura client (`/client/src`)
 - `lib/api.js` — istanza axios (baseURL `VITE_API_URL`), interceptor: aggiunge `Bearer` token; su 401 logout + redirect `/login` **solo se era presente un token** (no logout su 401 anonimi/boot)
@@ -160,7 +180,7 @@ Endpoint `ws://<host>/ws`. Eventi server→client per il sync real-time: `transa
 - `public/sw.js` — service worker per le notifiche Web Push (eventi `push` + `notificationclick`)
 
 ### Routing
-Pubbliche: `/login`. Protette (PrivateRoute → Layout): `/` (Dashboard), `/transactions`, `/tax-savings`, `/ocr` (Nuova spesa), `/analytics` (Analisi), `/shopping-list` (Lista spesa), `/budgets` (Budget), `/summary` (Riepilogo rapido).
+Pubbliche: `/login`, `/register`. Protette (PrivateRoute → Layout): `/` (Dashboard), `/transactions`, `/tax-savings`, `/ocr` (Nuova spesa), `/analytics` (Analisi), `/shopping-list` (Lista spesa), `/budgets` (Budget), `/summary` (Riepilogo rapido), `/settings` (Impostazioni famiglia).
 
 ### Env client
 `VITE_API_URL`, `VITE_WS_URL` — vedi `/client/.env.example`.

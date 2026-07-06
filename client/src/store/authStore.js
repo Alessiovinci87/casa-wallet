@@ -32,6 +32,22 @@ export const useAuthStore = create((set) => ({
     return data.user;
   },
 
+  // Registrazione: crea una nuova famiglia (householdName) oppure si unisce a
+  // una esistente (inviteCode). Stessa persistenza sessione del login.
+  register: async ({ name, email, password, householdName, inviteCode }) => {
+    const { data } = await api.post("/api/auth/register", {
+      name,
+      email,
+      password,
+      ...(householdName ? { householdName } : {}),
+      ...(inviteCode ? { inviteCode } : {}),
+    });
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("user", JSON.stringify(data.user));
+    set({ token: data.token, user: data.user, hydrated: true });
+    return data;
+  },
+
   logout: () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");

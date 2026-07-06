@@ -4,6 +4,8 @@ import { useAuthStore } from "./store/authStore.js";
 import PrivateRoute from "./components/PrivateRoute.jsx";
 import Layout from "./components/Layout.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
+import RegisterPage from "./pages/RegisterPage.jsx";
+import SettingsPage from "./pages/SettingsPage.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import TransactionsPage from "./pages/TransactionsPage.jsx";
 import TaxSavingsPage from "./pages/TaxSavingsPage.jsx";
@@ -36,6 +38,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
         <Route
           element={
             <PrivateRoute>
@@ -51,6 +54,7 @@ function App() {
           <Route path="/shopping-list" element={<ShoppingListPage />} />
           <Route path="/budgets" element={<BudgetsPage />} />
           <Route path="/summary" element={<SummaryPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

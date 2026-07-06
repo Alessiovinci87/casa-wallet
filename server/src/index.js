@@ -9,6 +9,7 @@ import dotenv from "dotenv";
 import { initWebSocket } from "./lib/ws.js";
 import { startCronJobs } from "./jobs/cron.js";
 import authRouter from "./routes/auth.js";
+import householdRouter from "./routes/household.js";
 import transactionsRouter from "./routes/transactions.js";
 import taxSavingsRouter from "./routes/taxSavings.js";
 import ocrRouter from "./routes/ocr.js";
@@ -49,6 +50,7 @@ app.get("/api/health", (_req, res) => {
 
 // --- Routes ---
 app.use("/api/auth", authRouter);
+app.use("/api/household", householdRouter);
 app.use("/api/transactions", transactionsRouter);
 app.use("/api/tax-savings", taxSavingsRouter);
 app.use("/api/ocr", ocrRouter);

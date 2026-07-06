@@ -52,6 +52,7 @@ router.post("/", async (req, res) => {
       const transaction = await tx.transaction.create({
         data: {
           userId: req.user.id,
+          householdId: req.user.householdId,
           amount: total,
           type: "EXPENSE",
           category: category || "Spesa",
@@ -63,6 +64,7 @@ router.post("/", async (req, res) => {
       const receipt = await tx.receipt.create({
         data: {
           userId: req.user.id,
+          householdId: req.user.householdId,
           store: store ?? null,
           total,
           date: receiptDate,
@@ -74,15 +76,25 @@ router.post("/", async (req, res) => {
       return [transaction, receipt];
     });
 
-    broadcast({ event: "transaction_update", payload: { action: "created", transaction } });
-    broadcast({ event: "receipt_update", payload: { action: "created", receipt } });
+    broadcast(req.user.householdId, { event: "transaction_update", payload: { action: "created", transaction } });
+    broadcast(req.user.householdId, { event: "receipt_update", payload: { action: "created", receipt } });
     return res.status(201).json(receipt);
   }
 
   // Path 2: receipt only, optionally linked to an existing transaction.
+  // La transazione da collegare deve appartenere alla famiglia del chiamante.
+  if (transactionId) {
+    const tx = await prisma.transaction.findFirst({
+      where: { id: transactionId, householdId: req.user.householdId },
+    });
+    if (!tx) {
+      return res.status(404).json({ error: "Transazione da collegare non trovata" });
+    }
+  }
   const receipt = await prisma.receipt.create({
     data: {
       userId: req.user.id,
+      householdId: req.user.householdId,
       store: store ?? null,
       total,
       date: receiptDate,
@@ -92,14 +104,14 @@ router.post("/", async (req, res) => {
     include: { items: true },
   });
 
-  broadcast({ event: "receipt_update", payload: { action: "created", receipt } });
+  broadcast(req.user.householdId, { event: "receipt_update", payload: { action: "created", receipt } });
   res.status(201).json(receipt);
 });
 
 // GET /api/receipts?store=&from=&to=  → receipts with items, newest first.
 router.get("/", async (req, res) => {
   const { store, from, to } = req.query;
-  const where = {};
+  const where = { householdId: req.user.householdId };
 
   if (store) where.store = store;
   if (from || to) {

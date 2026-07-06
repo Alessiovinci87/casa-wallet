@@ -12,6 +12,7 @@ const links = [
   { to: "/shopping-list", label: "Lista spesa" },
   { to: "/budgets", label: "Budget" },
   { to: "/summary", label: "Riepilogo" },
+  { to: "/settings", label: "Impostazioni" },
 ];
 
 export default function Layout() {

@@ -21,17 +21,17 @@ export function getPublicKey() {
 }
 
 /**
- * Send a push notification to every stored subscription. Stale subscriptions
+ * Send a push notification to the given subscriptions. Stale subscriptions
  * (404/410) are pruned automatically.
+ * @param {Array} subs rows from PushSubscription
  * @param {{ title: string, body: string, url?: string }} msg
  */
-export async function sendPushToAll({ title, body, url = "/" }) {
+async function sendToSubscriptions(subs, { title, body, url = "/" }) {
   if (!ensureConfigured()) {
     console.warn(`[push] VAPID non configurato — push saltata: "${title}"`);
     return { skipped: true };
   }
 
-  const subs = await prisma.pushSubscription.findMany();
   const payload = JSON.stringify({ title, body, url });
   let sent = 0;
 
@@ -54,4 +54,26 @@ export async function sendPushToAll({ title, body, url = "/" }) {
   );
 
   return { sent, total: subs.length };
+}
+
+/**
+ * Push a tutti i device di un singolo utente (es. promemoria tasse personale).
+ * @param {string} userId
+ * @param {{ title: string, body: string, url?: string }} msg
+ */
+export async function sendPushToUser(userId, msg) {
+  const subs = await prisma.pushSubscription.findMany({ where: { userId } });
+  return sendToSubscriptions(subs, msg);
+}
+
+/**
+ * Push a tutti i device di tutti i membri di una famiglia.
+ * @param {string} householdId
+ * @param {{ title: string, body: string, url?: string }} msg
+ */
+export async function sendPushToHousehold(householdId, msg) {
+  const subs = await prisma.pushSubscription.findMany({
+    where: { user: { householdId } },
+  });
+  return sendToSubscriptions(subs, msg);
 }

@@ -1,15 +1,18 @@
 // Tax savings ("salvadanaio tasse") routes — all protected.
+// Il salvadanaio è PERSONALE: ogni utente vede e gestisce solo i propri
+// accantonamenti (via transaction.userId), anche dentro la stessa famiglia.
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
-import { sendTaxAlert } from "../lib/taxAlert.js";
+import { sendTaxAlertForUser } from "../lib/taxAlert.js";
 
 const router = Router();
 router.use(authMiddleware);
 
 // GET /api/tax-savings → total pending (not transferred) + full list by month/year.
-router.get("/", async (_req, res) => {
+router.get("/", async (req, res) => {
   const items = await prisma.taxSaving.findMany({
+    where: { transaction: { userId: req.user.id } },
     orderBy: [{ year: "desc" }, { month: "desc" }],
     include: { transaction: true },
   });
@@ -22,8 +25,9 @@ router.get("/", async (_req, res) => {
 });
 
 // GET /api/tax-savings/summary → { totalPending, byMonth: [{month, year, amount, transferred}] }
-router.get("/summary", async (_req, res) => {
+router.get("/summary", async (req, res) => {
   const items = await prisma.taxSaving.findMany({
+    where: { transaction: { userId: req.user.id } },
     orderBy: [{ year: "desc" }, { month: "desc" }],
   });
 
@@ -48,7 +52,10 @@ router.get("/summary", async (_req, res) => {
 // PUT /api/tax-savings/:id/transfer → mark as transferred.
 router.put("/:id/transfer", async (req, res) => {
   const { id } = req.params;
-  const existing = await prisma.taxSaving.findUnique({ where: { id } });
+  // Solo i propri accantonamenti: 404 se di un altro utente.
+  const existing = await prisma.taxSaving.findFirst({
+    where: { id, transaction: { userId: req.user.id } },
+  });
   if (!existing) {
     return res.status(404).json({ error: "Salvadanaio non trovato" });
   }
@@ -60,11 +67,11 @@ router.put("/:id/transfer", async (req, res) => {
   res.json(updated);
 });
 
-// POST /api/tax-savings/send-alert → invia subito l'email di promemoria tasse
-// (utile per testare il contenuto senza aspettare il cron mensile).
-router.post("/send-alert", async (_req, res) => {
+// POST /api/tax-savings/send-alert → invia subito l'email+push di promemoria
+// tasse al solo chiamante (utile per testare senza aspettare il cron mensile).
+router.post("/send-alert", async (req, res) => {
   try {
-    const result = await sendTaxAlert({ force: true });
+    const result = await sendTaxAlertForUser(req.user.id, { force: true });
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message || "Invio alert fallito" });
