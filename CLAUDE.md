@@ -2,9 +2,17 @@
 
 App di gestione economia domestica **multi-tenant** (famiglie/household). Nata per 2 utenti (Alessio e moglie), ora con registrazione pubblica in ottica commercializzazione (store Android/iOS via Capacitor in futuro).
 
-## Stato avanzamento (aggiornato 6 luglio 2026)
+## Stato avanzamento (aggiornato 13 luglio 2026)
 
 ### Completato ✅
+- **Capacitor Android — primo APK debug (13 lug 2026)** — commit `508e733`
+  - `client/capacitor.config.json` (appId `com.casawallet.app`, webDir `dist`) + progetto nativo `client/android/` committato
+  - `client/.env.production` con URL Railway → le build native puntano alla prod (le env Vercel hanno comunque precedenza in build cloud)
+  - CORS server: aggiunte le origini webview Capacitor (`https://localhost`, `http://localhost`, `capacitor://localhost`) — deployato e verificato con preflight
+  - Toolchain locale senza admin: JDK 21 portable `C:\Users\aless\dev-tools\jdk-21`, Android SDK `C:\Users\aless\dev-tools\android-sdk` (android-35, build-tools 35); `client/android/local.properties` (gitignored) punta all'SDK
+  - Rebuild: in `/client` `npm run build && npx cap sync android`, poi in `/client/android` con `JAVA_HOME` al JDK portable: `.\gradlew.bat assembleDebug` → `android/app/build/outputs/apk/debug/app-debug.apk`
+  - Resta per lo store: icona/splash (da `client/public/favicon.svg` via @capacitor/assets), push native FCM (Web Push non funziona in webview, già guardato da `pushSupported()`), keystore + AAB release, account Google Play; iOS richiede un Mac
+- **Azioni prod chiuse (13 lug 2026)**: `INVOICE_CRED_SECRET` impostata su Railway (via CLI, progetto `vibrant-gratitude`/servizio `casa-wallet`); prod verificata E2E via API (register+login+JWT, account di test `test-claude-20260713@casawallet.local` da rimuovere col reset pre-lancio). NB: password seed prod = env Railway, diversa da quella locale
 - **Fatture elettroniche: import FatturaPA XML + connettore Aruba (6 lug 2026)** — testato E2E (parser 33/33, route 17/17)
   - Modelli `Invoice` (PERSONALE: numero+year dedupe `@@unique([userId,numero,year])`, importi imponibile/iva/ritenuta/cassa/bollo/grossTotal/netToPay, status EMESSA|INCASSATA, link 1:1 a Transaction) e `ArubaConnection` (credenziali cifrate AES-256-GCM, chiave env `INVOICE_CRED_SECRET`); `FiscalProfile.partitaIva` (verifica proprietà fatture)
   - `lib/fatturapa.js`: parser puro namespace-agnostic (fast-xml-parser, aritmetica in centesimi), multi-body (lotto), totali SEMPRE da DatiRiepilogo (`ImportoTotaleDocumento` è opzionale), netto = imponibile+iva+bollo−ritenuta, cross-check pagamenti→warning; `sniffP7m` (p7m rifiutati in v1); TD04/divisa≠EUR → skip
