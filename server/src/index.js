@@ -31,10 +31,18 @@ const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
 const app = express();
 
 // Allow the configured client URL, any Vercel preview deploy (*.vercel.app),
+// the Capacitor webview (https://localhost on Android, capacitor://localhost on iOS)
 // and non-browser requests (no Origin header, e.g. curl/health checks).
+const CAPACITOR_ORIGINS = new Set([
+  "https://localhost",
+  "http://localhost",
+  "capacitor://localhost",
+]);
+
 function corsOrigin(origin, cb) {
   if (!origin) return cb(null, true);
   if (origin === CLIENT_URL) return cb(null, true);
+  if (CAPACITOR_ORIGINS.has(origin)) return cb(null, true);
   try {
     if (new URL(origin).hostname.endsWith(".vercel.app")) return cb(null, true);
   } catch {
