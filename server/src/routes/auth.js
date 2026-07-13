@@ -40,7 +40,9 @@ function publicUser(user) {
 //  - householdName → crea una nuova famiglia, l'utente è OWNER
 //  - inviteCode    → si unisce alla famiglia esistente come MEMBER
 router.post("/register", async (req, res) => {
-  const { name, email, password, householdName, inviteCode } = req.body || {};
+  const { name, password, householdName, inviteCode } = req.body || {};
+  // Email normalizzata: "Mario@x.com" e "mario@x.com" sono lo stesso account.
+  const email = String(req.body?.email || "").trim().toLowerCase();
 
   if (!name || !email || !password) {
     return res.status(400).json({ error: "Nome, email e password obbligatori" });
@@ -65,26 +67,34 @@ router.post("/register", async (req, res) => {
 
   let user;
   let household;
-  if (householdName) {
-    // Modalità A: nuova famiglia + utente OWNER, atomico.
-    ({ user, household } = await prisma.$transaction(async (tx) => {
-      const h = await createHouseholdWithUniqueCode(tx, householdName.trim());
-      const u = await tx.user.create({
-        data: { name, email, passwordHash, householdId: h.id, role: "OWNER" },
+  try {
+    if (householdName) {
+      // Modalità A: nuova famiglia + utente OWNER, atomico.
+      ({ user, household } = await prisma.$transaction(async (tx) => {
+        const h = await createHouseholdWithUniqueCode(tx, householdName.trim());
+        const u = await tx.user.create({
+          data: { name, email, passwordHash, householdId: h.id, role: "OWNER" },
+        });
+        return { user: u, household: h };
+      }));
+    } else {
+      // Modalità B: join con codice invito.
+      household = await prisma.household.findUnique({
+        where: { inviteCode: String(inviteCode).trim().toUpperCase() },
       });
-      return { user: u, household: h };
-    }));
-  } else {
-    // Modalità B: join con codice invito.
-    household = await prisma.household.findUnique({
-      where: { inviteCode: String(inviteCode).trim().toUpperCase() },
-    });
-    if (!household) {
-      return res.status(404).json({ error: "Codice invito non valido" });
+      if (!household) {
+        return res.status(404).json({ error: "Codice invito non valido" });
+      }
+      user = await prisma.user.create({
+        data: { name, email, passwordHash, householdId: household.id, role: "MEMBER" },
+      });
     }
-    user = await prisma.user.create({
-      data: { name, email, passwordHash, householdId: household.id, role: "MEMBER" },
-    });
+  } catch (err) {
+    // Race sul check email: due registrazioni concorrenti → unique violation.
+    if (err?.code === "P2002") {
+      return res.status(409).json({ error: "Email già registrata" });
+    }
+    throw err;
   }
 
   const token = signToken(user);
@@ -97,7 +107,8 @@ router.post("/register", async (req, res) => {
 
 // POST /api/auth/login
 router.post("/login", async (req, res) => {
-  const { email, password } = req.body || {};
+  const { password } = req.body || {};
+  const email = String(req.body?.email || "").trim().toLowerCase();
   if (!email || !password) {
     return res.status(400).json({ error: "Email e password obbligatorie" });
   }

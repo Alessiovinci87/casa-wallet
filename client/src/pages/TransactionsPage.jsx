@@ -123,7 +123,18 @@ export default function TransactionsPage() {
                   {t.type === "INCOME" ? "+" : "−"}{eur(t.amount)}
                 </span>
                 <button onClick={() => openEdit(t)} className="text-ink-400 hover:text-brand-600" title="Modifica">✎</button>
-                <button onClick={() => deleteTransaction(t.id)} className="text-ink-400 hover:text-rose-600" title="Elimina">✕</button>
+                <button
+                  onClick={async () => {
+                    if (!window.confirm(`Eliminare "${t.description || "questa transazione"}" (${eur(t.amount)})?`)) return;
+                    try {
+                      await deleteTransaction(t.id);
+                    } catch {
+                      window.alert("Eliminazione non riuscita, riprova.");
+                    }
+                  }}
+                  className="text-ink-400 hover:text-rose-600"
+                  title="Elimina"
+                >✕</button>
               </div>
             </div>
           ))

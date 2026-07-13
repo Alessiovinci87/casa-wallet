@@ -175,6 +175,86 @@ function addMonths(date, n) {
   return d;
 }
 
+// Incassi attesi: fatture EMESSE non ancora incassate, con data d'incasso
+// stimata dallo storico. Il ritardo mediano richiede ≥3 fatture già incassate;
+// sotto quella soglia si usa un default prudenziale di 45 giorni.
+const DEFAULT_COLLECTION_DELAY_DAYS = 45;
+const MIN_DELAY_SAMPLES = 3;
+
+async function computeExpectedCollections({ userId, todayUTC, fallbackTaxPercent }) {
+  const [pending, collected, fiscalProfile] = await Promise.all([
+    prisma.invoice.findMany({
+      where: { userId, status: "EMESSA" },
+      select: { date: true, dueDate: true, netToPay: true },
+    }),
+    prisma.invoice.findMany({
+      where: { userId, status: "INCASSATA", collectedAt: { not: null } },
+      select: { date: true, collectedAt: true },
+      orderBy: { collectedAt: "desc" },
+      take: 24, // le più recenti: i tempi d'incasso cambiano nel tempo
+    }),
+    prisma.fiscalProfile.findUnique({
+      where: { userId },
+      select: { defaultTaxPercent: true },
+    }),
+  ]);
+
+  if (pending.length === 0) return null;
+
+  const delays = collected
+    .map((inv) => Math.max(0, Math.round((inv.collectedAt - inv.date) / MS_PER_DAY)))
+    .sort((a, b) => a - b);
+  const delayDays =
+    delays.length >= MIN_DELAY_SAMPLES
+      ? Math.round(percentile(delays, 0.5))
+      : DEFAULT_COLLECTION_DELAY_DAYS;
+  const delaySource = delays.length >= MIN_DELAY_SAMPLES ? "storico" : "default";
+
+  // All'incasso una quota va al salvadanaio tasse: come capacità di rientro
+  // conta solo il netto dopo l'accantonamento.
+  const taxPercent = fiscalProfile?.defaultTaxPercent ?? fallbackTaxPercent ?? 0;
+
+  const items = pending.map((inv) => {
+    const estimated = inv.dueDate ?? new Date(inv.date.getTime() + delayDays * MS_PER_DAY);
+    const expectedAt = estimated > todayUTC ? estimated : todayUTC;
+    return { expectedAt, net: inv.netToPay * (1 - taxPercent / 100) };
+  });
+  items.sort((a, b) => a.expectedAt - b.expectedAt);
+
+  const gross = pending.reduce((s, inv) => s + inv.netToPay, 0);
+  const net = items.reduce((s, it) => s + it.net, 0);
+
+  return {
+    count: pending.length,
+    gross: Number(gross.toFixed(2)),
+    net: Number(net.toFixed(2)),
+    taxPercent,
+    delayDays,
+    delaySource,
+    nextExpectedAt: items[0].expectedAt,
+    items,
+  };
+}
+
+/**
+ * Mesi per rientrare di `amount` con capacità mensile + incassi attesi che
+ * arrivano lungo la strada (cumulati alla fine di ogni mese). Ritorna null se
+ * non si rientra entro 10 anni (non dovrebbe accadere con capacità > 0).
+ */
+function monthsToRepayWithCollections(amount, monthlyCapacity, collections, todayUTC) {
+  let collectedSoFar = 0;
+  let idx = 0;
+  for (let m = 1; m <= 120; m++) {
+    const windowEnd = addMonths(todayUTC, m);
+    while (idx < collections.length && collections[idx].expectedAt <= windowEnd) {
+      collectedSoFar += collections[idx].net;
+      idx += 1;
+    }
+    if (monthlyCapacity * m + collectedSoFar >= amount) return m;
+  }
+  return null;
+}
+
 /**
  * Simulazione: "posso prendere `amount` € dal fondo tasse e rientrare prima
  * della prossima scadenza?" Tre scenari dai percentili della capacità mensile.
@@ -203,17 +283,31 @@ export async function simulateSelfFinancing({ userId, householdId, amount, scope
 
   const fundAvailable = pendingSavings.reduce((s, t) => s + t.amount, 0);
 
+  // Incassi attesi (fatture EMESSE): accelerano il rientro negli scenari
+  // realistico e ottimista; lo scenario pessimista li ignora per prudenza.
+  const expectedCollections = await computeExpectedCollections({
+    userId,
+    todayUTC,
+    fallbackTaxPercent: profile.effectiveTaxPercent,
+  });
+
   const scenarioDefs = [
-    { name: "pessimista", monthlyCapacity: profile.capacity.buffered.p25 },
-    { name: "realistico", monthlyCapacity: profile.capacity.buffered.p50 },
-    { name: "ottimista", monthlyCapacity: profile.capacity.buffered.p75 },
+    { name: "pessimista", monthlyCapacity: profile.capacity.buffered.p25, useCollections: false },
+    { name: "realistico", monthlyCapacity: profile.capacity.buffered.p50, useCollections: true },
+    { name: "ottimista", monthlyCapacity: profile.capacity.buffered.p75, useCollections: true },
   ];
 
-  const scenarios = scenarioDefs.map(({ name, monthlyCapacity }) => {
+  const scenarios = scenarioDefs.map(({ name, monthlyCapacity, useCollections }) => {
+    const withCollections = useCollections && expectedCollections != null;
     if (monthlyCapacity == null || monthlyCapacity <= 0) {
-      return { name, monthlyCapacity, monthsToRepay: null, repaidBy: null, verdict: "NO" };
+      return { name, monthlyCapacity, monthsToRepay: null, repaidBy: null, verdict: "NO", withCollections: false };
     }
-    const monthsToRepay = Math.ceil(amount / monthlyCapacity);
+    const monthsToRepay = withCollections
+      ? monthsToRepayWithCollections(amount, monthlyCapacity, expectedCollections.items, todayUTC)
+      : Math.ceil(amount / monthlyCapacity);
+    if (monthsToRepay == null) {
+      return { name, monthlyCapacity, monthsToRepay: null, repaidBy: null, verdict: "NO", withCollections };
+    }
     const repaidBy = addMonths(todayUTC, monthsToRepay);
     let verdict;
     if (!nextDeadline) {
@@ -225,7 +319,7 @@ export async function simulateSelfFinancing({ userId, householdId, amount, scope
     } else {
       verdict = "NO";
     }
-    return { name, monthlyCapacity, monthsToRepay, repaidBy, verdict };
+    return { name, monthlyCapacity, monthsToRepay, repaidBy, verdict, withCollections };
   });
 
   const byName = Object.fromEntries(scenarios.map((s) => [s.name, s.verdict]));
@@ -243,6 +337,18 @@ export async function simulateSelfFinancing({ userId, householdId, amount, scope
     exceedsFund: amount > fundAvailable,
     overdueCount,
     nextDeadline,
+    // Metadati per la UI (senza la lista items, interna alla simulazione).
+    expectedCollections: expectedCollections
+      ? {
+          count: expectedCollections.count,
+          gross: expectedCollections.gross,
+          net: expectedCollections.net,
+          taxPercent: expectedCollections.taxPercent,
+          delayDays: expectedCollections.delayDays,
+          delaySource: expectedCollections.delaySource,
+          nextExpectedAt: expectedCollections.nextExpectedAt,
+        }
+      : null,
     scenarios,
     overallVerdict,
     profile: {

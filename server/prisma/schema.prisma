@@ -121,6 +121,10 @@ model ReceiptItem {
   store         String?
   date          DateTime
   createdAt     DateTime @default(now())
+
+  // Le analytics raggruppano/filtrano per canonicalName e joinano su receiptId.
+  @@index([receiptId])
+  @@index([canonicalName])
 }
 
 model RecurringProduct {

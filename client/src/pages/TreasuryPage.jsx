@@ -323,6 +323,26 @@ export default function TreasuryPage() {
               </div>
             </div>
 
+            {/* Incassi attesi (fatture emesse non ancora incassate) */}
+            {simulation.expectedCollections && (
+              <div className="card p-4 text-sm bg-brand-50/50">
+                <div className="font-semibold mb-1">
+                  Incassi attesi: {simulation.expectedCollections.count}{" "}
+                  {simulation.expectedCollections.count === 1 ? "fattura" : "fatture"} per{" "}
+                  <span className="nums">{eur(simulation.expectedCollections.gross)}</span>
+                </div>
+                <p className="text-xs text-ink-600">
+                  Al netto dell'accantonamento tasse ({simulation.expectedCollections.taxPercent}%) valgono{" "}
+                  <strong className="nums">{eur(simulation.expectedCollections.net)}</strong> di capacità di rientro.
+                  Primo incasso stimato: <strong>{dayjs(simulation.expectedCollections.nextExpectedAt).format("D MMM YYYY")}</strong>{" "}
+                  ({simulation.expectedCollections.delaySource === "storico"
+                    ? `in base ai tuoi tempi medi d'incasso, ~${simulation.expectedCollections.delayDays} gg`
+                    : `stima prudenziale ${simulation.expectedCollections.delayDays} gg, ancora pochi incassi storici`}).
+                  Contano negli scenari realistico e ottimista; il pessimista li esclude per prudenza.
+                </p>
+              </div>
+            )}
+
             {/* Scenari */}
             <div className="grid sm:grid-cols-3 gap-3">
               {simulation.scenarios.map((s) => (
@@ -340,6 +360,11 @@ export default function TreasuryPage() {
                       <div>Rientro: <strong className="nums">{eur(s.monthlyCapacity)}</strong>/mese</div>
                       <div>Tempo: <strong>{s.monthsToRepay} {s.monthsToRepay === 1 ? "mese" : "mesi"}</strong></div>
                       <div>Reintegro entro: <strong>{dayjs(s.repaidBy).format("D MMM YYYY")}</strong></div>
+                      {simulation.expectedCollections && (
+                        <div className="text-ink-400">
+                          {s.withCollections ? "Include gli incassi attesi" : "Senza incassi attesi"}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

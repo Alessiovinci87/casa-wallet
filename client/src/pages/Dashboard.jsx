@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTransactionStore } from "../store/transactionStore.js";
 import { useTaxStore } from "../store/taxStore.js";
 import api from "../lib/api.js";
 import { eur } from "../lib/format.js";
 import { PAY_METHOD_LABELS } from "../lib/constants.js";
-import BalanceTrendChart from "../components/BalanceTrendChart.jsx";
 import NotificationsToggle from "../components/NotificationsToggle.jsx";
+
+// Lazy: recharts (~150KB) esce dal bundle iniziale; il grafico appare al mount.
+const BalanceTrendChart = lazy(() => import("../components/BalanceTrendChart.jsx"));
 
 const now = new Date();
 const MONTH = now.getMonth() + 1;
@@ -202,7 +204,9 @@ export default function Dashboard() {
         <div className="text-xl sm:text-2xl font-bold text-ink-900 nums">{eur(forecastExpense)}</div>
       </div>
 
-      <BalanceTrendChart transactions={transactions} month={MONTH} year={YEAR} />
+      <Suspense fallback={<div className="card h-64 animate-pulse" />}>
+        <BalanceTrendChart transactions={transactions} month={MONTH} year={YEAR} />
+      </Suspense>
 
       <div className="card p-4">
         <h2 className="text-sm font-semibold text-ink-600 mb-3">Entrate vs Uscite</h2>

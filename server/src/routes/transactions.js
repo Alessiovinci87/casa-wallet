@@ -37,22 +37,34 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ error: "method non valido (CASH | POS | CARD | TRANSFER)" });
   }
 
+  const amountNum = Number(amount);
+  if (!Number.isFinite(amountNum) || amountNum <= 0) {
+    return res.status(400).json({ error: "amount deve essere un numero > 0" });
+  }
   const when = new Date(date);
-  const applies = taxApplies(type, taxPercent);
-  const taxAmount = applies ? Number((amount * taxPercent) / 100) : null;
+  if (Number.isNaN(when.getTime())) {
+    return res.status(400).json({ error: "date non valida" });
+  }
+  const taxPct = taxPercent == null || taxPercent === "" ? null : Number(taxPercent);
+  if (taxPct != null && (!Number.isFinite(taxPct) || taxPct < 0 || taxPct > 100)) {
+    return res.status(400).json({ error: "taxPercent deve essere tra 0 e 100" });
+  }
+
+  const applies = taxApplies(type, taxPct);
+  const taxAmount = applies ? Number((amountNum * taxPct) / 100) : null;
 
   const transaction = await prisma.transaction.create({
     data: {
       userId: req.user.id,
       householdId: req.user.householdId,
-      amount,
+      amount: amountNum,
       type,
       category,
       subcategory: subcategory ?? null,
       method,
       description: description ?? null,
       date: when,
-      taxPercent: applies ? taxPercent : null,
+      taxPercent: applies ? taxPct : null,
       taxAmount,
       ...(applies && {
         taxSaving: {
@@ -122,10 +134,24 @@ router.put("/:id", async (req, res) => {
     return res.status(400).json({ error: "method non valido (CASH | POS | CARD | TRANSFER)" });
   }
 
-  const nextAmount = amount ?? existing.amount;
+  const nextAmount = amount != null ? Number(amount) : existing.amount;
+  if (!Number.isFinite(nextAmount) || nextAmount <= 0) {
+    return res.status(400).json({ error: "amount deve essere un numero > 0" });
+  }
   const nextType = type ?? existing.type;
   const nextDate = date ? new Date(date) : existing.date;
-  const nextTaxPercent = taxPercent !== undefined ? taxPercent : existing.taxPercent;
+  if (Number.isNaN(nextDate.getTime())) {
+    return res.status(400).json({ error: "date non valida" });
+  }
+  const nextTaxPercent =
+    taxPercent !== undefined
+      ? taxPercent == null || taxPercent === ""
+        ? null
+        : Number(taxPercent)
+      : existing.taxPercent;
+  if (nextTaxPercent != null && (!Number.isFinite(nextTaxPercent) || nextTaxPercent < 0 || nextTaxPercent > 100)) {
+    return res.status(400).json({ error: "taxPercent deve essere tra 0 e 100" });
+  }
 
   const applies = taxApplies(nextType, nextTaxPercent);
   const taxAmount = applies ? Number((nextAmount * nextTaxPercent) / 100) : null;

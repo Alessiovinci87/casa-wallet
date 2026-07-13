@@ -55,7 +55,7 @@ export default function TransactionForm({ initial, onClose }) {
     setError("");
     try {
       const fd = new FormData();
-      fd.append("image", file);
+      fd.append("images", file);
       const { data } = await api.post("/api/ocr/parse", fd);
       setForm((f) => ({
         ...f,
