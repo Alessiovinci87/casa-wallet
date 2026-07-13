@@ -2,9 +2,14 @@
 
 App di gestione economia domestica **multi-tenant** (famiglie/household). Nata per 2 utenti (Alessio e moglie), ora con registrazione pubblica in ottica commercializzazione (store Android/iOS via Capacitor in futuro).
 
-## Stato avanzamento (aggiornato 13 luglio 2026)
+## Stato avanzamento (aggiornato 14 luglio 2026)
 
 ### Completato ✅
+- **Incassi attesi nel simulatore + refinement generale (14 lug 2026)** — commit `1aac656`, deployato (Railway+Vercel+APK)
+  - Tesoreria: `computeExpectedCollections` in `lib/treasury.js` — fatture EMESSE come incassi attesi (data stimata: dueDate o date+ritardo mediano storico su ≥3 incassi, default 45gg; netto = netToPay × (1−defaultTaxPercent)); scenari realistico/ottimista li cumulano mese per mese (`monthsToRepayWithCollections`), pessimista li esclude. Response simulate: `expectedCollections {count, gross, net, taxPercent, delayDays, delaySource, nextExpectedAt}` + `withCollections` per scenario; card dedicata in TreasuryPage
+  - Hardening server: rate limit login/register (20/15min, `trust proxy` per Railway), fail-fast `JWT_SECRET` all'avvio (warn se manca INVOICE_CRED_SECRET), error handler JSON globale (CORS→403), validazione amount/date/taxPercent su POST/PUT transactions, email `trim().toLowerCase()` in register/login, P2002→409, CORS vercel ristretto a `casa-wallet*.vercel.app`, `@@index([receiptId])`+`@@index([canonicalName])` su ReceiptItem (applicati anche al dev.db)
+  - Fix client: bottone 📷 OCR nel TransactionForm era SEMPRE rotto (inviava campo `image`, multer si aspetta `images`); conferma + gestione errore su elimina transazione; code splitting route lazy + recharts lazy → bundle iniziale 725KB→~300KB
+  - Non fatto (valutato, rimandato): WS token in query string (cambio protocollo), refetch ridondante post-mutazione (WS broadcast include il mittente), stato errore negli store client, PRODUCT_CATEGORIES duplicata client/server
 - **Capacitor Android — primo APK debug (13 lug 2026)** — commit `508e733`
   - `client/capacitor.config.json` (appId `com.casawallet.app`, webDir `dist`) + progetto nativo `client/android/` committato
   - `client/.env.production` con URL Railway → le build native puntano alla prod (le env Vercel hanno comunque precedenza in build cloud)
@@ -172,7 +177,7 @@ Tutte le route (eccetto login) richiedono header `Authorization: Bearer <token>`
 
 ### Tesoreria (`/api/treasury`) — protette
 - `GET /profile?scope=user|household&months=3..24&buffer=0..0.5` → profilo finanziario (percentili capacità, spese ricorrenti, aliquota effettiva) o `{ok:false, reason:"DATI_INSUFFICIENTI"}`
-- `POST /simulate` body `{ amount, scope? }` → fondo disponibile, 3 scenari (pessimista/realistico/ottimista) con verdetti OK/RISCHIO/NO vs prossima scadenza, `overallVerdict`, disclaimer
+- `POST /simulate` body `{ amount, scope? }` → fondo disponibile, 3 scenari (pessimista/realistico/ottimista) con verdetti OK/RISCHIO/NO vs prossima scadenza, `overallVerdict`, `expectedCollections` (fatture EMESSE come incassi attesi: contano in realistico/ottimista, esclusi dal pessimista), disclaimer
 - `GET /fiscal-profile` → `{ profile, suggestedMinPercent, belowSuggested }`
 - `PUT /fiscal-profile` body `{ regime, coeffRedditivita?, aliquotaImposta?, aliquotaInps?, defaultTaxPercent? }` → upsert, stesso shape del GET (warning % mai bloccante)
 
