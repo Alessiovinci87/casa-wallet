@@ -181,7 +181,7 @@ function addMonths(date, n) {
 const DEFAULT_COLLECTION_DELAY_DAYS = 45;
 const MIN_DELAY_SAMPLES = 3;
 
-async function computeExpectedCollections({ userId, todayUTC, fallbackTaxPercent }) {
+export async function computeExpectedCollections({ userId, todayUTC, fallbackTaxPercent }) {
   const [pending, collected, fiscalProfile] = await Promise.all([
     prisma.invoice.findMany({
       where: { userId, status: "EMESSA" },

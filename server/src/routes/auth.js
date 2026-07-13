@@ -1,15 +1,34 @@
-// Auth routes: register (crea famiglia o join con codice invito), login, refresh, me.
+// Auth routes: register (crea famiglia o join con codice invito), login, refresh, me,
+// verifica email (non bloccante: banner nel client finché emailVerifiedAt è null).
+import crypto from "node:crypto";
 import { Router } from "express";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { prisma } from "../lib/prisma.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { createHouseholdWithUniqueCode } from "../lib/inviteCode.js";
+import { sendEmail } from "../lib/email.js";
 
 const router = Router();
 
 const TOKEN_TTL = "7d";
 const MIN_PASSWORD_LENGTH = 8;
+
+const newVerifyToken = () => crypto.randomBytes(32).toString("hex");
+
+// Fire-and-forget: la registrazione non deve fallire se Resend è giù/assente.
+function sendVerificationEmail(req, user, token) {
+  const verifyUrl = `${req.protocol}://${req.get("host")}/api/auth/verify-email?token=${token}`;
+  sendEmail({
+    to: user.email,
+    subject: "CasaWallet — conferma la tua email",
+    html:
+      `<p>Ciao ${user.name},</p>` +
+      `<p>conferma il tuo indirizzo email per completare la registrazione a CasaWallet:</p>` +
+      `<p><a href="${verifyUrl}">Conferma email</a></p>` +
+      `<p style="color:#888;font-size:12px">Se non ti sei registrato tu, ignora questo messaggio.</p>`,
+  }).catch((err) => console.error("[auth] invio email verifica fallito:", err.message));
+}
 
 function signToken(user) {
   return jwt.sign(
@@ -32,6 +51,7 @@ function publicUser(user) {
     email: user.email,
     householdId: user.householdId,
     role: user.role,
+    emailVerified: !!user.emailVerifiedAt,
   };
 }
 
@@ -67,13 +87,15 @@ router.post("/register", async (req, res) => {
 
   let user;
   let household;
+  const emailVerifyToken = newVerifyToken();
+
   try {
     if (householdName) {
       // Modalità A: nuova famiglia + utente OWNER, atomico.
       ({ user, household } = await prisma.$transaction(async (tx) => {
         const h = await createHouseholdWithUniqueCode(tx, householdName.trim());
         const u = await tx.user.create({
-          data: { name, email, passwordHash, householdId: h.id, role: "OWNER" },
+          data: { name, email, passwordHash, householdId: h.id, role: "OWNER", emailVerifyToken },
         });
         return { user: u, household: h };
       }));
@@ -86,7 +108,7 @@ router.post("/register", async (req, res) => {
         return res.status(404).json({ error: "Codice invito non valido" });
       }
       user = await prisma.user.create({
-        data: { name, email, passwordHash, householdId: household.id, role: "MEMBER" },
+        data: { name, email, passwordHash, householdId: household.id, role: "MEMBER", emailVerifyToken },
       });
     }
   } catch (err) {
@@ -97,12 +119,49 @@ router.post("/register", async (req, res) => {
     throw err;
   }
 
+  sendVerificationEmail(req, user, emailVerifyToken);
+
   const token = signToken(user);
   res.status(201).json({
     token,
     user: publicUser(user),
     household: { id: household.id, name: household.name, inviteCode: household.inviteCode },
   });
+});
+
+// GET /api/auth/verify-email?token= — link cliccato dall'email: pagina HTML minima.
+router.get("/verify-email", async (req, res) => {
+  const token = String(req.query.token || "");
+  const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+  const page = (title, body) =>
+    `<!doctype html><html lang="it"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">` +
+    `<body style="font-family:system-ui;display:flex;min-height:90vh;align-items:center;justify-content:center">` +
+    `<div style="text-align:center"><h2>${title}</h2><p>${body}</p>` +
+    `<p><a href="${clientUrl}" style="color:#7c3aed">Vai a CasaWallet</a></p></div></body></html>`;
+
+  if (!token) return res.status(400).send(page("Link non valido", "Manca il token di verifica."));
+
+  const user = await prisma.user.findUnique({ where: { emailVerifyToken: token } });
+  if (!user) {
+    return res.status(404).send(page("Link non valido o già usato", "Richiedi un nuovo link dall'app."));
+  }
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { emailVerifiedAt: new Date(), emailVerifyToken: null },
+  });
+  res.send(page("Email verificata ✓", `Grazie ${user.name}, il tuo account è confermato.`));
+});
+
+// POST /api/auth/resend-verification — reinvia il link all'utente loggato.
+router.post("/resend-verification", authMiddleware, async (req, res) => {
+  const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+  if (!user) return res.status(404).json({ error: "Utente non trovato" });
+  if (user.emailVerifiedAt) return res.status(409).json({ error: "Email già verificata" });
+
+  const emailVerifyToken = newVerifyToken();
+  await prisma.user.update({ where: { id: user.id }, data: { emailVerifyToken } });
+  sendVerificationEmail(req, user, emailVerifyToken);
+  res.json({ ok: true, sent: !!process.env.RESEND_API_KEY });
 });
 
 // POST /api/auth/login
@@ -140,14 +199,11 @@ router.post("/refresh", authMiddleware, async (req, res) => {
 
 // GET /api/auth/me
 router.get("/me", authMiddleware, async (req, res) => {
-  const user = await prisma.user.findUnique({
-    where: { id: req.user.id },
-    select: { id: true, name: true, email: true, householdId: true, role: true },
-  });
+  const user = await prisma.user.findUnique({ where: { id: req.user.id } });
   if (!user) {
     return res.status(404).json({ error: "Utente non trovato" });
   }
-  res.json({ user });
+  res.json({ user: publicUser(user) });
 });
 
 export default router;

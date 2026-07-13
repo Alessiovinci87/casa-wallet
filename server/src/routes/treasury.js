@@ -7,7 +7,9 @@ import {
   buildFinancialProfile,
   simulateSelfFinancing,
   computeSuggestedMinPercent,
+  computeExpectedCollections,
 } from "../lib/treasury.js";
+import { estimateTaxPayments } from "../lib/taxEstimate.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -50,6 +52,71 @@ router.post("/simulate", async (req, res) => {
     scope,
   });
   res.json(result);
+});
+
+// GET /api/treasury/expected-collections — fatture EMESSE con data d'incasso stimata
+// (per la card "In arrivo" in Dashboard). null → nessuna fattura in attesa.
+router.get("/expected-collections", async (req, res) => {
+  const today = new Date();
+  const todayUTC = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+  const collections = await computeExpectedCollections({ userId: req.user.id, todayUTC });
+  if (!collections) return res.json(null);
+  const { items, ...meta } = collections;
+  res.json(meta);
+});
+
+// GET /api/treasury/tax-estimate?year= — stima pagamenti 30/6 e 30/11 dalle fatture.
+router.get("/tax-estimate", async (req, res) => {
+  const now = new Date();
+  const rawYear = Number(req.query.year);
+  const year =
+    Number.isInteger(rawYear) && rawYear >= 2020 && rawYear <= now.getUTCFullYear() + 1
+      ? rawYear
+      : now.getUTCFullYear();
+  res.json(await estimateTaxPayments({ userId: req.user.id, year }));
+});
+
+// GET /api/treasury/fiscal-report?year= — dati per l'export annuale (commercialista).
+router.get("/fiscal-report", async (req, res) => {
+  const now = new Date();
+  const rawYear = Number(req.query.year);
+  const year = Number.isInteger(rawYear) && rawYear >= 2020 ? rawYear : now.getUTCFullYear();
+  const from = new Date(Date.UTC(year, 0, 1));
+  const to = new Date(Date.UTC(year + 1, 0, 1));
+
+  const [invoices, savings, estimate] = await Promise.all([
+    prisma.invoice.findMany({
+      where: { userId: req.user.id, status: "INCASSATA", collectedAt: { gte: from, lt: to } },
+      orderBy: { collectedAt: "asc" },
+      select: {
+        numero: true, year: true, date: true, customerName: true, customerVat: true,
+        imponibile: true, iva: true, ritenuta: true, bollo: true, grossTotal: true,
+        netToPay: true, collectedAt: true,
+      },
+    }),
+    prisma.taxSaving.findMany({
+      where: { year, transaction: { userId: req.user.id } },
+      select: { amount: true, transferred: true },
+    }),
+    estimateTaxPayments({ userId: req.user.id, year: year + 1 }), // dovuto per l'anno `year` si paga in year+1
+  ]);
+
+  const sum = (arr, f) => Math.round(arr.reduce((s, x) => s + f(x), 0) * 100) / 100;
+  res.json({
+    year,
+    invoices,
+    totals: {
+      fatturatoIncassato: sum(invoices, (i) => i.imponibile),
+      ivaIncassata: sum(invoices, (i) => i.iva),
+      ritenuteSubite: sum(invoices, (i) => i.ritenuta),
+      nettoIncassato: sum(invoices, (i) => i.netToPay),
+      accantonato: sum(savings, (s) => s.amount),
+      trasferito: sum(savings.filter((s) => s.transferred), (s) => s.amount),
+    },
+    // dueEstimate: dovuto stimato per l'anno d'imposta `year` (da pagare a giugno/novembre year+1)
+    dueEstimate: estimate.ok ? estimate.basedOn.duePrevYear : null,
+    disclaimer: estimate.ok ? estimate.disclaimer : null,
+  });
 });
 
 async function fiscalProfileResponse(userId) {

@@ -1,8 +1,9 @@
-// Scadenze fiscali PERSONALI — CRUD + trigger promemoria di test.
+// Scadenze fiscali PERSONALI — CRUD + generazione da stima + trigger promemoria di test.
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { sendDeadlineRemindersForUser } from "../lib/deadlineReminder.js";
+import { estimateTaxPayments } from "../lib/taxEstimate.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -55,6 +56,68 @@ router.post("/", async (req, res) => {
     },
   });
   res.status(201).json(enrich(deadline));
+});
+
+// POST /api/deadlines/generate  body: { year? } — crea le scadenze standard del
+// forfettario (30/6 saldo+1° acconto, 30/11 2° acconto) con gli importi stimati
+// dalle fatture. Idempotente: salta le scadenze che esistono già (stesso type e
+// stesso anno di dueDate).
+router.post("/generate", async (req, res) => {
+  const now = new Date();
+  const rawYear = Number(req.body?.year);
+  const year =
+    Number.isInteger(rawYear) && rawYear >= 2020 && rawYear <= now.getUTCFullYear() + 1
+      ? rawYear
+      : now.getUTCFullYear();
+
+  const estimate = await estimateTaxPayments({ userId: req.user.id, year });
+  if (!estimate.ok) return res.status(400).json({ error: estimate.detail || estimate.reason });
+  if (estimate.noHistory) {
+    return res.status(400).json({
+      error: `Nessuna fattura incassata nel ${year - 1}: non c'è una base per stimare saldo e acconti.`,
+    });
+  }
+
+  const candidates = [
+    {
+      name: `Saldo ${year - 1} + 1° acconto ${year} (stima)`,
+      type: "IRPEF_SALDO",
+      dueDate: estimate.payments.giugno.dueDate,
+      expectedAmount: estimate.payments.giugno.amount,
+    },
+    {
+      name: `2° acconto ${year} (stima)`,
+      type: "IRPEF_ACCONTO",
+      dueDate: estimate.payments.novembre.dueDate,
+      expectedAmount: estimate.payments.novembre.amount,
+    },
+  ].filter((c) => c.expectedAmount > 0);
+
+  const existing = await prisma.taxDeadline.findMany({
+    where: {
+      userId: req.user.id,
+      dueDate: { gte: new Date(Date.UTC(year, 0, 1)), lt: new Date(Date.UTC(year + 1, 0, 1)) },
+    },
+    select: { type: true },
+  });
+  const existingTypes = new Set(existing.map((d) => d.type));
+
+  const created = [];
+  const skipped = [];
+  for (const c of candidates) {
+    if (existingTypes.has(c.type)) {
+      skipped.push({ type: c.type, reason: "esiste già una scadenza di questo tipo nell'anno" });
+      continue;
+    }
+    created.push(await prisma.taxDeadline.create({ data: { userId: req.user.id, ...c } }));
+  }
+
+  res.status(created.length ? 201 : 200).json({
+    created: created.map(enrich),
+    skipped,
+    estimate: { giugno: estimate.payments.giugno, novembre: estimate.payments.novembre },
+    disclaimer: estimate.disclaimer,
+  });
 });
 
 // PUT /api/deadlines/:id — update parziale (+ paid)

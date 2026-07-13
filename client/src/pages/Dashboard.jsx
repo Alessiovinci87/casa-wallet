@@ -1,7 +1,9 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import dayjs from "dayjs";
 import { useTransactionStore } from "../store/transactionStore.js";
 import { useTaxStore } from "../store/taxStore.js";
+import { useAuthStore } from "../store/authStore.js";
 import api from "../lib/api.js";
 import { eur } from "../lib/format.js";
 import { PAY_METHOD_LABELS } from "../lib/constants.js";
@@ -40,10 +42,15 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { transactions, fetchTransactions } = useTransactionStore();
   const { summary, fetchSummary } = useTaxStore();
+  const user = useAuthStore((s) => s.user);
   // Previous month totals, fetched separately so the store keeps the current month.
   const [prev, setPrev] = useState(null);
   // Prossima scadenza fiscale entro 60 giorni (incluse quelle scadute).
   const [nextDeadline, setNextDeadline] = useState(null);
+  // Fatture emesse in attesa d'incasso (null = nessuna).
+  const [incoming, setIncoming] = useState(null);
+  // Banner verifica email: "sent" dopo il reinvio.
+  const [resendState, setResendState] = useState("idle");
 
   useEffect(() => {
     fetchTransactions({ month: MONTH, year: YEAR });
@@ -62,6 +69,13 @@ export default function Dashboard() {
         setPrev({ income, expense, tax });
       })
       .catch(() => setPrev(null));
+  }, []);
+
+  useEffect(() => {
+    api
+      .get("/api/treasury/expected-collections")
+      .then(({ data }) => setIncoming(data))
+      .catch(() => setIncoming(null));
   }, []);
 
   useEffect(() => {
@@ -101,6 +115,29 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-4">
+      {/* Banner verifica email (non bloccante). Solo quando il flag è presente e false. */}
+      {user?.emailVerified === false && (
+        <div className="bg-tax-50 text-tax-600 rounded-xl p-3 text-sm flex items-center justify-between gap-3">
+          <span>✉ Conferma la tua email: controlla la posta ({user.email}).</span>
+          <button
+            type="button"
+            disabled={resendState !== "idle"}
+            className="shrink-0 text-xs font-semibold underline disabled:opacity-50"
+            onClick={async () => {
+              setResendState("sending");
+              try {
+                await api.post("/api/auth/resend-verification");
+                setResendState("sent");
+              } catch {
+                setResendState("idle");
+              }
+            }}
+          >
+            {resendState === "sent" ? "Inviata ✓" : resendState === "sending" ? "Invio…" : "Reinvia"}
+          </button>
+        </div>
+      )}
+
       <NotificationsToggle />
 
       {/* Hero: saldo disponibile del mese (tasse accantonate escluse) */}
@@ -153,6 +190,26 @@ export default function Dashboard() {
           </span>
         )}
       </button>
+
+      {/* Incassi attesi: fatture emesse non ancora incassate */}
+      {incoming && incoming.count > 0 && (
+        <button
+          type="button"
+          onClick={() => navigate("/invoices")}
+          className="card w-full p-4 flex items-center justify-between hover:border-brand-200 transition text-left"
+        >
+          <div>
+            <div className="text-sm text-ink-600">
+              In arrivo · {incoming.count} {incoming.count === 1 ? "fattura" : "fatture"}
+            </div>
+            <div className="text-xs text-ink-400 mt-0.5">
+              Primo incasso stimato {dayjs(incoming.nextExpectedAt).format("D MMM")}
+              {incoming.taxPercent > 0 && ` · netto accantonamento ${eur(incoming.net)}`}
+            </div>
+          </div>
+          <span className="text-lg font-bold text-brand-600 nums">{eur(incoming.gross)}</span>
+        </button>
+      )}
 
       {/* Prossima scadenza fiscale (entro 60 giorni) */}
       {nextDeadline && (

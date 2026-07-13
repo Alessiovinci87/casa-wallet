@@ -16,4 +16,6 @@ WORKDIR /app/server
 EXPOSE 3001
 
 # JSON form + exec: node diventa PID 1 e riceve correttamente SIGTERM da Railway.
-CMD ["sh", "-c", "npx prisma db push && node prisma/seed.js && exec node src/index.js"]
+# --accept-data-loss: db push non è interattivo in container; senza flag un warning
+# (anche innocuo, es. unique su colonna nuova) manda il deploy in crash-loop.
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node prisma/seed.js && exec node src/index.js"]

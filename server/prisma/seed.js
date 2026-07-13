@@ -34,15 +34,17 @@ async function main() {
 
   for (const u of users) {
     const passwordHash = await bcrypt.hash(u.password, 10);
+    // I due account storici sono considerati verificati (niente banner).
     await prisma.user.upsert({
       where: { email: u.email },
-      update: { name: u.name, passwordHash, householdId: household.id, role: u.role },
+      update: { name: u.name, passwordHash, householdId: household.id, role: u.role, emailVerifiedAt: new Date() },
       create: {
         email: u.email,
         name: u.name,
         passwordHash,
         householdId: household.id,
         role: u.role,
+        emailVerifiedAt: new Date(),
       },
     });
     console.log(`seeded user: ${u.email} (${u.role})`);

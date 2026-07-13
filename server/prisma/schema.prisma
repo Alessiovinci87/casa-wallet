@@ -34,6 +34,8 @@ model User {
   householdId  String
   household    Household     @relation(fields: [householdId], references: [id])
   role         String        @default("MEMBER") // OWNER | MEMBER — validato in API (niente enum: dual-provider)
+  emailVerifiedAt  DateTime? // null = email non ancora verificata (banner nel client, non bloccante)
+  emailVerifyToken String?   @unique
   createdAt    DateTime      @default(now())
   transactions Transaction[]
   receipts     Receipt[]

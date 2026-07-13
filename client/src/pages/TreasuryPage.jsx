@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import { useTreasuryStore } from "../store/treasuryStore.js";
 import { eur } from "../lib/format.js";
+import api from "../lib/api.js";
+import { fiscalReportToCsv, downloadCsv } from "../lib/exportCsv.js";
 import Segmented from "../components/Segmented.jsx";
 
 const DEADLINE_TYPES = [
@@ -39,11 +41,51 @@ export default function TreasuryPage() {
   });
   const [fiscalSaved, setFiscalSaved] = useState(false);
   const [error, setError] = useState("");
+  // Stima pagamenti 30/6 e 30/11 dalle fatture (null = profilo incompleto o niente dati).
+  const [taxEstimate, setTaxEstimate] = useState(null);
+  const [generateMsg, setGenerateMsg] = useState("");
+  const [exporting, setExporting] = useState(false);
+
+  const fetchTaxEstimate = () =>
+    api
+      .get("/api/treasury/tax-estimate")
+      .then(({ data }) => setTaxEstimate(data))
+      .catch(() => setTaxEstimate(null));
 
   useEffect(() => {
     fetchDeadlines();
     fetchFiscalProfile();
+    fetchTaxEstimate();
   }, [fetchDeadlines, fetchFiscalProfile]);
+
+  const generateDeadlines = async () => {
+    setError("");
+    setGenerateMsg("");
+    try {
+      const { data } = await api.post("/api/deadlines/generate", {});
+      await fetchDeadlines();
+      if (data.created.length > 0) {
+        setGenerateMsg(`Create ${data.created.length} scadenze dalla stima.`);
+      } else {
+        setGenerateMsg("Scadenze già presenti per quest'anno: nessuna creata.");
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || "Generazione scadenze fallita");
+    }
+  };
+
+  const exportFiscalReport = async (year) => {
+    setError("");
+    setExporting(true);
+    try {
+      const { data } = await api.get("/api/treasury/fiscal-report", { params: { year } });
+      downloadCsv(fiscalReportToCsv(data), `report-fiscale-${year}.csv`);
+    } catch (err) {
+      setError(err.response?.data?.error || "Export fallito");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   useEffect(() => {
     fetchProfile(scope);
@@ -108,6 +150,8 @@ export default function TreasuryPage() {
       });
       setFiscalSaved(true);
       setTimeout(() => setFiscalSaved(false), 2500);
+      fetchTaxEstimate(); // aliquote cambiate → la stima giugno/novembre cambia
+
     } catch (err) {
       setError(err.response?.data?.error || "Errore nel salvataggio del profilo");
     }
@@ -232,6 +276,51 @@ export default function TreasuryPage() {
           )}
         </div>
       </section>
+
+      {/* ============ (a2) Stima pagamenti fiscali dalle fatture ============ */}
+      {taxEstimate?.ok && !taxEstimate.noHistory && (
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-semibold">Pagamenti {taxEstimate.year} stimati dalle fatture</h2>
+            <button
+              type="button"
+              onClick={generateDeadlines}
+              className="px-3 py-1.5 text-sm bg-brand-600 text-white rounded-lg hover:bg-brand-700"
+            >
+              Crea scadenze da stima
+            </button>
+          </div>
+          {generateMsg && <div className="text-sm text-brand-700 bg-brand-50 rounded p-2">{generateMsg}</div>}
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div className="card p-4 text-sm">
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-semibold">30 giugno</span>
+                <span className="text-lg font-bold text-tax-600 nums">{eur(taxEstimate.payments.giugno.amount)}</span>
+              </div>
+              <div className="text-xs text-ink-600 space-y-0.5">
+                <div>Saldo {taxEstimate.year - 1}: <span className="nums">{eur(taxEstimate.payments.giugno.detail.saldoAnnoPrecedente)}</span></div>
+                <div>1° acconto {taxEstimate.year}: <span className="nums">{eur(taxEstimate.payments.giugno.detail.primoAcconto)}</span></div>
+              </div>
+            </div>
+            <div className="card p-4 text-sm">
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-semibold">30 novembre</span>
+                <span className="text-lg font-bold text-tax-600 nums">{eur(taxEstimate.payments.novembre.amount)}</span>
+              </div>
+              <div className="text-xs text-ink-600">
+                2° acconto {taxEstimate.year}, sul dovuto {taxEstimate.year - 1} (
+                <span className="nums">{eur(taxEstimate.basedOn.duePrevYear.total)}</span> su{" "}
+                <span className="nums">{eur(taxEstimate.basedOn.revenuePrevYear)}</span> incassati)
+              </div>
+            </div>
+          </div>
+          <p className="text-xs text-ink-400">
+            Proiezione {taxEstimate.year}: con {eur(taxEstimate.basedOn.revenueYtd)} incassati
+            {taxEstimate.basedOn.pendingImponibile > 0 && ` + ${eur(taxEstimate.basedOn.pendingImponibile)} di fatture in attesa`}
+            , il dovuto stimato è <strong className="nums">{eur(taxEstimate.projectionCurrentYear.total)}</strong>. {taxEstimate.disclaimer}
+          </p>
+        </section>
+      )}
 
       {/* ============ (b) Profilo finanziario ============ */}
       <section className="space-y-3">
@@ -460,6 +549,29 @@ export default function TreasuryPage() {
             </div>
           </div>
         </form>
+      </section>
+
+      {/* ============ (e) Export per il commercialista ============ */}
+      <section className="space-y-3">
+        <h2 className="font-semibold">Export per il commercialista</h2>
+        <div className="card p-4 flex flex-wrap items-center justify-between gap-3 text-sm">
+          <p className="text-ink-600">
+            CSV con le fatture incassate dell'anno, i totali e l'accantonato del salvadanaio tasse.
+          </p>
+          <div className="flex gap-2">
+            {[dayjs().year() - 1, dayjs().year()].map((y) => (
+              <button
+                key={y}
+                type="button"
+                disabled={exporting}
+                onClick={() => exportFiscalReport(y)}
+                className="px-3 py-1.5 border border-card-line rounded-lg hover:border-brand-300 disabled:opacity-50 nums"
+              >
+                ⬇ {y}
+              </button>
+            ))}
+          </div>
+        </div>
       </section>
     </div>
   );

@@ -31,8 +31,47 @@ export default function TransactionForm({ initial, onClose }) {
   }));
   const [ocrBusy, setOcrBusy] = useState(false);
   const [error, setError] = useState("");
+  // Riconciliazione: fatture EMESSE per riconoscere un'entrata come incasso.
+  const [pendingInvoices, setPendingInvoices] = useState(null); // null = non ancora caricate
+  const [collecting, setCollecting] = useState(false);
+  const fetchTransactions = useTransactionStore((s) => s.fetchTransactions);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  // Al primo passaggio su "Entrata" carica le fatture in attesa (una volta sola).
+  useEffect(() => {
+    if (isEdit || form.type !== "INCOME" || pendingInvoices !== null) return;
+    api
+      .get("/api/invoices", { params: { status: "EMESSA" } })
+      .then(({ data }) => setPendingInvoices(Array.isArray(data) ? data : []))
+      .catch(() => setPendingInvoices([]));
+  }, [form.type, isEdit, pendingInvoices]);
+
+  // Una fattura "corrisponde" se il netto da incassare è entro l'1% (min 1 cent).
+  const amountNum = Number(form.amount);
+  const matchedInvoice =
+    !isEdit && form.type === "INCOME" && Number.isFinite(amountNum) && amountNum > 0 && pendingInvoices
+      ? pendingInvoices.find(
+          (inv) => Math.abs(inv.netToPay - amountNum) <= Math.max(0.01, inv.netToPay * 0.01)
+        )
+      : null;
+
+  const collectMatched = async () => {
+    setCollecting(true);
+    setError("");
+    try {
+      await api.put(`/api/invoices/${matchedInvoice.id}/collect`, {
+        method: form.method,
+        date: new Date(form.date).toISOString(),
+        ...(form.taxPercent !== "" && { taxPercent: Number(form.taxPercent) }),
+      });
+      await fetchTransactions();
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.error || "Registrazione incasso fallita");
+      setCollecting(false);
+    }
+  };
 
   // Prefill % tasse dal profilo fiscale: solo in creazione, solo se il campo è
   // vuoto — mai sovrascrivere una scelta dell'utente o una modifica.
@@ -169,6 +208,27 @@ export default function TransactionForm({ initial, onClose }) {
             options={PAY_METHODS.map((m) => ({ value: m, label: PAY_METHOD_LABELS[m] }))}
           />
         </div>
+
+        {/* Riconciliazione: l'importo coincide con una fattura in attesa */}
+        {matchedInvoice && (
+          <div className="mt-3 bg-brand-50 rounded-xl p-3 text-sm">
+            <div className="font-semibold text-brand-700">
+              È l'incasso della fattura n. {matchedInvoice.numero}?
+            </div>
+            <div className="text-xs text-ink-600 mt-0.5">
+              {matchedInvoice.customerName} · netto <span className="nums">{Number(matchedInvoice.netToPay).toFixed(2)}€</span>.
+              Registrandola come incasso, la fattura risulta incassata e l'accantonamento tasse parte in automatico.
+            </div>
+            <button
+              type="button"
+              disabled={collecting}
+              onClick={collectMatched}
+              className="mt-2 px-3 py-1.5 text-xs font-semibold bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:opacity-50"
+            >
+              {collecting ? "Registro…" : "Registra come incasso fattura"}
+            </button>
+          </div>
+        )}
 
         {form.type === "INCOME" && (
           <div className="mt-3">

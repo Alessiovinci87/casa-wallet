@@ -4,6 +4,7 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { broadcast } from "../lib/ws.js";
+import { checkUnusualSpend } from "../lib/spendAlert.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -80,6 +81,13 @@ router.post("/", async (req, res) => {
   });
 
   emit(req.user.householdId, "created", transaction);
+
+  // Fire-and-forget: push "spesa insolita" se questa transazione fa superare
+  // la soglia mensile della categoria (1.5× la media storica).
+  if (type === "EXPENSE") {
+    checkUnusualSpend({ householdId: req.user.householdId, category, amount: amountNum, date: when });
+  }
+
   res.status(201).json(transaction);
 });
 
