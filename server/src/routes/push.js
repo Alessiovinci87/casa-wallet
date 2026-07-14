@@ -43,7 +43,7 @@ router.post("/unsubscribe", async (req, res) => {
 // POST /api/push/test → send a test notification to the caller's devices.
 router.post("/test", async (req, res) => {
   const result = await sendPushToUser(req.user.id, {
-    title: "CasaWallet",
+    title: "Awareness",
     body: "Notifica di prova ✅",
     url: "/",
   });

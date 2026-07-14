@@ -4,7 +4,7 @@ import { Resend } from "resend";
 
 // Resend's shared sandbox sender works without verifying a domain. Override with
 // RESEND_FROM once a custom domain is configured.
-const FROM = process.env.RESEND_FROM || "CasaWallet <onboarding@resend.dev>";
+const FROM = process.env.RESEND_FROM || "Awareness <onboarding@resend.dev>";
 
 let client = null;
 function getClient() {

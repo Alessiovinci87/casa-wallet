@@ -29,14 +29,14 @@ export async function sendTaxAlertForUser(userId, { force = false } = {}) {
     return { userId, email: user.email, totalPending, sent: false };
   }
 
-  const subject = `CasaWallet — Tasse da accantonare: ${eur(totalPending)}`;
+  const subject = `Awareness — Tasse da accantonare: ${eur(totalPending)}`;
   const html = `
     <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto;">
       <h2 style="color:#059669;">Promemoria salvadanaio tasse</h2>
       <p>Ciao ${user.name}, al momento risultano <strong>${eur(totalPending)}</strong>
       accantonati per le tue tasse e non ancora trasferiti sul conto dedicato.</p>
       <p style="color:#64748b;font-size:14px;">
-        Ricordati di effettuare il bonifico e segnare gli importi come trasferiti in CasaWallet.
+        Ricordati di effettuare il bonifico e segnare gli importi come trasferiti in Awareness.
       </p>
     </div>`;
 

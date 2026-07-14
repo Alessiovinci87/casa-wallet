@@ -36,7 +36,7 @@ export default function Layout() {
       <header className="bg-white border-b border-card-line sticky top-0 z-20">
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-6 min-w-0">
-            <span className="font-bold text-brand-600">CasaWallet</span>
+            <span className="font-bold text-brand-600">Awareness</span>
             {/* Desktop nav */}
             <nav className="hidden md:flex gap-4 text-sm">
               {links.map((l) => (

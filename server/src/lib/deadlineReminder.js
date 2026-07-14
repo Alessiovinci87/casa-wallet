@@ -50,7 +50,7 @@ export async function sendDeadlineRemindersForUser(userId, { force = false } = {
     }
 
     const when = daysUntil === 0 ? "oggi" : daysUntil === 1 ? "domani" : `tra ${daysUntil} giorni`;
-    const subject = `CasaWallet — Scadenza ${d.name} ${when}: ${eur(d.expectedAmount)}`;
+    const subject = `Awareness — Scadenza ${d.name} ${when}: ${eur(d.expectedAmount)}`;
     const html = `
       <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto;">
         <h2 style="color:#b3701a;">Scadenza fiscale in arrivo</h2>
@@ -58,7 +58,7 @@ export async function sendDeadlineRemindersForUser(userId, { force = false } = {
         <strong>${eur(d.expectedAmount)}</strong> previsti per il
         ${new Date(d.dueDate).toLocaleDateString("it-IT")}.</p>
         <p style="color:#64748b;font-size:14px;">
-          Controlla in CasaWallet se il fondo tasse copre l'importo.
+          Controlla in Awareness se il fondo tasse copre l'importo.
         </p>
       </div>`;
 

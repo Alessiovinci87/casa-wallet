@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">CasaWallet</string>
-    <string name="title_activity_main">CasaWallet</string>
+    <string name="app_name">Awareness</string>
+    <string name="title_activity_main">Awareness</string>
     <string name="package_name">com.casawallet.app</string>
     <string name="custom_url_scheme">com.casawallet.app</string>
 </resources>

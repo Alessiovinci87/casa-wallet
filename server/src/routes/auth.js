@@ -21,10 +21,10 @@ function sendVerificationEmail(req, user, token) {
   const verifyUrl = `${req.protocol}://${req.get("host")}/api/auth/verify-email?token=${token}`;
   sendEmail({
     to: user.email,
-    subject: "CasaWallet — conferma la tua email",
+    subject: "Awareness — conferma la tua email",
     html:
       `<p>Ciao ${user.name},</p>` +
-      `<p>conferma il tuo indirizzo email per completare la registrazione a CasaWallet:</p>` +
+      `<p>conferma il tuo indirizzo email per completare la registrazione a Awareness:</p>` +
       `<p><a href="${verifyUrl}">Conferma email</a></p>` +
       `<p style="color:#888;font-size:12px">Se non ti sei registrato tu, ignora questo messaggio.</p>`,
   }).catch((err) => console.error("[auth] invio email verifica fallito:", err.message));
@@ -137,7 +137,7 @@ router.get("/verify-email", async (req, res) => {
     `<!doctype html><html lang="it"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">` +
     `<body style="font-family:system-ui;display:flex;min-height:90vh;align-items:center;justify-content:center">` +
     `<div style="text-align:center"><h2>${title}</h2><p>${body}</p>` +
-    `<p><a href="${clientUrl}" style="color:#7c3aed">Vai a CasaWallet</a></p></div></body></html>`;
+    `<p><a href="${clientUrl}" style="color:#7c3aed">Vai a Awareness</a></p></div></body></html>`;
 
   if (!token) return res.status(400).send(page("Link non valido", "Manca il token di verifica."));
 

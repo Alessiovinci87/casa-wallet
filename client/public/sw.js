@@ -1,4 +1,4 @@
-/* CasaWallet service worker — Web Push handling. */
+/* Awareness service worker — Web Push handling. */
 
 self.addEventListener("push", (event) => {
   let data = {};
@@ -8,7 +8,7 @@ self.addEventListener("push", (event) => {
     data = { body: event.data && event.data.text() };
   }
 
-  const title = data.title || "CasaWallet";
+  const title = data.title || "Awareness";
   event.waitUntil(
     self.registration.showNotification(title, {
       body: data.body || "",

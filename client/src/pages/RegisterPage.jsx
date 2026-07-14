@@ -44,7 +44,7 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-paper">
       <form onSubmit={handleSubmit} className="card p-8 w-full max-w-sm">
-        <h1 className="text-2xl font-bold text-brand-600 mb-1">CasaWallet</h1>
+        <h1 className="text-2xl font-bold text-brand-600 mb-1">Awareness</h1>
         <p className="text-sm text-ink-600 mb-6">Crea il tuo account</p>
 
         <div className="flex gap-2 mb-6">
