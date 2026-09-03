@@ -14,6 +14,7 @@ const links = [
   { to: "/treasury", label: "Tesoreria" },
   { to: "/invoices", label: "Fatture" },
   { to: "/ocr", label: "Nuova spesa" },
+  { to: "/import", label: "Importa CSV" },
   { to: "/analytics", label: "Analisi" },
   { to: "/shopping-list", label: "Lista spesa" },
   { to: "/budgets", label: "Budget" },

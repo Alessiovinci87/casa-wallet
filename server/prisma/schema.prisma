@@ -21,6 +21,7 @@ model Household {
   // Null = saldo calcolato da tutte le transazioni (senza punto zero).
   openingBalance     Float?
   openingBalanceDate DateTime?
+  csvMapping         String?   // JSON: mapping colonne dell'ultimo import estratto conto
 
   users             User[]
   transactions      Transaction[]
@@ -30,6 +31,7 @@ model Household {
   categoryBudgets   CategoryBudget[]
   recurringRules    RecurringRule[]
   savingsGoals      SavingsGoal[]
+  categoryRules     CategoryRule[]
 }
 
 model User {
@@ -79,9 +81,11 @@ model Transaction {
   recurringRuleId String?
   recurringRule   RecurringRule? @relation(fields: [recurringRuleId], references: [id])
   goalContribution GoalContribution? // prelievo da un obiettivo registrato come uscita
+  importHash  String?     // dedupe import CSV: sha1(data|importo|descrizione normalizzata)
 
   @@index([householdId, date])
   @@index([recurringRuleId, date])
+  @@index([householdId, importHash])
 }
 
 model TaxSaving {
@@ -366,6 +370,20 @@ model InternalLoan {
   updatedAt         DateTime  @updatedAt
 
   @@index([userId, status])
+}
+
+// Regola di categorizzazione per l'import CSV: se la descrizione contiene
+// `pattern` (case-insensitive) → categoria. Scoped famiglia.
+model CategoryRule {
+  id          String    @id @default(cuid())
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id])
+  pattern     String
+  category    String
+  type        String?   // INCOME | EXPENSE (null = entrambi)
+  createdAt   DateTime  @default(now())
+
+  @@unique([householdId, pattern])
 }
 
 enum TxType {

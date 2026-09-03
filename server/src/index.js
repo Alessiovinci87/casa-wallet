@@ -28,6 +28,7 @@ import goalsRouter from "./routes/goals.js";
 import dashboardRouter from "./routes/dashboard.js";
 import forecastRouter from "./routes/forecast.js";
 import loansRouter from "./routes/loans.js";
+import importRouter from "./routes/import.js";
 
 dotenv.config();
 
@@ -111,6 +112,7 @@ app.use("/api/goals", goalsRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/forecast", forecastRouter);
 app.use("/api/loans", loansRouter);
+app.use("/api/import", importRouter);
 
 // --- Error handler globale: mai HTML, sempre JSON coerente con il resto dell'API ---
 // (Express 5 inoltra qui anche i reject delle route async.)
