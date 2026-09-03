@@ -38,6 +38,8 @@ const TITLES = [
   ["/settings", "Impostazioni"],
   ["/onboarding", "Punto zero"],
 ];
+// Pagine principali (tab bar): niente tasto indietro.
+const ROOTS = new Set(["/", "/movements", "/goals", "/forecast", "/more"]);
 const pageTitle = (path) => (path === "/" ? "Home" : TITLES.find(([p]) => path.startsWith(p))?.[1] || "");
 
 // Il FAB non compare sulle pagine che sono già un form.
@@ -132,7 +134,19 @@ export default function Layout() {
       <div className="flex-1 min-w-0">
         <header className="sticky top-0 z-20 bg-paper/90 backdrop-blur border-b border-card-line">
           <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
-            <h1 className="text-lg font-bold truncate">{title}</h1>
+            <div className="flex items-center min-w-0">
+              {!ROOTS.has(location.pathname) && (
+                <button
+                  type="button"
+                  onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/more"))}
+                  className="w-11 h-11 -ml-3 mr-1 flex items-center justify-center text-ink-600"
+                  aria-label="Indietro"
+                >
+                  <span aria-hidden="true" className="text-2xl leading-none">‹</span>
+                </button>
+              )}
+              <h1 className="text-lg font-bold truncate">{title}</h1>
+            </div>
             <button
               onClick={() => navigate("/settings")}
               className="w-11 h-11 -mr-2 flex items-center justify-center"

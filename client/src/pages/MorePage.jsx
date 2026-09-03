@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import api from "../lib/api.js";
 import { useAuthStore } from "../store/authStore.js";
+import { hardRefresh } from "../lib/refresh.js";
 
 // "Altro": le sezioni secondarie, una lista con tap target da 44px.
 const ITEMS = [
@@ -54,6 +55,13 @@ export default function MorePage() {
             <span className="text-ink-400">›</span>
           </button>
         ))}
+      </div>
+      <div className="card px-4 py-3 flex items-center justify-between gap-3">
+        <span className="text-[13px] text-ink-600">
+          <span className="block font-medium text-ink-900">Aggiorna app</span>
+          Svuota la cache e ricarica l'ultima versione.
+        </span>
+        <button onClick={hardRefresh} className="shrink-0 text-brand-600 font-medium min-h-[44px] px-2">Aggiorna</button>
       </div>
       {isOwner && (
         <div className="card px-4 py-3 flex items-center justify-between gap-3">

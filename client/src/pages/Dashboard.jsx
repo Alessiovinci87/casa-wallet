@@ -234,8 +234,16 @@ export default function Dashboard() {
               if (t.type === "INCOME") inc += t.amount; else { exp += t.amount; done.push(t); }
             }
             const todayKey = dayjs().format("YYYY-MM-DD");
-            const future = upcoming.filter((e) => e.type === "EXPENSE" && mine(e.accountId) && dayjs(e.date).format("YYYY-MM-DD") > todayKey);
+            const futureAll = upcoming.filter((e) => mine(e.accountId) && dayjs(e.date).format("YYYY-MM-DD") > todayKey);
+            const future = futureAll.filter((e) => e.type === "EXPENSE");
             const next = future[0] || null;
+            // Saldo previsto il giorno della prossima uscita: saldo di oggi ± tutte le
+            // ricorrenze (entrate e uscite) fino a quel giorno incluso. Si aggiorna da solo
+            // quando cambiano saldo, movimenti o ricorrenze.
+            const nextKey = next ? dayjs(next.date).format("YYYY-MM-DD") : null;
+            const balanceOnNext = next
+              ? a.balance + futureAll.filter((e) => dayjs(e.date).format("YYYY-MM-DD") <= nextKey).reduce((s, e) => s + (e.type === "INCOME" ? e.amount : -e.amount), 0)
+              : null;
             const thisMonth = future.filter((e) => dayjs(e.date).month() === now.getMonth() && dayjs(e.date).year() === now.getFullYear());
             const expected = exp + thisMonth.reduce((s, e) => s + e.amount, 0);
             const open = openAccount === a.id;
@@ -245,8 +253,9 @@ export default function Dashboard() {
                   <div className="text-[13px] uppercase tracking-widest text-ink-600">{a.name}</div>
                   <div className="text-4xl sm:text-5xl font-bold tracking-tight mt-1 nums">{eur(a.balance)}</div>
                   {next && (
-                    <div className="text-[13px] mt-1.5 text-rose-600 nums">
-                      Prossima uscita {dayjs(next.date).format("D MMM")} · {next.description || next.category} −{eur(next.amount)}
+                    <div className="text-[13px] mt-1.5 nums">
+                      <span className="text-rose-600">Prossima uscita {dayjs(next.date).format("D MMM")} · {next.description || next.category} −{eur(next.amount)}</span>
+                      <span className={`block ${balanceOnNext < 0 ? "text-rose-600" : "text-ink-400"}`}>saldo previsto il {dayjs(next.date).format("D MMM")}: {eur(balanceOnNext)}</span>
                     </div>
                   )}
                   <div className="text-[13px] mt-1 text-ink-600 flex flex-wrap gap-x-2">
