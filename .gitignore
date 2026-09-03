@@ -28,3 +28,6 @@ Thumbs.db
 *.log
 
 .vercel
+
+# Guida utente: HTML intermedio (tenuto solo con --keep-html)
+docs/guide/.guide.html
