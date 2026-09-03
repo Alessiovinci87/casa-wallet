@@ -64,9 +64,10 @@ export async function buildAdvisorReport({ householdId, userId, months = 3 }) {
   const incomeRules = rules.filter((r) => r.type === "INCOME");
   const fixedMonthly = round2(fixedRules.reduce((s, r) => s + monthlyEquivalent(r), 0));
   const incomeRulesMonthly = round2(incomeRules.reduce((s, r) => s + monthlyEquivalent(r), 0));
-  // Entrate attese: le ricorrenti sono la base; lo storico (se c'è) alza la stima se maggiore.
-  const expectedIncome = round2(Math.max(incomeRulesMonthly, shortHistory ? 0 : avgIncomeHist));
-  const incomeSource = expectedIncome === incomeRulesMonthly && incomeRulesMonthly > 0 ? "ricorrenze" : expectedIncome > 0 ? "storico" : "nessuna";
+  // Entrate attese: chi ha entrate variabili (P.IVA, freelance) non ha ricorrenze:
+  // vale la media di ciò che è entrato davvero, anche con poco storico (segnalato).
+  const expectedIncome = round2(Math.max(incomeRulesMonthly, avgIncomeHist));
+  const incomeSource = expectedIncome === 0 ? "nessuna" : incomeRulesMonthly >= avgIncomeHist ? "ricorrenze" : shortHistory ? "storico breve" : "media storica";
   const variableMonthly = avgVariableHist;
   const free = round2(expectedIncome - fixedMonthly - variableMonthly);
 
@@ -145,7 +146,8 @@ export async function buildAdvisorReport({ householdId, userId, months = 3 }) {
   // --- Messaggi
   const messages = [];
   if (shortHistory) messages.push({ level: "info", title: "Storico breve", text: `Ho ${observedMonths.length === 0 ? "nessun" : "meno di due"} mes${observedMonths.length === 1 ? "e" : "i"} di movimenti: uso le ricorrenze come base. Importa gli estratti degli ultimi mesi (Altro → Importa estratto conto) e il resoconto diventa affidabile.` });
-  if (expectedIncome === 0) messages.push({ level: "bad", title: "Nessuna entrata prevedibile", text: "Non ci sono entrate ricorrenti né storico: aggiungi lo stipendio o le entrate fisse come ricorrenza (Movimenti → Ricorrenze → Entrata)." });
+  if (expectedIncome === 0) messages.push({ level: "bad", title: "Nessuna entrata registrata", text: "Non ho entrate da cui partire. Se hai entrate fisse aggiungile come ricorrenza; se sono variabili, registra ogni incasso come Entrata (o importa l'estratto conto): la media dei mesi diventa la base del calcolo." });
+  else if (incomeSource === "storico breve") messages.push({ level: "info", title: "Entrate variabili", text: `Uso la media di ciò che è entrato finora (${fmt(expectedIncome)} al mese) come base: con entrate variabili è una stima grezza. Importando gli estratti degli ultimi mesi diventa una media vera.` });
   if (expectedIncome > 0 && fixedMonthly > expectedIncome * 0.6) messages.push({ level: "warn", title: "Fisse pesanti", text: `Le spese fisse (${fmt(fixedMonthly)}) sono il ${Math.round((fixedMonthly / expectedIncome) * 100)}% delle entrate: sopra il 60% ogni imprevisto pesa. Guarda le ricorrenze e chiediti quali servono davvero.` });
   if (smallSubsTotal >= 20) messages.push({ level: "info", title: "Abbonamenti", text: `${smallSubs.length} ricorrenze piccole (${smallSubs.map((s) => s.description).slice(0, 5).join(", ")}${smallSubs.length > 5 ? "…" : ""}) valgono ${fmt(smallSubsTotal)} al mese, ${fmt(round2(smallSubsTotal * 12))} l'anno.` });
   if (free < 0) messages.push({ level: "bad", title: "Esce più di quanto entra", text: `Ogni mese mancano circa ${fmt(-free)} tra fisse e variabili. Prima di qualsiasi obiettivo va chiuso questo buco.` });
