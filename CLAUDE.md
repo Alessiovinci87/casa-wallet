@@ -2,9 +2,20 @@
 
 App di gestione economia domestica **multi-tenant** (famiglie/household). Nata per 2 utenti (Alessio e moglie), ora con registrazione pubblica in ottica commercializzazione (store Android/iOS via Capacitor in futuro).
 
-## Stato avanzamento (aggiornato 14 luglio 2026)
+## Stato avanzamento (aggiornato 3 settembre 2026)
 
 ### Completato ✅
+- **Sessione "Consapevolezza & Obiettivi" (3 set 2026)** — 8 feature F1–F8, un commit per feature (`96758af`..`181dd71` + fix Dashboard), tutte testate E2E via curl in locale (SQLite). **Non ancora deployate**: al push su `main` Railway fa `prisma db push` — le modifiche sono SOLO tabelle nuove e colonne nullable (verificato `prisma validate` sullo schema Postgres committato), quindi il deploy è sicuro. Concetto cardine: **Disponibile reale** = saldo effettivo − tasse accantonate non trasferite (tutti i membri) − parcheggiati negli obiettivi − uscite ricorrenti dovute entro fine mese − prestiti interni aperti.
+  - **F1 Ricorrenze**: modello `RecurringRule` (scoped famiglia; type, amount, category, method, description, frequency WEEKLY|MONTHLY|BIMONTHLY|QUARTERLY|SEMIANNUAL|YEARLY, interval, dayOfMonth (31 = ultimo giorno, febbraio ok), weekday, startDate, endDate, nextRunAt, lastPostedAt, pendingAt, autoPost, active) + `Transaction.recurringRuleId?`. `lib/recurrence.js`: occorrenze deterministiche, `monthlyEquivalent` (amount/mesi), `processRule` idempotente per (regola, data) con recupero dei giorni saltati; autoPost=false → `pendingAt` + push "Conferma addebito", la transazione nasce a `POST /:id/confirm`. Cron giornaliero 06:00 Europe/Rome. Client: `/recurring`, toggle "Ripeti" nel TransactionForm (`postFirst`: la prima occorrenza nasce subito), chip "↻ Ricorrente". Le entrate ricorrenti NON creano TaxSaving. Seed: 4 regole demo con `SEED_DEMO_RULES=1` (Rata auto, Internet, Aquamea, Mutuo semestrale).
+  - **F2 Entrate/Uscite**: `/expenses` e `/income` (stesso `TransactionsPage` con prop `type`), `/transactions` → redirect. Totale del mese + Δ% vs mese precedente; Uscite: blocchi Fisse (recurringRuleId) / Variabili; Entrate: badge "Fattura n. X" (GET /transactions ora include `invoice {id, numero}`) e % tasse.
+  - **F3 Obiettivi**: modelli `SavingsGoal` (kind GOAL|SINKING|BUFFER, targetAmount, targetDate, startDate, priority 1..3, personal+userId, linkedRecurringRuleId) e `GoalContribution` (± importo, transactionId? per prelievi con uscita reale). `lib/goals.js`: saved, quota mensile = residuo/mesi rimanenti (SINKING collegato: quota costante `amount/mesi` della regola + `shortfall`/`catchUpQuota`), stato ON_TRACK|BEHIND|AHEAD|DONE vs traiettoria lineare per mesi (il mese corrente è fascia di tolleranza), `projectedDate` al ritmo degli ultimi 90 gg, `proposeAllocation` (SINKING per scadenza → GOAL per priorità/data → BUFFER, il resto ai BUFFER). **La scadenza di una ricorrenza collegata svuota il SINKING** (contributo negativo legato all'uscita, in `postOccurrence`). Client: `/goals` (card, wizard "servono N €/mese", Versa/Preleva, Distribuisci), `AllocateModal` proposto dopo ogni entrata (manuale o incasso fattura), card in Dashboard.
+  - **F4 Disponibile reale**: `Household.openingBalance/openingBalanceDate` (PUT `/api/household/opening-balance`, qualsiasi membro), `lib/available.js` + `GET /api/dashboard/available` → `{balance, taxPending, goalsParked, committedUntilMonthEnd, committedItems, loansOutstanding, fixedMonthly, available, status OK|LOW|NEGATIVE, breakdown[]}`. Dashboard: numero grande = Disponibile reale (tap → breakdown), colore verde/giallo (<20% fisse)/rosso; sezione saldo iniziale in Impostazioni. La card "Previsione spesa fine mese" ora proietta solo le variabili e somma le fisse una volta sola.
+  - **F5 Previsione 90 gg**: `lib/forecast.js` + `GET /api/forecast?days=` (7..365): parte dal libero di oggi (available + committed) e applica ricorrenze future, scadenze fiscali non pagate di tutti i membri **al netto del fondo tasse consumato in ordine di scadenza** (`coveredByFund`), incassi attesi (`computeExpectedCollections` per membro, netto), quote obiettivi (residuo oggi + 1° del mese). Ritorna `daily[]` con saldo e flag NEGATIVE/LOW, `events[]`, `minBalance/minDate/firstNegative`. Pagina `/forecast` con grafico recharts lazy e timeline.
+  - **F6 Prestito interno**: modello `InternalLoan` (personale; amount, takenAt, dueDate = prossima TaxDeadline non pagata, monthlyRepayment = amount/mesi alla scadenza, repaid, status OPEN|REPAID|LATE, note, simulationVerdict) + `FiscalProfile.maxSelfFinancePercent` (default 50). `lib/loans.js`: guardrail server (verdetto OK di `simulateSelfFinancing`, amount ≤ max% × fondo − prestiti aperti, scadenza futura obbligatoria), `checkInternalLoans` nel cron 08:00 (LATE vs traiettoria lineare, rata nel giorno del prelievo, alert forte a 30 gg). Route `/api/loans`. Tesoreria: "Preleva con piano di rientro" accanto al simulatore, "di cui prestati", lista prestiti con barra e Registra rata.
+  - **F7 Import CSV**: `Household.csvMapping` (JSON), `Transaction.importHash`, modello `CategoryRule` (pattern → categoria, unique per famiglia). `lib/bankImport.js`: parser tollerante (delimitatore auto, virgolette, BOM/latin1), importi "1.234,56"/"12.30"/"(12,00)", date dd/mm/yyyy|yyyy-mm-dd, hash sha1(data|importo|descrizione normalizzata) → i doppioni esatti nello stesso giorno sono considerati duplicati (limite noto), categorizzazione a regole + keyword italiane (niente AI), `detectRecurrences` (importo ±2%, giorno ±3, ≥3 mesi). Route `/api/import`: `bank-csv/preview` (multipart `file` + `mapping` JSON + `saveMapping`), `bank-csv/commit` (atomico, skip duplicati, `learn` crea la regola), `category-rules` CRUD, `recurrence-candidates`. Pagina `/import`.
+  - **F8 Onboarding**: `/onboarding` in 5 passi (saldo iniziale → ricorrenze → % tasse se P.IVA → obiettivi → invito). Dashboard apre il wizard al primo accesso (nessun punto zero, nessuna transazione) una volta sola (`localStorage.onboardingSeen`); link in Impostazioni.
+  - **Tooling**: `scripts/commit-schema-pg.sh` stagea la versione Postgres+enum di `schema.prisma` senza toccare l'override sqlite locale (usarlo a ogni commit che tocca lo schema). Nuovi eventi WS: `recurring_update`, `goal_update`.
+  - **Non fatto / limiti**: GPT per le righe CSV irrisolte (solo keyword); Fondo agosto (BUFFER) da dimensionare dopo l'import reale; nessun deploy eseguito in questa sessione.
 - **6 nuove funzionalità (14 lug 2026)** — commit `f7ddab9`, live (Railway+Vercel+APK). Testato E2E in locale (stima al centesimo, verify-email flusso completo, alert soglia, generate idempotente)
   - **Stima pagamenti 30/6 e 30/11**: `lib/taxEstimate.js` (metodo storico su fatture INCASSATE: dovuto(Y)=imponibile×coeff×(imposta+INPS); giugno=saldo+1°acconto, novembre=2°acconto; acconti versati≈dovuto(Y−2)); `GET /api/treasury/tax-estimate?year=` (`noHistory` se 0 incassi anno prec.); sezione in Tesoreria con proiezione anno corrente (incassato+fatture attese)
   - **Scadenze precompilate**: `POST /api/deadlines/generate {year?}` → crea 30/6 (IRPEF_SALDO) e 30/11 (IRPEF_ACCONTO) dagli importi stimati, idempotente per type+anno; bottone "Crea scadenze da stima"
@@ -105,6 +116,10 @@ App di gestione economia domestica **multi-tenant** (famiglie/household). Nata p
 - [x] ~~Debounce filtro anno in TransactionsPage~~ — fatto (19 giu 2026)
 
 ### Prossima sessione — note di ripartenza
+- **3 set 2026**: F1–F8 committate su `main` ma NON pushate/deployate. Prima del push: rileggere il diff dello schema (solo aggiunte nullable/nuove tabelle → `prisma db push` in Dockerfile passa). Il dev.db locale contiene dati di prova (opening balance 5000 al 1/9, obiettivi Vacanze/Mutuo/Fondo agosto, 4 regole demo, un account "Altra" famiglia `altro-f1@test.local`) — non sono in prod.
+- Per committare lo schema: `bash scripts/commit-schema-pg.sh` (stagea la versione Postgres), poi `git add` del resto. Il file locale resta sqlite.
+- Avvio locale: `cd server && npm run dev` (porta 3001) e `cd client && npm run dev` (5173). Seed con regole demo: `SEED_DEMO_RULES=1 node prisma/seed.js`.
+- Idee lasciate aperte: GPT per righe CSV irrisolte; dimensionare "Fondo agosto" dopo l'import reale; push native FCM per Capacitor; email digest settimanale del Disponibile reale.
 - Working tree locale: `schema.prisma` in versione SQLite (provider sqlite + `type`/`method` String) — override **non committato**, come da strategia dual-provider. La versione committata è postgres+enum CON le modifiche household.
 - Per riavviare l'ambiente locale: `cd server && npm run dev` (DB SQLite `dev.db` migrato con household e popolato dal seed).
 - Roadmap concordata (6 lug 2026): ① redesign UI stile home banking (task in corso) → ② motore di tesoreria (scadenze fiscali, simulatore auto-finanziamento, % minima suggerita con avviso se la % utente è sotto) → ③ import FatturaPA XML + connettori Aruba e Fattura24 (gestionale della moglie) → ④ Capacitor per store Android/iOS + in-app purchase → ⑤ home banking (open banking PSD2, es. GoCardless).
@@ -197,6 +212,38 @@ Tutte le route (eccetto login) richiedono header `Authorization: Bearer <token>`
 - `GET /aruba` (stato), `POST /aruba/connect {username,password}` (valida con signin reale, salva cifrato), `DELETE /aruba/connect`, `POST /aruba/sync` (incrementale da lastSyncAt, skip Scartata) → `{ imported, skipped, errors }`
 - Env richiesta per il connettore: `INVOICE_CRED_SECRET`
 
+### Ricorrenze (`/api/recurring-rules`) — protette, scoped famiglia
+- `GET /?active=true` → `{ rules: [...+monthlyEquivalent, monthsPerOccurrence], monthlyFixedExpense, monthlyFixedIncome }`
+- `POST /` body `{ type, amount, category, method, description?, frequency, interval?, dayOfMonth?, weekday?, startDate, endDate?, autoPost?, postFirst? }` → 201 (la regola viene processata subito: se dovuta, la transazione nasce o va in attesa); `postFirst` parte dalla startDate anche se passata
+- `PUT /:id` (update parziale, ricalcola nextRunAt mai nel passato), `DELETE /:id` (le transazioni restano, link a null)
+- `GET /upcoming?days=90` → `{ events: [{ruleId, date, type, amount, category, description, autoPost, pending}] }` materializzate, non salvate
+- `POST /run-due {force?}` (test del cron, solo la propria famiglia), `POST /:id/confirm {amount?, date?}` (409 se nulla in attesa), `POST /:id/skip`
+- WS `recurring_update`; le transazioni create dal cron emettono `transaction_update`
+
+### Obiettivi (`/api/goals`) — protette, condivisi (personal=true → solo il proprietario)
+- `GET /?includeInactive=` → `{ goals: [...saved, target, remaining, dueDate, monthsRemaining, monthlyQuota, shortfall, catchUpQuota, monthContributed, monthRemaining, paceMonthly, projectedDate, status, progress], summary: {count, parked, monthQuota, monthContributed, behind} }`
+- `POST /` body `{ name, kind?, icon?, targetAmount, targetDate? (obbligatoria per GOAL), priority?, personal?, linkedRecurringRuleId? }` (con regola collegata name/target/kind si deducono); `PUT /:id`; `DELETE /:id` (contributi in cascade)
+- `GET /:id/contributions`; `POST /:id/contribute { amount (±), date?, note?, createTransaction?, category?, method? }` (400 se prelievo > saved)
+- `POST /allocate { amount? | incomeTransactionId? }` → proposta senza scritture `{ amount, allocations[{goalId, amount, ...}], unallocated, source }`; `POST /allocate/confirm { allocations[{goalId, amount}], date?, note? }` → contributi atomici
+- WS `goal_update`
+
+### Dashboard / previsione
+- `GET /api/dashboard/available` → Disponibile reale con `breakdown[]` e `committedItems[]`
+- `GET /api/forecast?days=90` → `{ startBalance, threshold, endBalance, minBalance, minDate, firstNegative, daysNegative, daysLow, totals, events[], daily[{date, delta, balance, flag, events?}] }`
+- `PUT /api/household/opening-balance { openingBalance|null, openingBalanceDate? }` (qualsiasi membro); `GET /api/household` ora include `openingBalance/openingBalanceDate`
+
+### Prestiti interni (`/api/loans`) — protette, PERSONALI
+- `GET /?includeClosed=` → `{ loans[...outstanding, expectedRepaidByNow, behindBy, progress, daysToDue, suggestedRepayment], outstanding, openCount, fundAvailable, maxPercent, cap }`
+- `POST / { amount, note?, scope? }` → 201 oppure 400 `{ error, code: VERDICT|CAP|NO_DEADLINE|DATI_INSUFFICIENTI, cap?, maxPercent? }`
+- `POST /:id/repay { amount }` (→ REPAID al saldo), `DELETE /:id` (409 se rate già rientrate), `POST /check {force?}` (test del controllo giornaliero)
+- `PUT /api/treasury/fiscal-profile` accetta anche `maxSelfFinancePercent`
+
+### Import CSV (`/api/import`) — protette, scoped famiglia
+- `POST /bank-csv/preview` multipart `file` (+ `mapping` JSON `{dateCol, descCol, amountCol | debitCol+creditCol, hasHeader?, invertSign?}` indici colonna, `saveMapping=true`) → `{ delimiter, headers, sample, totalRows, savedMapping, mapping, parsed: null | [{line, date, amount, type, description, hash, duplicate, category, categorySource, error?}], stats }`
+- `POST /bank-csv/commit { rows[{date, amount, type, description, category, hash?, method?, learn?}], method? }` → `{ created, skipped, errors }` (max 2000 righe)
+- `GET /category-rules`, `POST /category-rules {pattern, category, type?}`, `DELETE /category-rules/:id`
+- `GET /recurrence-candidates?months=12` → `{ proposals[{description, type, category, amount, dayOfMonth, months, lastDate}] }` (esclude quelle già coperte da una regola)
+
 ### Push notifications (`/api/push`) — protette (Web Push / VAPID)
 - `GET /public-key` → `{ publicKey }` (chiave VAPID pubblica; `null` se non configurato)
 - `POST /subscribe` → body subscription `{ endpoint, keys: { p256dh, auth } }`: upsert `PushSubscription`
@@ -214,7 +261,7 @@ Tutte le route (eccetto login) richiedono header `Authorization: Bearer <token>`
 Logica predittiva (dettaglio): per ogni `canonicalName` si prendono le date di acquisto (1 per giorno), si calcola l'intervallo medio semplice in giorni; `predictedNextPurchase = ultimo acquisto + intervallo`; `isDue` quando `daysRemaining <= 0`. Servono ≥2 acquisti per una previsione (con 1 solo acquisto: `isDue=false`, `avgIntervalDays=null`, ma il prodotto resta nella risposta come "non ancora prevedibile"). `RecurringProduct.alwaysBuy` forza `isDue=true` anche con pochi dati; `intervalDays` sovrascrive la media. Una dismissal esclude il prodotto solo se più recente dell'ultimo acquisto.
 
 ## WebSocket
-Endpoint `ws://<host>/ws?token=<jwt>` — connessione autenticata (senza/invalid token → close 4401). Eventi server→client scoped per famiglia: `transaction_update`, `receipt_update`, `shopping_list_update`.
+Endpoint `ws://<host>/ws?token=<jwt>` — connessione autenticata (senza/invalid token → close 4401). Eventi server→client scoped per famiglia: `transaction_update`, `receipt_update`, `shopping_list_update`, `invoice_update`, `recurring_update`, `goal_update`.
 
 ## Struttura client (`/client/src`)
 - `lib/api.js` — istanza axios (baseURL `VITE_API_URL`), interceptor: aggiunge `Bearer` token; su 401 logout + redirect `/login` **solo se era presente un token** (no logout su 401 anonimi/boot)
@@ -227,14 +274,17 @@ Endpoint `ws://<host>/ws?token=<jwt>` — connessione autenticata (senza/invalid
 - `store/analyticsStore.js` — `{ byCategory, byStore, topProducts, storeComparison, trend, range, fetchAll, fetchTrend }`
 - `store/shoppingListStore.js` — `{ list, recurring, fetchList, fetchRecurring, dismiss, setRecurring, removeRecurring }`
 - `store/budgetStore.js` — `{ budgets, loading, fetchBudgets, saveBudget, removeBudget }`
+- `store/recurringStore.js` — `{ rules, monthlyFixedExpense, monthlyFixedIncome, loaded, fetchRules, createRule, updateRule, deleteRule, confirmPending, skipPending }`
+- `store/goalStore.js` — `{ goals, summary, loaded, fetchGoals, createGoal, updateGoal, deleteGoal, contribute, propose, confirmAllocation }`
+- `store/treasuryStore.js` — ora anche `{ loans, fetchLoans, createLoan, repayLoan, cancelLoan }`; `store/householdStore.js` — anche `setOpeningBalance`
 - `lib/exportCsv.js` — genera/scarica CSV transazioni; `lib/push.js` — registrazione service worker + subscribe Web Push (VAPID)
 - `hooks/useWebSocket.js` — connessione a `VITE_WS_URL`; refresh su `transaction_update`, `receipt_update` (transazioni + lista spesa + analytics se già caricate), `shopping_list_update`; riconnessione 3s
-- `components/` — `PrivateRoute` (attende `hydrated`), `Layout` (nav + WS), `TransactionForm` (modal + bottone OCR), `BalanceTrendChart` (recharts), `NotificationsToggle` (attiva Web Push)
-- `pages/` — `LoginPage`, `Dashboard`, `TransactionsPage`, `TaxSavingsPage`, `OcrPage` (nuova spesa da scontrino: camera/galleria, scontrino lungo multi-foto, conferma editabile), `AnalyticsPage`, `ShoppingListPage`, `BudgetsPage`, `SummaryPage`
+- `components/` — `PrivateRoute` (attende `hydrated`), `Layout` (nav + WS), `TransactionForm` (modal + bottone OCR + toggle Ripeti + proposta riparto dopo un'entrata), `RecurrenceFields` (campi pianificazione condivisi), `AllocateModal` (Distribuisci), `BalanceTrendChart`/`ForecastChart` (recharts, lazy), `NotificationsToggle` (attiva Web Push)
+- `pages/` — `LoginPage`, `Dashboard`, `TransactionsPage` (prop `type`: Uscite/Entrate), `RecurringPage`, `GoalsPage`, `ForecastPage`, `ImportPage`, `OnboardingPage`, `TaxSavingsPage`, `TreasuryPage`, `InvoicesPage`, `OcrPage`, `AnalyticsPage`, `ShoppingListPage`, `BudgetsPage`, `SummaryPage`, `SettingsPage`
 - `public/sw.js` — service worker per le notifiche Web Push (eventi `push` + `notificationclick`)
 
 ### Routing
-Pubbliche: `/login`, `/register`. Protette (PrivateRoute → Layout): `/` (Dashboard), `/transactions`, `/tax-savings`, `/treasury` (Tesoreria), `/invoices` (Fatture), `/ocr` (Nuova spesa), `/analytics` (Analisi), `/shopping-list` (Lista spesa), `/budgets` (Budget), `/summary` (Riepilogo rapido), `/settings` (Impostazioni famiglia).
+Pubbliche: `/login`, `/register`. Protette (PrivateRoute → Layout): `/` (Dashboard), `/expenses` (Uscite), `/income` (Entrate), `/transactions` (→ redirect `/expenses`), `/goals` (Obiettivi), `/recurring` (Ricorrenze), `/forecast` (Previsione), `/tax-savings`, `/treasury` (Tesoreria), `/invoices` (Fatture), `/ocr` (Nuova spesa), `/import` (Importa CSV), `/analytics` (Analisi), `/shopping-list` (Lista spesa), `/budgets` (Budget), `/summary` (Riepilogo rapido), `/settings` (Impostazioni famiglia), `/onboarding` (Punto zero).
 
 ### Env client
 `VITE_API_URL`, `VITE_WS_URL` — vedi `/client/.env.example`.

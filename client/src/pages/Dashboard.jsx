@@ -124,11 +124,15 @@ export default function Dashboard() {
   const max = Math.max(income, expense, 1);
   const recent = transactions.slice(0, 5);
 
-  // Previsione spesa a fine mese: media giornaliera × giorni del mese.
+  // Previsione spesa a fine mese: le fisse (ricorrenze già registrate + quelle
+  // ancora dovute entro fine mese) contano una volta sola; solo le variabili
+  // vengono proiettate con la media giornaliera. Così una rata il 5 non gonfia il mese.
   const dayOfMonth = now.getDate();
   const daysInMonth = new Date(YEAR, MONTH, 0).getDate();
-  const avgDailyExpense = dayOfMonth > 0 ? expense / dayOfMonth : 0;
-  const forecastExpense = avgDailyExpense * daysInMonth;
+  const fixedSoFar = transactions.filter((t) => t.type === "EXPENSE" && t.recurringRuleId).reduce((s, t) => s + t.amount, 0);
+  const variableSoFar = expense - fixedSoFar;
+  const avgDailyExpense = dayOfMonth > 0 ? variableSoFar / dayOfMonth : 0;
+  const forecastExpense = avgDailyExpense * daysInMonth + fixedSoFar + (avail?.committedUntilMonthEnd || 0);
 
   return (
     <div className="space-y-4">
@@ -324,7 +328,8 @@ export default function Dashboard() {
         <div>
           <div className="text-sm font-semibold text-ink-600">Previsione spesa fine mese</div>
           <div className="text-xs text-ink-400 mt-0.5 nums">
-            Media {eur(avgDailyExpense)}/giorno · {dayOfMonth} di {daysInMonth} giorni
+            Variabili {eur(avgDailyExpense)}/giorno · {dayOfMonth} di {daysInMonth} giorni
+            {(fixedSoFar + (avail?.committedUntilMonthEnd || 0)) > 0 && ` · fisse ${eur(fixedSoFar + (avail?.committedUntilMonthEnd || 0))}`}
           </div>
         </div>
         <div className="text-xl sm:text-2xl font-bold text-ink-900 nums">{eur(forecastExpense)}</div>
