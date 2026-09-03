@@ -105,6 +105,16 @@ export default function TransactionsPage({ type = "EXPENSE", accountId = "", onA
   const monthDate = new Date(filters.year, filters.month - 1, 1);
   const isCurrent = filters.month === now.getMonth() + 1 && filters.year === now.getFullYear();
 
+  if (showForm) {
+    return (
+      <TransactionForm
+        initial={formInitial}
+        onClose={() => { setShowForm(false); setFormInitial(null); }}
+        onDelete={formInitial?.id ? () => { setShowForm(false); remove(formInitial); } : undefined}
+      />
+    );
+  }
+
   return (
     <div className="space-y-4">
       <h1 className="sr-only">{TITLES[type]}</h1>
@@ -176,13 +186,6 @@ export default function TransactionsPage({ type = "EXPENSE", accountId = "", onA
         </button>
       </div>
 
-      {showForm && (
-        <TransactionForm
-          initial={formInitial}
-          onClose={() => { setShowForm(false); setFormInitial(null); }}
-          onDelete={formInitial?.id ? () => { setShowForm(false); remove(formInitial); } : undefined}
-        />
-      )}
     </div>
   );
 }

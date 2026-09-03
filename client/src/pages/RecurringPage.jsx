@@ -90,8 +90,9 @@ function RuleForm({ initial, onClose }) {
   };
 
   return (
-    <div className="modal-backdrop">
-      <form onSubmit={submit} className="card p-6 w-full max-w-md modal-panel space-y-3">
+    <div className="space-y-3">
+      <button type="button" onClick={onClose} className="min-h-[44px] text-[13px] text-ink-600 flex items-center">‹ Annulla</button>
+      <form onSubmit={submit} className="card p-4 sm:p-6 w-full space-y-3">
         <h2 className="text-lg font-semibold">{isEdit ? "Modifica ricorrenza" : "Nuova ricorrenza"}</h2>
         {error && <div className="text-sm text-rose-600 bg-rose-50 rounded p-2">{error}</div>}
 
@@ -131,7 +132,7 @@ function RuleForm({ initial, onClose }) {
           <RecurrenceFields value={rec} onChange={setRec} startDate={form.startDate} amount={form.amount} onStartDateChange={(d) => set("startDate", d)} />
         </div>
 
-        <div className="flex justify-end gap-2 pt-3 sticky bottom-0 bg-white -mb-2 pb-2 border-t border-card-line">
+        <div className="flex justify-end gap-2 pt-3 border-t border-card-line">
           <button type="button" onClick={onClose} className="px-4 py-2 text-ink-600 hover:text-ink-900">Annulla</button>
           <button type="submit" disabled={saving} className="px-4 py-2 bg-brand-600 text-white rounded hover:bg-brand-700 disabled:opacity-50">
             {saving ? "Salvo…" : "Salva"}
@@ -175,6 +176,8 @@ export default function RecurringPage({ accountId = "" } = {}) {
     if (!Number.isFinite(amount) || amount <= 0) return window.alert("Importo non valido");
     try { await confirmPending(r.id, { amount }); fetchTransactions(); } catch (err) { window.alert(err.response?.data?.error || "Conferma non riuscita"); }
   };
+
+  if (showForm) return <RuleForm initial={editing} onClose={() => { setShowForm(false); setEditing(null); }} />;
 
   return (
     <div className="space-y-4">
@@ -281,7 +284,6 @@ export default function RecurringPage({ accountId = "" } = {}) {
         )}
       </div>
 
-      {showForm && <RuleForm initial={editing} onClose={() => { setShowForm(false); setEditing(null); }} />}
     </div>
   );
 }

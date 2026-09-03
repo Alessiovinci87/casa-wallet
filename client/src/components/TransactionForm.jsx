@@ -186,10 +186,11 @@ export default function TransactionForm({ initial, onClose, onDelete }) {
   }
 
   return (
-    <div className="modal-backdrop">
-      <form onSubmit={handleSubmit} className="card p-6 w-full max-w-md modal-panel">
+    <div className="space-y-3">
+      <button type="button" onClick={onClose} className="min-h-[44px] text-[13px] text-ink-600 flex items-center">‹ Annulla</button>
+      <form onSubmit={handleSubmit} className="card p-4 sm:p-6 w-full">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">{isEdit ? "Modifica transazione" : "Nuova transazione"}</h2>
+          <h2 className="text-lg font-semibold">{isEdit ? "Modifica movimento" : "Nuovo movimento"}</h2>
           <label className="text-sm text-brand-600 cursor-pointer hover:underline">
             {ocrBusy ? "Analisi…" : "📷 Foto"}
             <input type="file" accept="image/*" className="hidden" onChange={handleOcr} disabled={ocrBusy} />
@@ -341,7 +342,7 @@ export default function TransactionForm({ initial, onClose, onDelete }) {
           </div>
         )}
 
-        <div className="flex justify-end gap-2 mt-6 sticky bottom-0 bg-white pt-3 -mb-2 pb-2 border-t border-card-line">
+        <div className="flex justify-end gap-2 mt-6 pt-3 border-t border-card-line">
           {isEdit && onDelete && (
             <button type="button" onClick={onDelete} className="mr-auto px-3 py-2 min-h-[44px] text-rose-600 hover:bg-rose-50 rounded">
               Elimina
