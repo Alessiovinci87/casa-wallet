@@ -57,7 +57,7 @@ router.post("/bank-csv/preview", upload.single("file"), async (req, res) => {
   } catch (err) {
     return res.status(400).json({ error: err.message || "File non leggibile" });
   }
-  const { format, rows, delimiter = null, autoMapping = null } = parsedFile;
+  const { format, rows, delimiter = null, autoMapping = null, suggestedMapping = null } = parsedFile;
   if (rows.length === 0) return res.status(400).json({ error: "Nessun movimento trovato nel file" });
   if (format === "pdf" && rows.length === 1) {
     return res.status(400).json({ error: "Nel PDF non ho trovato righe con data e importo. Se l'estratto è scansionato (immagine), chiedi alla banca il formato Excel o XML." });
@@ -67,7 +67,8 @@ router.post("/bank-csv/preview", upload.single("file"), async (req, res) => {
   const saved = household?.csvMapping ? parseMapping(household.csvMapping) : null;
   // I formati strutturati (camt, PDF) hanno colonne fisse: il mapping salvato del
   // CSV non si applica e non va sovrascritto.
-  const mapping = autoMapping || parseMapping(req.body?.mapping) || saved;
+  // Priorità: colonne fisse del formato → mapping inviato → mapping salvato → proposta dalle intestazioni.
+  const mapping = autoMapping || parseMapping(req.body?.mapping) || saved || suggestedMapping;
 
   const base = {
     format,

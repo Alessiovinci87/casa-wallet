@@ -61,9 +61,18 @@ export function parseAmount(raw) {
 }
 
 /** dd/mm/yyyy, dd-mm-yyyy, dd.mm.yyyy, yyyy-mm-dd, dd/mm/yy → Date UTC mezzanotte. */
+const MONTHS_IT = { gen: 0, feb: 1, mar: 2, apr: 3, mag: 4, giu: 5, lug: 6, ago: 7, set: 8, ott: 9, nov: 10, dic: 11 };
+
 export function parseDate(raw) {
   if (!raw) return null;
   const s = String(raw).trim();
+  // "03 settembre 2026", "3 set 2026", "03-set-26"
+  const it = s.match(/^(\d{1,2})[\s\-\/]+([a-zà]{3,})[\s\-\/]+(\d{2,4})/i);
+  if (it && MONTHS_IT[it[2].slice(0, 3).toLowerCase()] != null) {
+    let y = +it[3];
+    if (y < 100) y += 2000;
+    return new Date(Date.UTC(y, MONTHS_IT[it[2].slice(0, 3).toLowerCase()], +it[1]));
+  }
   let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (m) return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
   m = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/);
@@ -82,6 +91,27 @@ export function normalizeDescription(s) {
     .replace(/[^a-z0-9àèéìòù ]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/**
+ * Toglie dalla descrizione la coda tecnica (numero carta, riferimenti bonifico,
+ * commissioni) che le banche accodano al nome della controparte.
+ */
+export function cleanDescription(s) {
+  let d = String(s || "").replace(/\s+/g, " ").trim();
+  // "o/c: MARIO ROSSI ABI-CAB: ..." → " da MARIO ROSSI"
+  d = d.replace(/\s*o\/c:\s*([^:]*?)\s+ABI-CAB:\s*\S+/i, " da $1");
+  // Importo in chiaro nel testo ("EUR 910,00 Affitto Settembre") → separatore prima della causale.
+  d = d.replace(/\s+EUR\s+[\d.]+,\d{2}\s*/g, " · ");
+  // Code tecniche: numero carta e data operazione, commissioni, riferimenti bonifico, mandati SDD.
+  d = d.replace(/\s*(Operazione\s+carta|Comm\.\s*bonifico|Comm\.\s*di\s+maggiorazione|Num\.\s*Bon(?:ifico|\.\s*Sepa)|RIF\.\s|SDD\/RID|\bN:\s*\d|ID:\S+|DEB:).*$/i, "");
+  d = d.replace(/\s*\*{2,}\d{2,}.*$/, "");
+  d = d.replace(/\s*\b\d{6,}\b.*$/, "");
+  d = d.replace(/\s+del\s+\d{2}\.\d{2}\.\d{4}.*$/, "");
+  d = d.replace(/\s*·\s*$/, "").replace(/\s+/g, " ").trim();
+  // Parole monche rimaste in coda ("… S.a.r.l. e", "ENEL ENERGIA S P A N:", "F24 - CBI DEL :").
+  for (let i = 0; i < 3; i++) d = d.replace(/\s+(e|a|di|del|da|per|N:|DEL|CBI|-|:)$/i, "");
+  return d.slice(0, 100);
 }
 
 export function importHash({ date, amount, description }) {
@@ -108,7 +138,9 @@ export function applyMapping(rows, mapping) {
       else if (credit != null && credit !== 0) amount = Math.abs(credit);
     }
     if (mapping.invertSign && amount != null) amount = -amount;
-    const description = String(r[mapping.descCol] ?? "").trim();
+    // Stessa pulizia per tutti i formati: così PDF ed Excel dello stesso movimento
+    // producono lo stesso hash e i doppioni vengono riconosciuti.
+    const description = cleanDescription(String(r[mapping.descCol] ?? ""));
     if (!date || amount == null || amount === 0) {
       out.push({ line: i + 1, error: !date ? "data non riconosciuta" : "importo non riconosciuto", raw: r });
       continue;
@@ -142,13 +174,13 @@ const DEFAULT_KEYWORDS = [
   [/(f24|agenzia entrate|inps|imposta|tributi|delega unificata)/, "Tasse"],
   [/(farmac|parafarm|medic|ospedal|dott|dentist|ottic|veterinar|analisi)/, "Salute"],
   [/(conad|coop|esselunga|carrefour|lidl|eurospin|md |pam |supermerc|iper|despar|crai|penny|aldi|todis|sigma|nonna isa|panific|macell|frutta|ortofrutt|alimentar|market)/, "Spesa"],
-  [/(benzin|carbur|eni |q8|esso|ip |tamoil|autostrad|telepass|treno|trenitalia|italo|atm |atac|arst|bus|parcheggio|parking|taxi|uber|traghett|moby|tirrenia|grimaldi|ryanair|easyjet|volotea|ita airways)/, "Trasporti"],
+  [/(benzin|carbur|eni |eni\d|q8|esso|ip |tamoil|autostrad|telepass|treno|trenitalia|italo|atm |atac|arst|bus|parcheggio|parking|taxi|uber|traghett|moby|tirrenia|grimaldi|ryanair|easyjet|volotea|ita airways)/, "Trasporti"],
   [/(enel|eni gas|a2a|hera|iren|acea|edison|sorgenia|plenitude|abbanoa|luce|gas|acqua|tim |vodafone|wind|iliad|fastweb|internet|telefon|algonet|sky |aruba|hosting)/, "Bollette"],
   [/(affitto|mutuo|condomin|canone|leroy|brico|ikea|mondo convenienza|arredo|idraul|elettricist)/, "Casa"],
   [/(ristor|pizz|trattor|osteria|bar |caff|pub |mcdonald|burger|kebab|sushi|gelat|pasticc|deliveroo|glovo|just eat|bottega|vineria|viner|panin)/, "Ristorante"],
   [/(zara|h&m|decathlon|abbigl|scarpe|shein|zalando|ovs|primark|bershka|intimissimi|calzedonia|nike|adidas)/, "Abbigliamento"],
   [/(netflix|spotify|cinema|amazon prime|disney|dazn|palestra|gym|steam|playstation|nintendo|giocheria|kinderpark|parco|lido|teatro|concert|libreria|feltrinelli|suno|chatgpt|openai|apple\.com|google \*|youtube)/, "Svago"],
-  [/(finanziament|compass|findomestic|agos|prestito|rata |amazon|klarna|paypal|ebay|aliexpress|temu|mediaworld|unieuro|euronics|tabacch|edicola|profumeria|douglas|sephora|beauty|parrucch|barbier|estetic)/, "Altro"],
+  [/(finanziament|compass|findomestic|agos|prestito|rata |amazon|amzn|klarna|paypal|kiko|maurys|upim|competenze spese|imposta di bollo|commission|ebay|aliexpress|temu|mediaworld|unieuro|euronics|tabacch|edicola|profumeria|douglas|sephora|beauty|parrucch|barbier|estetic)/, "Altro"],
   [/(stipendio|emolument|salary|pensione|cedolino)/, "Stipendio"],
   [/(fattura|fatt\.|onorari|compenso|parcella)/, "Fatture"],
   [/(rimborso|storno|refund|riaccredito)/, "Rimborso"],

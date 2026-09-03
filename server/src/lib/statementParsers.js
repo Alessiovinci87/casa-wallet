@@ -6,7 +6,7 @@
 // presente quando il formato è strutturato e le colonne non vanno scelte a mano.
 import { XMLParser } from "fast-xml-parser";
 import { createRequire } from "node:module";
-import { parseCsv, detectDelimiter } from "./bankImport.js";
+import { parseCsv, detectDelimiter, parseDate, cleanDescription } from "./bankImport.js";
 
 const require = createRequire(import.meta.url);
 const XLSX = require("xlsx");
@@ -49,7 +49,8 @@ function parseSheet(buffer, format) {
     const rows = sheetRows(wb.Sheets[name]);
     if (!best || rows.length > best.length) best = rows;
   }
-  return { format, rows: trimToTable(best || []) };
+  const rows = trimToTable(best || []);
+  return { format, rows, suggestedMapping: rows.length ? guessMapping(rows[0]) : null };
 }
 
 function sheetRows(ws) {
@@ -65,7 +66,21 @@ function cellToString(v) {
 }
 const pad = (n) => String(n).padStart(2, "0");
 
-const isDateCell = (c) => /^\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}$|^\d{4}-\d{2}-\d{2}/.test(String(c).trim());
+const isDateCell = (c) => parseDate(c) != null;
+
+/** Propone il mapping dalle intestazioni (Data operazione, Descrizione, Entrate/Uscite o Importo). */
+export function guessMapping(headers) {
+  const h = headers.map((x) => String(x || "").toLowerCase().trim());
+  const find = (re) => { const i = h.findIndex((x) => re.test(x)); return i < 0 ? null : i; };
+  const dateCol = find(/^data( operazione| contabile| op\.?| cont\.?)?$|^date$/) ?? find(/^data/);
+  const descCol = find(/descrizione|causale|dettagl|description|memo/);
+  const amountCol = find(/^importo|^amount|^ammontare/);
+  const debitCol = find(/^uscite|^dare|^addebit|^debit/);
+  const creditCol = find(/^entrate|^avere|^accredit|^credit/);
+  if (dateCol == null || descCol == null || (amountCol == null && (debitCol == null || creditCol == null))) return null;
+  const twoCols = debitCol != null && creditCol != null;
+  return { dateCol, descCol, amountCol: twoCols ? null : amountCol, debitCol: twoCols ? debitCol : null, creditCol: twoCols ? creditCol : null, hasHeader: true, invertSign: false };
+}
 
 /**
  * Gli export bancari hanno spesso intestazione libera (IBAN, saldo, periodo)
@@ -78,7 +93,9 @@ export function trimToTable(rows) {
     const filled = clean[i].filter((c) => String(c).trim() !== "").length;
     if (filled >= 3 && !clean[i].some(isDateCell) && clean[i + 1].some(isDateCell)) {
       const width = Math.max(...clean.slice(i).map((r) => r.length));
-      return clean.slice(i).map((r) => Array.from({ length: width }, (_, j) => r[j] ?? ""));
+      // Coda senza date (Totale, "Dati aggiornati al…") fuori.
+      const body = clean.slice(i + 1).filter((r) => r.some(isDateCell));
+      return [clean[i], ...body].map((r) => Array.from({ length: width }, (_, j) => r[j] ?? ""));
     }
   }
   return clean;
@@ -92,7 +109,8 @@ function parseXml(buffer, decode) {
   if (/urn:schemas-microsoft-com:office:spreadsheet|<Workbook|<table/i.test(text.slice(0, 2000))) {
     const wb = XLSX.read(text, { type: "string" });
     const rows = sheetRows(wb.Sheets[wb.SheetNames[0]]);
-    return { format: "xml-excel", rows: trimToTable(rows) };
+    const t = trimToTable(rows);
+    return { format: "xml-excel", rows: t, suggestedMapping: t.length ? guessMapping(t[0]) : null };
   }
   const parser = new XMLParser({ ignoreAttributes: false, removeNSPrefix: true, parseTagValue: false, trimValues: true });
   const doc = parser.parse(text);
@@ -208,11 +226,31 @@ export async function parsePdf(buffer) {
         byY.get(y).push({ s: it.str, x: it.transform[4], w: it.width || 0 });
       }
       const ys = [...byY.keys()].sort((a, b) => b - a); // dall'alto in basso
-      for (const y of ys) lines.push(byY.get(y).sort((a, b) => a.x - b.x));
+      for (const y of ys) lines.push(mergeGlyphs(byY.get(y).sort((a, b) => a.x - b.x)));
       return "";
     },
   });
   return { format: "pdf", ...parsePdfLines(lines), autoMapping: STD_MAPPING };
+}
+
+/**
+ * Alcuni PDF (es. estratti trimestrali) hanno un frammento per lettera: unisce
+ * i frammenti contigui (gap < 1pt) in una parola, quelli vicini (< 3pt) in una
+ * cella separata da spazio; oltre restano celle distinte.
+ */
+export function mergeGlyphs(items) {
+  const out = [];
+  for (const it of items) {
+    const prev = out[out.length - 1];
+    const glyph = it.s.trim().length === 1;
+    if (prev && prev.w > 0 && glyph && (prev.g || prev.s.trim().length === 1)) {
+      const gap = it.x - (prev.x + prev.w);
+      if (gap < 1) { prev.s += it.s; prev.w = it.x + it.w - prev.x; prev.g = true; continue; }
+      if (gap < 3) { prev.s += ` ${it.s}`; prev.w = it.x + it.w - prev.x; prev.g = true; continue; }
+    }
+    out.push({ ...it });
+  }
+  return out;
 }
 
 /** Variante testuale (test / fallback): ogni riga → frammenti separati da spazi. */
@@ -271,7 +309,7 @@ export function parsePdfLines(lines) {
       const d = toks.find((t) => DEBIT_HEAD.test(t.s));
       const c = toks.find((t) => CREDIT_HEAD.test(t.s));
       if (d && c) {
-        cols = { debitX: d.x, creditX: c.x, balanceX: toks.find((t) => BALANCE_HEAD.test(t.s))?.x ?? null };
+        cols = { debitX: d.x, creditX: c.x, balanceX: toks.find((t) => BALANCE_HEAD.test(t.s))?.x ?? null, descX: toks.find((t) => /^descrizione/i.test(t.s))?.x ?? null };
         current = null;
         continue;
       }
@@ -299,9 +337,27 @@ export function parsePdfLines(lines) {
       current = null;
       continue;
     }
-    const descToks = toks.slice(nDates, amounts[0].i);
+    // Descrizione: tra le date e il primo importo; se vuota (layout con la
+    // descrizione a destra) le parole dopo l'ultimo importo, tolti simboli e stati.
+    let descToks = toks.slice(nDates, amounts[0].i);
+    if (!descToks.length) {
+      descToks = toks.slice(amounts[amounts.length - 1].i + 1).filter((t) => !/^[€¤Ä]$/.test(t.s) && !/^(contabilizzato|da contabilizzare)$/i.test(t.s));
+    }
     const desc = descToks.map((t) => t.s).join(" ");
-    descX = descToks.length ? descToks[0].x : null;
+    if (!/[a-zà-ù]/i.test(desc) && cols?.descX == null) {
+      // Data + importo senza testo: riepilogo scalare / tassi, non un movimento.
+      current = null;
+      continue;
+    }
+    // Descrizione vuota sulla riga del movimento: può arrivare sulla riga dopo
+    // (colonna Descrizione dell'intestazione); se resta vuota la riga cade alla fine.
+    descX = descToks.length ? descToks[0].x : cols?.descX ?? null;
+    if (/^saldo\b/i.test(desc)) {
+      // "SALDO INIZIALE" / "SALDO FINALE": non è un movimento.
+      prevBalance = amounts[amounts.length - 1].n;
+      current = null;
+      continue;
+    }
     const explicit = amounts.find((a) => /^[-+]|^\(|-$/.test(a.s));
     let value;
     if (amounts.length === 1) {
@@ -334,29 +390,12 @@ export function parsePdfLines(lines) {
     current = [normalizeDate(toks[0].s), desc, value.toFixed(2).replace(".", ",")];
     rows.push(current);
   }
-  for (let i = 1; i < rows.length; i++) rows[i][1] = cleanDescription(rows[i][1]) || "Movimento";
-  return { rows };
-}
-
-/**
- * Toglie dalla descrizione la coda tecnica (numero carta, riferimenti bonifico,
- * commissioni) che le banche accodano al nome della controparte.
- */
-export function cleanDescription(s) {
-  let d = String(s || "").replace(/\s+/g, " ").trim();
-  // "o/c: MARIO ROSSI ABI-CAB: ..." → " da MARIO ROSSI"
-  d = d.replace(/\s*o\/c:\s*([^:]*?)\s+ABI-CAB:\s*\S+/i, " da $1");
-  // Importo in chiaro nel testo ("EUR 910,00 Affitto Settembre") → separatore prima della causale.
-  d = d.replace(/\s+EUR\s+[\d.]+,\d{2}\s*/g, " · ");
-  // Code tecniche: numero carta e data operazione, commissioni, riferimenti bonifico, mandati SDD.
-  d = d.replace(/\s*(Operazione\s+carta|Comm\.\s*bonifico|Comm\.\s*di\s+maggiorazione|Num\.\s*Bon(?:ifico|\.\s*Sepa)|RIF\.\s|SDD\/RID|\bN:\s*\d|ID:\S+|DEB:).*$/i, "");
-  d = d.replace(/\s*\*{2,}\d{2,}.*$/, "");
-  d = d.replace(/\s*\b\d{6,}\b.*$/, "");
-  d = d.replace(/\s+del\s+\d{2}\.\d{2}\.\d{4}.*$/, "");
-  d = d.replace(/\s*·\s*$/, "").replace(/\s+/g, " ").trim();
-  // Parole monche rimaste in coda ("… S.a.r.l. e", "ENEL ENERGIA S P A N:", "F24 - CBI DEL :").
-  for (let i = 0; i < 3; i++) d = d.replace(/\s+(e|a|di|del|da|per|N:|DEL|CBI|-|:)$/i, "");
-  return d.slice(0, 100);
+  const out = [rows[0]];
+  for (const r of rows.slice(1)) {
+    if (!/[a-zà-ù]/i.test(r[1])) continue; // riepilogo scalare / tassi: data + saldo senza testo
+    out.push([r[0], cleanDescription(r[1]) || "Movimento", r[2]]);
+  }
+  return { rows: out };
 }
 
 function toNumber(raw) {
