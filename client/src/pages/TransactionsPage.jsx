@@ -61,7 +61,7 @@ function DayGroups({ items, type, onEdit, empty }) {
   ));
 }
 
-export default function TransactionsPage({ type = "EXPENSE", accountId = "", onAccountChange }) {
+export default function TransactionsPage({ type = "EXPENSE", accountId = "", onAccountChange, hideAccountFilter = false }) {
   const { transactions, loading, fetchTransactions, deleteTransaction } = useTransactionStore();
   const location = useLocation();
   const accounts = useAccountStore((s) => s.accounts);
@@ -110,7 +110,7 @@ export default function TransactionsPage({ type = "EXPENSE", accountId = "", onA
       <h1 className="sr-only">{TITLES[type]}</h1>
 
       {/* Filtro per conto (solo con più conti) */}
-      {accounts.length > 1 && (
+      {accounts.length > 1 && !hideAccountFilter && (
         <Segmented
           size="sm"
           value={accountId || ""}

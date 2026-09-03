@@ -45,13 +45,13 @@ export async function computeCommittedUntilMonthEnd(householdId, today = todayRo
     // (vedi computeAvailable), non dal blocco "entro fine mese".
     if ((monthsPerOccurrence(rule) || 1) > 1 && !rule.pendingAt) continue;
     if (rule.pendingAt) {
-      items.push({ ruleId: rule.id, description: rule.description || rule.category, date: rule.pendingAt, amount: rule.amount, pending: true });
+      items.push({ ruleId: rule.id, accountId: rule.accountId ?? null, description: rule.description || rule.category, date: rule.pendingAt, amount: rule.amount, pending: true });
     }
     // Da nextRunAt (mai prima di domani: oggi il cron ha già postato) a fine mese.
     const from = new Date(Math.max(today.getTime() + MS_PER_DAY, rule.nextRunAt ? rule.nextRunAt.getTime() : 0));
     if (from > monthEnd) continue;
     for (const date of occurrencesBetween(rule, from, monthEnd)) {
-      items.push({ ruleId: rule.id, description: rule.description || rule.category, date, amount: rule.amount, pending: false });
+      items.push({ ruleId: rule.id, accountId: rule.accountId ?? null, description: rule.description || rule.category, date, amount: rule.amount, pending: false });
     }
   }
   items.sort((a, b) => a.date - b.date);

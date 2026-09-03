@@ -142,7 +142,7 @@ function RuleForm({ initial, onClose }) {
   );
 }
 
-export default function RecurringPage() {
+export default function RecurringPage({ accountId = "" } = {}) {
   const { rules, monthlyFixedExpense, monthlyFixedIncome, loading, fetchRules, updateRule, deleteRule, confirmPending, skipPending } = useRecurringStore();
   const fetchTransactions = useTransactionStore((s) => s.fetchTransactions);
   const yearRemainingExpense = useRecurringStore((s) => s.yearRemainingExpense);
@@ -156,7 +156,9 @@ export default function RecurringPage() {
 
   useEffect(() => { fetchRules(); fetchAccounts().catch(() => {}); }, [fetchRules, fetchAccounts]);
 
-  const visible = rules.filter((r) => filter === "ALL" || r.type === filter);
+  const defaultAccountId = accounts.find((a) => a.isDefault)?.id;
+  const inAccount = (r) => !accountId || r.accountId === accountId || (accountId === defaultAccountId && !r.accountId);
+  const visible = rules.filter((r) => (filter === "ALL" || r.type === filter) && inAccount(r));
   const pending = rules.filter((r) => r.pendingAt);
 
   const toggleActive = async (r) => {

@@ -128,6 +128,12 @@ export default function Dashboard() {
     fetchGoals().catch(() => {});
     fetchRules().catch(() => {});
   }, [fetchTransactions, fetchGoals, fetchRules]);
+  // Ricorrenze in arrivo (60 gg): "prossima uscita" e prospetto del mese per conto.
+  const [upcoming, setUpcoming] = useState([]);
+  useEffect(() => {
+    api.get("/api/recurring-rules/upcoming", { params: { days: 60 } }).then(({ data }) => setUpcoming(data.events || [])).catch(() => setUpcoming([]));
+  }, [rules]);
+  const [openAccount, setOpenAccount] = useState(null);
 
   useEffect(() => {
     api.get("/api/transactions", { params: { month: prevDate.getMonth() + 1, year: prevDate.getFullYear() } })
@@ -220,27 +226,60 @@ export default function Dashboard() {
       {avail?.accounts?.length > 1 ? (
         <>
           {avail.accounts.map((a) => {
+            const mine = (accountId) => accountId === a.id || (a.isDefault && !accountId);
             let inc = 0, exp = 0;
+            const done = [];
             for (const t of transactions) {
-              const mine = t.accountId === a.id || (a.isDefault && !t.accountId);
-              if (!mine) continue;
-              if (t.type === "INCOME") inc += t.amount; else exp += t.amount;
+              if (!mine(t.accountId)) continue;
+              if (t.type === "INCOME") inc += t.amount; else { exp += t.amount; done.push(t); }
             }
+            const todayKey = dayjs().format("YYYY-MM-DD");
+            const future = upcoming.filter((e) => e.type === "EXPENSE" && mine(e.accountId) && dayjs(e.date).format("YYYY-MM-DD") > todayKey);
+            const next = future[0] || null;
+            const thisMonth = future.filter((e) => dayjs(e.date).month() === now.getMonth() && dayjs(e.date).year() === now.getFullYear());
+            const expected = exp + thisMonth.reduce((s, e) => s + e.amount, 0);
+            const open = openAccount === a.id;
             return (
-              <button
-                key={a.id}
-                type="button"
-                onClick={() => navigate(`/movements?tab=expenses&account=${a.id}`)}
-                className={`w-full text-left rounded-2xl p-5 ${a.balance < 0 ? "bg-rose-50 text-rose-700" : "bg-white border border-card-line text-ink-900"}`}
-              >
-                <div className="text-[13px] uppercase tracking-widest text-ink-600">{a.name}</div>
-                <div className="text-4xl sm:text-5xl font-bold tracking-tight mt-1 nums">{eur(a.balance)}</div>
-                <div className="text-[13px] mt-1.5 text-ink-600 flex flex-wrap gap-x-2">
-                  <span className="text-brand-600 nums">+{eur(inc)}</span>
-                  <span className="nums">−{eur(exp)}</span>
-                  <span className="text-ink-400">{MONTH_NAME} · tocca per i movimenti</span>
-                </div>
-              </button>
+              <div key={a.id} className={`rounded-2xl p-5 ${a.balance < 0 ? "bg-rose-50 text-rose-700" : "bg-white border border-card-line text-ink-900"}`}>
+                <button type="button" onClick={() => navigate(`/movements?tab=expenses&account=${a.id}`)} className="w-full text-left">
+                  <div className="text-[13px] uppercase tracking-widest text-ink-600">{a.name}</div>
+                  <div className="text-4xl sm:text-5xl font-bold tracking-tight mt-1 nums">{eur(a.balance)}</div>
+                  {next && (
+                    <div className="text-[13px] mt-1.5 text-rose-600 nums">
+                      Prossima uscita {dayjs(next.date).format("D MMM")} · {next.description || next.category} −{eur(next.amount)}
+                    </div>
+                  )}
+                  <div className="text-[13px] mt-1 text-ink-600 flex flex-wrap gap-x-2">
+                    <span className="text-brand-600 nums">+{eur(inc)}</span>
+                    <span className="nums">−{eur(exp)}</span>
+                    <span className="text-ink-400">{MONTH_NAME} · tocca per i movimenti</span>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOpenAccount(open ? null : a.id)}
+                  className="mt-2 w-full min-h-[44px] flex items-center justify-between text-[13px] text-ink-600"
+                  aria-expanded={open}
+                >
+                  <span>Uscite di {MONTH_NAME}: {done.length + thisMonth.length} voci · previste <span className="nums font-semibold text-ink-900">{eur(expected)}</span></span>
+                  <ChevronIcon size={18} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+                </button>
+                {open && (
+                  <ul className="divide-y divide-card-line text-[13px]">
+                    {[...done.map((t) => ({ key: t.id, date: t.date, label: t.description || t.category, amount: t.amount, state: "fatta" })),
+                      ...thisMonth.map((e) => ({ key: `${e.ruleId}-${e.date}`, date: e.date, label: e.description || e.category, amount: e.amount, state: e.pending ? "da confermare" : "in arrivo" }))]
+                      .sort((x, y) => new Date(x.date) - new Date(y.date))
+                      .map((i) => (
+                        <li key={i.key} className="py-2 flex items-center gap-2">
+                          <span className="w-12 shrink-0 text-ink-400 nums">{dayjs(i.date).format("D MMM")}</span>
+                          <span className="min-w-0 flex-1 truncate">{i.label} <span className={i.state === "fatta" ? "text-ink-400" : "text-tax-600"}>· {i.state}</span></span>
+                          <span className="shrink-0 nums">−{eur(i.amount)}</span>
+                        </li>
+                      ))}
+                    {done.length + thisMonth.length === 0 && <li className="py-2 text-ink-400">Nessuna uscita registrata o prevista questo mese.</li>}
+                  </ul>
+                )}
+              </div>
             );
           })}
           <button type="button" onClick={() => setSheet(true)} className="w-full text-left px-1 py-2 min-h-[44px] flex items-center justify-between gap-3 text-[13px] text-ink-600">

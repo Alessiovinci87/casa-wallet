@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import Segmented from "../components/Segmented.jsx";
+import { useAccountStore } from "../store/accountStore.js";
 import TransactionsPage from "./TransactionsPage.jsx";
 import RecurringPage from "./RecurringPage.jsx";
 
@@ -14,6 +16,11 @@ export default function MovementsPage({ tab: forced }) {
   const [params, setParams] = useSearchParams();
   const tab = forced || params.get("tab") || "expenses";
   const account = params.get("account") || "";
+  const accounts = useAccountStore((s) => s.accounts);
+  const accountsLoaded = useAccountStore((s) => s.loaded);
+  const fetchAccounts = useAccountStore((s) => s.fetchAccounts);
+  useEffect(() => { if (!accountsLoaded) fetchAccounts().catch(() => {}); }, [accountsLoaded, fetchAccounts]);
+  const setAccount = (id) => setParams(id ? { tab, account: id } : { tab });
   return (
     <div className="space-y-4">
       <Segmented
@@ -22,7 +29,15 @@ export default function MovementsPage({ tab: forced }) {
         options={TABS}
         className="[&>button]:flex-1 [&>button]:min-h-[44px]"
       />
-      {tab === "recurring" ? <RecurringPage embedded /> : <TransactionsPage type={tab === "income" ? "INCOME" : "EXPENSE"} embedded accountId={account} onAccountChange={(id) => setParams(id ? { tab, account: id } : { tab })} />}
+      {accounts.length > 1 && (
+        <Segmented
+          size="sm"
+          value={account}
+          onChange={setAccount}
+          options={[{ value: "", label: "Tutti i conti" }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}
+        />
+      )}
+      {tab === "recurring" ? <RecurringPage embedded accountId={account} /> : <TransactionsPage type={tab === "income" ? "INCOME" : "EXPENSE"} embedded accountId={account} hideAccountFilter />}
     </div>
   );
 }

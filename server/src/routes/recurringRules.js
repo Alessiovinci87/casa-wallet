@@ -148,6 +148,7 @@ router.get("/upcoming", async (req, res) => {
     for (const date of occurrencesBetween(rule, from, to)) {
       events.push({
         ruleId: rule.id,
+        accountId: rule.accountId ?? null,
         date,
         type: rule.type,
         amount: rule.amount,
@@ -160,6 +161,7 @@ router.get("/upcoming", async (req, res) => {
     if (rule.pendingAt) {
       events.push({
         ruleId: rule.id,
+        accountId: rule.accountId ?? null,
         date: rule.pendingAt,
         type: rule.type,
         amount: rule.amount,
