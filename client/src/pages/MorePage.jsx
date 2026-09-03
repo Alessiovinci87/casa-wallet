@@ -23,9 +23,7 @@ export default function MorePage() {
   // Ricomincia da capo: azzera i dati economici della famiglia e riapre il Punto zero.
   const restart = async () => {
     const word = window.prompt(
-      "Ricominciare da capo? Verranno cancellati movimenti, ricorrenze, obiettivi, fatture, scadenze, budget e saldo iniziale di tutta la famiglia. Restano account e famiglia.
-
-Per confermare scrivi RICOMINCIA:"
+      "Ricominciare da capo? Verranno cancellati movimenti, ricorrenze, obiettivi, fatture, scadenze, budget e saldo iniziale di tutta la famiglia. Restano account e famiglia.\n\nPer confermare scrivi RICOMINCIA:"
     );
     if (word == null) return;
     setResetting(true);
