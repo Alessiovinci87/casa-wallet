@@ -152,7 +152,7 @@ export default function Dashboard() {
           <button
             type="button"
             className="text-left hover:text-white transition"
-            onClick={() => navigate("/transactions", { state: { filterType: "INCOME" } })}
+            onClick={() => navigate("/income")}
           >
             <span className="block text-xs text-white/60">Entrate</span>
             <span className="font-semibold nums">+ {eur(income)}</span>
@@ -160,7 +160,7 @@ export default function Dashboard() {
           <button
             type="button"
             className="text-left hover:text-white transition"
-            onClick={() => navigate("/transactions", { state: { filterType: "EXPENSE" } })}
+            onClick={() => navigate("/expenses")}
           >
             <span className="block text-xs text-white/60">Uscite</span>
             <span className="font-semibold nums">− {eur(expense)}</span>

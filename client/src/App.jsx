@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./store/authStore.js";
 import PrivateRoute from "./components/PrivateRoute.jsx";
 import Layout from "./components/Layout.jsx";
@@ -60,7 +60,9 @@ function App() {
             }
           >
             <Route path="/" element={<Dashboard />} />
-            <Route path="/transactions" element={<TransactionsPage />} />
+            <Route path="/expenses" element={<TransactionsPage type="EXPENSE" />} />
+            <Route path="/income" element={<TransactionsPage type="INCOME" />} />
+            <Route path="/transactions" element={<Navigate to="/expenses" replace />} />
             <Route path="/tax-savings" element={<TaxSavingsPage />} />
             <Route path="/treasury" element={<TreasuryPage />} />
             <Route path="/invoices" element={<InvoicesPage />} />

@@ -5,7 +5,8 @@ import { useWebSocket } from "../hooks/useWebSocket.js";
 
 const links = [
   { to: "/", label: "Dashboard", end: true },
-  { to: "/transactions", label: "Transazioni" },
+  { to: "/expenses", label: "Uscite" },
+  { to: "/income", label: "Entrate" },
   { to: "/recurring", label: "Ricorrenze" },
   { to: "/tax-savings", label: "Salvadanaio" },
   { to: "/treasury", label: "Tesoreria" },

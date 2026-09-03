@@ -113,7 +113,11 @@ router.get("/", async (req, res) => {
 
   const transactions = await prisma.transaction.findMany({
     where,
-    include: { taxSaving: true, user: { select: { id: true, name: true } } },
+    include: {
+      taxSaving: true,
+      user: { select: { id: true, name: true } },
+      invoice: { select: { id: true, numero: true } }, // badge "fattura n. X" in Entrate
+    },
     orderBy: { date: "desc" },
   });
   res.json(transactions);

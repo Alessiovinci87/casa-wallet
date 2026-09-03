@@ -124,7 +124,7 @@ export default function OcrPage() {
       });
       shots.forEach((s) => URL.revokeObjectURL(s.url));
       setSuccess(true);
-      setTimeout(() => navigate("/transactions"), 900);
+      setTimeout(() => navigate("/expenses"), 900);
     } catch {
       setError("Salvataggio non riuscito.");
     }
