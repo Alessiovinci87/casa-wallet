@@ -52,6 +52,7 @@ model User {
   arubaConnection ArubaConnection?
   recurringRules  RecurringRule[]
   savingsGoals    SavingsGoal[]
+  internalLoans   InternalLoan[]
 }
 
 model Transaction {
@@ -209,6 +210,7 @@ model FiscalProfile {
   aliquotaImposta   Float?   // es. 15 (%)
   aliquotaInps      Float?   // es. 26.23 (%)
   defaultTaxPercent Float?   // % prefill nel form entrate (scelta libera dell'utente)
+  maxSelfFinancePercent Float? // % massima del fondo tasse prelevabile come prestito interno (default 50)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }
@@ -341,6 +343,29 @@ model GoalContribution {
   createdAt     DateTime     @default(now())
 
   @@index([goalId, date])
+}
+
+// Prestito interno dal fondo tasse (PERSONALE): tracciamento di un prelievo
+// autorizzato dal simulatore (verdetto OK, ≤ maxSelfFinancePercent del fondo).
+//   status: OPEN | REPAID | LATE (rientro sotto la traiettoria lineare)
+model InternalLoan {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id])
+  amount            Float
+  takenAt           DateTime
+  dueDate           DateTime  // ≤ prossima TaxDeadline non pagata
+  deadlineId        String?   // scadenza di riferimento (informativo)
+  monthlyRepayment  Float
+  repaid            Float     @default(0)
+  status            String    @default("OPEN")
+  note              String?
+  simulationVerdict String?   // verdetto al momento del prelievo
+  lastAlertAt       DateTime? // anti-duplicato alert 30 giorni
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([userId, status])
 }
 
 enum TxType {

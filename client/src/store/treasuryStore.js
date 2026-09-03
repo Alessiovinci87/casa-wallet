@@ -11,6 +11,27 @@ export const useTreasuryStore = create((set, get) => ({
   suggestedMinPercent: null,
   belowSuggested: false,
 
+  // Prestiti interni dal fondo tasse (personali).
+  loans: null, // { loans, outstanding, openCount, fundAvailable, maxPercent, cap }
+  fetchLoans: async () => {
+    const { data } = await api.get("/api/loans");
+    set({ loans: data });
+  },
+  createLoan: async (payload) => {
+    const { data } = await api.post("/api/loans", payload);
+    await get().fetchLoans();
+    return data;
+  },
+  repayLoan: async (id, amount) => {
+    const { data } = await api.post(`/api/loans/${id}/repay`, { amount });
+    await get().fetchLoans();
+    return data;
+  },
+  cancelLoan: async (id) => {
+    await api.delete(`/api/loans/${id}`);
+    await get().fetchLoans();
+  },
+
   fetchDeadlines: async () => {
     const { data } = await api.get("/api/deadlines");
     set({ deadlines: data });

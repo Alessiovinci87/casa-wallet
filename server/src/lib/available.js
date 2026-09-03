@@ -65,9 +65,10 @@ export async function computeAvailable({ householdId, userId }) {
     }),
     computeCommittedUntilMonthEnd(householdId, today),
     prisma.recurringRule.findMany({ where: { householdId, active: true, type: "EXPENSE" }, select: { amount: true, frequency: true, interval: true } }),
-    prisma.internalLoan?.aggregate
-      ? prisma.internalLoan.aggregate({ where: { status: { in: ["OPEN", "LATE"] }, user: { householdId } }, _sum: { amount: true, repaid: true } })
-      : Promise.resolve({ _sum: { amount: 0, repaid: 0 } }),
+    prisma.internalLoan.aggregate({
+      where: { status: { in: ["OPEN", "LATE"] }, user: { householdId } },
+      _sum: { amount: true, repaid: true },
+    }),
   ]);
 
   const taxPending = round2(taxAgg._sum.amount || 0);

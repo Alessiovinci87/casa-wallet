@@ -3,6 +3,7 @@ import cron from "node-cron";
 import { sendTaxAlerts } from "../lib/taxAlert.js";
 import { sendDeadlineReminders } from "../lib/deadlineReminder.js";
 import { runDueRules } from "../lib/recurrence.js";
+import { checkInternalLoans } from "../lib/loans.js";
 
 export function startCronJobs() {
   // Tax reminder: 1st day of every month at 09:00 Europe/Rome.
@@ -26,6 +27,9 @@ export function startCronJobs() {
       try {
         const result = await sendDeadlineReminders();
         console.log("[cron] deadline reminders:", JSON.stringify(result));
+        // Prestiti interni: stato LATE + rata mensile + alert a 30 giorni.
+        const loans = await checkInternalLoans();
+        console.log("[cron] prestiti interni:", JSON.stringify({ checked: loans.checked }));
       } catch (err) {
         console.error("[cron] deadline reminders falliti:", err);
       }

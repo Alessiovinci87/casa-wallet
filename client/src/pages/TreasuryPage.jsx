@@ -29,7 +29,10 @@ export default function TreasuryPage() {
     profile, fetchProfile,
     simulation, simulating, simulate,
     fiscalProfile, suggestedMinPercent, belowSuggested, fetchFiscalProfile, saveFiscalProfile,
+    loans, fetchLoans, createLoan, repayLoan, cancelLoan,
   } = useTreasuryStore();
+  const [loanBusy, setLoanBusy] = useState(false);
+  const [loanMsg, setLoanMsg] = useState("");
 
   const [scope, setScope] = useState("user");
   const [showForm, setShowForm] = useState(false);
@@ -37,7 +40,7 @@ export default function TreasuryPage() {
   const [form, setForm] = useState(emptyDeadline);
   const [simAmount, setSimAmount] = useState("");
   const [fiscal, setFiscal] = useState({
-    regime: "FORFETTARIO", partitaIva: "", coeffRedditivita: "", aliquotaImposta: "", aliquotaInps: "", defaultTaxPercent: "",
+    regime: "FORFETTARIO", partitaIva: "", coeffRedditivita: "", aliquotaImposta: "", aliquotaInps: "", defaultTaxPercent: "", maxSelfFinancePercent: "",
   });
   const [fiscalSaved, setFiscalSaved] = useState(false);
   const [error, setError] = useState("");
@@ -56,7 +59,33 @@ export default function TreasuryPage() {
     fetchDeadlines();
     fetchFiscalProfile();
     fetchTaxEstimate();
-  }, [fetchDeadlines, fetchFiscalProfile]);
+    fetchLoans().catch(() => {});
+  }, [fetchDeadlines, fetchFiscalProfile, fetchLoans]);
+
+  // Prestito interno: creato SOLO se il simulatore dà OK e l'importo è entro il cap (guardrail server).
+  const takeLoan = async () => {
+    if (!simulation?.ok || simulation.overallVerdict !== "OK") return;
+    const due = simulation.nextDeadline ? dayjs(simulation.nextDeadline.dueDate).format("DD/MM/YYYY") : "la prossima scadenza";
+    const note = window.prompt(`Preleva ${eur(simulation.amount)} dal fondo tasse con piano di rientro entro ${due}. A cosa serve? (facoltativo)`, "");
+    if (note == null) return;
+    setLoanBusy(true);
+    setLoanMsg("");
+    try {
+      const r = await createLoan({ amount: simulation.amount, note, scope });
+      setLoanMsg(`Prestito registrato: rata ${eur(r.loan.monthlyRepayment)}/mese, rientro entro ${dayjs(r.loan.dueDate).format("DD/MM/YYYY")}.`);
+    } catch (err) {
+      setLoanMsg(err.response?.data?.error || "Prestito rifiutato");
+    } finally {
+      setLoanBusy(false);
+    }
+  };
+  const repay = async (l) => {
+    const raw = window.prompt(`Rata di rientro per il prestito di ${eur(l.amount)} (mancano ${eur(l.outstanding)}):`, String(l.suggestedRepayment));
+    if (raw == null) return;
+    const amount = Number(String(raw).replace(",", "."));
+    if (!Number.isFinite(amount) || amount <= 0) return window.alert("Importo non valido");
+    try { await repayLoan(l.id, amount); } catch (err) { window.alert(err.response?.data?.error || "Operazione non riuscita"); }
+  };
 
   const generateDeadlines = async () => {
     setError("");
@@ -100,6 +129,7 @@ export default function TreasuryPage() {
         aliquotaImposta: fiscalProfile.aliquotaImposta ?? "",
         aliquotaInps: fiscalProfile.aliquotaInps ?? "",
         defaultTaxPercent: fiscalProfile.defaultTaxPercent ?? "",
+        maxSelfFinancePercent: fiscalProfile.maxSelfFinancePercent ?? "",
       });
     }
   }, [fiscalProfile]);
@@ -147,7 +177,9 @@ export default function TreasuryPage() {
         aliquotaImposta: fiscal.aliquotaImposta === "" ? null : Number(fiscal.aliquotaImposta),
         aliquotaInps: fiscal.aliquotaInps === "" ? null : Number(fiscal.aliquotaInps),
         defaultTaxPercent: fiscal.defaultTaxPercent === "" ? null : Number(fiscal.defaultTaxPercent),
+        maxSelfFinancePercent: fiscal.maxSelfFinancePercent === "" ? null : Number(fiscal.maxSelfFinancePercent),
       });
+      fetchLoans().catch(() => {});
       setFiscalSaved(true);
       setTimeout(() => setFiscalSaved(false), 2500);
       fetchTaxEstimate(); // aliquote cambiate → la stima giugno/novembre cambia
@@ -403,6 +435,9 @@ export default function TreasuryPage() {
               </div>
               <div className="text-right text-xs">
                 <div>Fondo tasse disponibile: <strong className="nums">{eur(simulation.fundAvailable)}</strong></div>
+                {loans?.outstanding > 0 && (
+                  <div className="text-tax-600 mt-0.5">di cui prestati <strong className="nums">{eur(loans.outstanding)}</strong></div>
+                )}
                 {simulation.exceedsFund && (
                   <div className="text-rose-600 font-semibold mt-0.5">L'importo supera il fondo disponibile</div>
                 )}
@@ -468,6 +503,62 @@ export default function TreasuryPage() {
               </p>
             )}
             <p className="text-xs text-ink-400">{simulation.disclaimer}</p>
+
+            {/* Prestito interno: solo con verdetto OK, entro il cap (guardrail lato server) */}
+            <div className="card p-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="text-sm">
+                <div className="font-semibold">Preleva con piano di rientro</div>
+                <div className="text-xs text-ink-600">
+                  {simulation.overallVerdict === "OK"
+                    ? <>Massimo prelevabile: <strong className="nums">{eur(loans?.cap ?? 0)}</strong> ({loans?.maxPercent ?? 50}% del fondo{loans?.outstanding > 0 ? ", al netto dei prestiti aperti" : ""}).</>
+                    : "Disponibile solo con verdetto OK."}
+                </div>
+                {loanMsg && <div className="text-xs mt-1 text-ink-900">{loanMsg}</div>}
+              </div>
+              <button
+                type="button"
+                disabled={loanBusy || simulation.overallVerdict !== "OK" || (loans && simulation.amount > loans.cap + 0.005)}
+                onClick={takeLoan}
+                className="px-4 py-2 bg-tax-600 text-white rounded-lg hover:opacity-90 disabled:opacity-40"
+              >
+                {loanBusy ? "…" : `Preleva ${eur(simulation.amount)}`}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Prestiti aperti */}
+        {loans?.loans?.length > 0 && (
+          <div className="card divide-y divide-card-line">
+            <div className="p-3 text-sm font-semibold text-ink-600">
+              Prestiti dal fondo tasse · da rientrare <span className="text-tax-600 nums">{eur(loans.outstanding)}</span>
+            </div>
+            {loans.loans.map((l) => (
+              <div key={l.id} className="p-3 space-y-1.5">
+                <div className="flex items-center justify-between gap-2 text-sm">
+                  <div className="min-w-0">
+                    <span className="font-medium nums">{eur(l.amount)}</span>
+                    <span className="text-ink-400"> · preso il {dayjs(l.takenAt).format("DD/MM/YYYY")} · entro il {dayjs(l.dueDate).format("DD/MM/YYYY")}</span>
+                    {l.note && <span className="text-ink-400"> · {l.note}</span>}
+                  </div>
+                  <span className={`shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full ${l.status === "LATE" ? "bg-rose-50 text-rose-700" : "bg-brand-50 text-brand-700"}`}>
+                    {l.status === "LATE" ? "In ritardo" : "In corso"}
+                  </span>
+                </div>
+                <div className="bg-paper rounded-full h-2">
+                  <div className={`${l.status === "LATE" ? "bg-rose-500" : "bg-brand-500"} h-2 rounded-full`} style={{ width: `${Math.round(l.progress * 100)}%` }} />
+                </div>
+                <div className="flex items-center justify-between gap-2 text-xs text-ink-600">
+                  <span className="nums">Rientrati {eur(l.repaid)} · mancano {eur(l.outstanding)} · rata {eur(l.monthlyRepayment)}/mese{l.behindBy > 0 && <span className="text-rose-600"> · indietro di {eur(l.behindBy)}</span>}</span>
+                  <div className="flex gap-2">
+                    <button onClick={() => repay(l)} className="px-2.5 py-1 bg-brand-600 text-white rounded-lg font-semibold">Registra rata</button>
+                    {l.repaid === 0 && (
+                      <button onClick={() => { if (window.confirm("Annullare il prestito?")) cancelLoan(l.id).catch(() => {}); }} className="px-2.5 py-1 border border-card-line rounded-lg text-ink-600">Annulla</button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </section>
@@ -531,6 +622,13 @@ export default function TreasuryPage() {
               <input type="number" step="1" min="0" max="100" value={fiscal.defaultTaxPercent}
                 onChange={(e) => setFiscal((f) => ({ ...f, defaultTaxPercent: e.target.value }))}
                 placeholder="30"
+                className="w-full px-2 py-1.5 border border-card-line rounded-lg nums" />
+            </div>
+            <div>
+              <label className="block text-xs text-ink-600 mb-1">% max prestito interno</label>
+              <input type="number" step="1" min="0" max="100" value={fiscal.maxSelfFinancePercent}
+                onChange={(e) => setFiscal((f) => ({ ...f, maxSelfFinancePercent: e.target.value }))}
+                placeholder="50"
                 className="w-full px-2 py-1.5 border border-card-line rounded-lg nums" />
             </div>
           </div>

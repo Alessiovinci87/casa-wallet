@@ -137,7 +137,7 @@ router.get("/fiscal-profile", async (req, res) => {
 // PUT /api/treasury/fiscal-profile
 // body: { regime, partitaIva?, coeffRedditivita?, aliquotaImposta?, aliquotaInps?, defaultTaxPercent? }
 router.put("/fiscal-profile", async (req, res) => {
-  const { regime, partitaIva, coeffRedditivita, aliquotaImposta, aliquotaInps, defaultTaxPercent } =
+  const { regime, partitaIva, coeffRedditivita, aliquotaImposta, aliquotaInps, defaultTaxPercent, maxSelfFinancePercent } =
     req.body || {};
 
   if (!regime || !REGIMES.has(regime)) {
@@ -154,6 +154,9 @@ router.put("/fiscal-profile", async (req, res) => {
   if (!inRange(aliquotaImposta, 0, 100) || !inRange(aliquotaInps, 0, 100) || !inRange(defaultTaxPercent, 0, 100)) {
     return res.status(400).json({ error: "le aliquote devono essere tra 0 e 100" });
   }
+  if (!inRange(maxSelfFinancePercent, 0, 100)) {
+    return res.status(400).json({ error: "maxSelfFinancePercent deve essere tra 0 e 100" });
+  }
 
   const data = {
     regime,
@@ -162,6 +165,8 @@ router.put("/fiscal-profile", async (req, res) => {
     aliquotaImposta: aliquotaImposta ?? null,
     aliquotaInps: aliquotaInps ?? null,
     defaultTaxPercent: defaultTaxPercent ?? null,
+    // Prestito interno: % massima del fondo prelevabile (default 50 se null).
+    ...(maxSelfFinancePercent !== undefined && { maxSelfFinancePercent: maxSelfFinancePercent ?? null }),
   };
   await prisma.fiscalProfile.upsert({
     where: { userId: req.user.id },
