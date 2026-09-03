@@ -2,6 +2,7 @@
 // CRUD + occorrenze future materializzate + trigger cron di test + conferma/salta
 // per le regole non automatiche.
 import { Router } from "express";
+import { resolveAccountId } from "../lib/accounts.js";
 import { prisma } from "../lib/prisma.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { broadcast } from "../lib/ws.js";
@@ -58,6 +59,7 @@ function parseBody(body, { partial = false } = {}) {
     data.category = String(b.category).trim();
   }
   if (b.description !== undefined) data.description = b.description ? String(b.description).trim() : null;
+  if (b.accountId !== undefined) data.accountId = b.accountId ? String(b.accountId) : null; // validato dopo (famiglia)
   if (b.frequency !== undefined) {
     if (!FREQUENCIES.has(b.frequency)) return { error: "frequency non valida" };
     data.frequency = b.frequency;
@@ -112,11 +114,14 @@ router.get("/", async (req, res) => {
   });
   const enriched = rules.map(enrichRule);
   const totals = { EXPENSE: 0, INCOME: 0 };
-  for (const r of enriched) if (r.active) totals[r.type] += r.monthlyEquivalent;
+  const year = { EXPENSE: 0, INCOME: 0 };
+  for (const r of enriched) if (r.active) { totals[r.type] += r.monthlyEquivalent; year[r.type] += r.remainingThisYear.total; }
   res.json({
     rules: enriched,
     monthlyFixedExpense: Number(totals.EXPENSE.toFixed(2)),
     monthlyFixedIncome: Number(totals.INCOME.toFixed(2)),
+    yearRemainingExpense: Number(year.EXPENSE.toFixed(2)),
+    yearRemainingIncome: Number(year.INCOME.toFixed(2)),
   });
 });
 
@@ -198,6 +203,7 @@ router.post("/", async (req, res) => {
     for (const t of linked) if (!lastLinked || t.date > lastLinked) lastLinked = t.date;
   }
   const startFrom = lastLinked && lastLinked >= today ? new Date(lastLinked.getTime() + MS_PER_DAY) : nextRunAt;
+  try { if (data.accountId) data.accountId = await resolveAccountId(req.user.householdId, data.accountId); } catch (err) { return res.status(400).json({ error: err.message }); }
   const rule = await prisma.recurringRule.create({
     data: {
       ...data,
@@ -232,6 +238,7 @@ router.put("/:id", async (req, res) => {
   const parsed = parseBody(req.body, { partial: true });
   if (parsed.error) return res.status(400).json({ error: parsed.error });
   const { data } = parsed;
+  try { if (data.accountId) data.accountId = await resolveAccountId(req.user.householdId, data.accountId); } catch (err) { return res.status(400).json({ error: err.message }); }
 
   const scheduleKeys = ["frequency", "interval", "dayOfMonth", "weekday", "startDate", "endDate", "active"];
   const merged = { ...existing, ...data };

@@ -7,13 +7,19 @@
 // Il saldo effettivo parte dal punto zero (Household.openingBalance alla data)
 // oppure, senza punto zero, dalla somma di tutte le transazioni.
 import { prisma } from "./prisma.js";
-import { monthlyEquivalent, occurrencesBetween, todayRomeUTC } from "./recurrence.js";
+import { accruedForPeriodic, monthlyEquivalent, monthsPerOccurrence, occurrencesBetween, todayRomeUTC } from "./recurrence.js";
+import { computeAccountBalances } from "./accounts.js";
 
 const round2 = (n) => Number((Math.round(n * 100) / 100).toFixed(2));
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-/** Saldo effettivo: opening + Σ INCOME − Σ EXPENSE dalla data di apertura. */
+/** Saldo effettivo: somma dei conti (ognuno: opening + Σ INCOME − Σ EXPENSE dalla sua data). */
 export async function computeBalance(household, today = todayRomeUTC()) {
+  return computeAccountBalances(household.id, today);
+}
+
+/** Vecchio calcolo a livello famiglia (senza conti); tenuto per riferimento/test. */
+export async function computeHouseholdBalance(household, today = todayRomeUTC()) {
   // Fino a oggi incluso: una transazione datata nel futuro (es. rata già registrata)
   // non è ancora uscita dal conto e vive nella previsione, non nel saldo.
   const endOfToday = new Date(today.getTime() + MS_PER_DAY - 1);
@@ -35,6 +41,9 @@ export async function computeCommittedUntilMonthEnd(householdId, today = todayRo
   const monthEnd = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0));
   const items = [];
   for (const rule of rules) {
+    // Le spese periodiche (ogni 2+ mesi) sono coperte dall'accantonamento mensile
+    // (vedi computeAvailable), non dal blocco "entro fine mese".
+    if ((monthsPerOccurrence(rule) || 1) > 1 && !rule.pendingAt) continue;
     if (rule.pendingAt) {
       items.push({ ruleId: rule.id, description: rule.description || rule.category, date: rule.pendingAt, amount: rule.amount, pending: true });
     }
@@ -67,7 +76,7 @@ export async function computeAvailable({ householdId, userId }) {
       include: { contributions: { select: { amount: true } } },
     }),
     computeCommittedUntilMonthEnd(householdId, today),
-    prisma.recurringRule.findMany({ where: { householdId, active: true, type: "EXPENSE" }, select: { amount: true, frequency: true, interval: true } }),
+    prisma.recurringRule.findMany({ where: { householdId, active: true, type: "EXPENSE" } }),
     prisma.internalLoan.aggregate({
       where: { status: { in: ["OPEN", "LATE"] }, user: { householdId } },
       _sum: { amount: true, repaid: true },
@@ -80,8 +89,15 @@ export async function computeAvailable({ householdId, userId }) {
 
   // Fisse mensili equivalenti: soglia del colore (giallo sotto il 20%).
   const fixedMonthly = round2(fixedRules.reduce((s, r) => s + monthlyEquivalent(r), 0));
+  // Spese periodiche (bimestrali, semestrali, annuali): quota maturata finora, così
+  // la rata semestrale pesa un sesto al mese e non tutta nel mese della scadenza.
+  const periodicItems = fixedRules
+    .filter((r) => (monthsPerOccurrence(r) || 1) > 1 && !r.pendingAt)
+    .map((r) => ({ ruleId: r.id, description: r.description || r.category, amount: r.amount, monthlyEquivalent: monthlyEquivalent(r), accrued: accruedForPeriodic(r, today), nextRunAt: r.nextRunAt }))
+    .filter((i) => i.accrued > 0);
+  const periodicAccrued = round2(periodicItems.reduce((s, i) => s + i.accrued, 0));
 
-  const available = round2(bal.balance - taxPending - goalsParked - committed.total - loansOutstanding);
+  const available = round2(bal.balance - taxPending - goalsParked - committed.total - periodicAccrued - loansOutstanding);
   const status = available < 0 ? "NEGATIVE" : fixedMonthly > 0 && available < fixedMonthly * 0.2 ? "LOW" : "OK";
 
   const breakdown = [
@@ -90,20 +106,26 @@ export async function computeAvailable({ householdId, userId }) {
     { key: "goalsParked", label: "Parcheggiati negli obiettivi", amount: goalsParked, sign: -1 },
     { key: "committed", label: "Uscite fisse entro fine mese", amount: committed.total, sign: -1 },
   ];
+  if (periodicAccrued > 0) {
+    breakdown.push({ key: "periodic", label: "Accantonato per spese periodiche", amount: periodicAccrued, sign: -1 });
+  }
   if (loansOutstanding > 0) {
     breakdown.push({ key: "loans", label: "Prestiti interni da rientrare", amount: loansOutstanding, sign: -1 });
   }
 
   return {
     today,
-    hasOpeningBalance: household.openingBalance != null,
+    hasOpeningBalance: bal.hasOpeningBalance,
     openingBalance: household.openingBalance,
     openingBalanceDate: household.openingBalanceDate,
+    accounts: bal.accounts,
     balance: bal.balance,
     taxPending,
     goalsParked,
     committedUntilMonthEnd: committed.total,
     committedItems: committed.items,
+    periodicAccrued,
+    periodicItems,
     loansOutstanding,
     fixedMonthly,
     available,

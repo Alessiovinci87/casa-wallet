@@ -32,6 +32,26 @@ model Household {
   recurringRules    RecurringRule[]
   savingsGoals      SavingsGoal[]
   categoryRules     CategoryRule[]
+  bankAccounts      BankAccount[]
+}
+
+// Conto bancario della famiglia (es. "Stipendi", "Mutuo"). Il saldo effettivo è
+// la somma dei conti: ogni conto ha il suo punto zero. `number` = cifre del
+// numero di conto / IBAN, usato per riconoscere il conto negli estratti importati.
+model BankAccount {
+  id                 String    @id @default(cuid())
+  householdId        String
+  household          Household @relation(fields: [householdId], references: [id])
+  name               String
+  number             String?
+  openingBalance     Float?
+  openingBalanceDate DateTime?
+  isDefault          Boolean   @default(false)
+  createdAt          DateTime  @default(now())
+  transactions       Transaction[]
+  recurringRules     RecurringRule[]
+
+  @@index([householdId])
 }
 
 model User {
@@ -82,8 +102,11 @@ model Transaction {
   recurringRule   RecurringRule? @relation(fields: [recurringRuleId], references: [id])
   goalContribution GoalContribution? // prelievo da un obiettivo registrato come uscita
   importHash  String?     // dedupe import CSV: sha1(data|importo|descrizione normalizzata)
+  accountId   String?     // conto di provenienza (null = conto predefinito)
+  account     BankAccount? @relation(fields: [accountId], references: [id])
 
   @@index([householdId, date])
+  @@index([accountId, date])
   @@index([recurringRuleId, date])
   @@index([householdId, importHash])
 }
@@ -299,6 +322,8 @@ model RecurringRule {
   updatedAt    DateTime  @updatedAt
   transactions Transaction[]
   linkedGoals  SavingsGoal[]
+  accountId    String?      // conto da cui esce/entra (null = predefinito)
+  account      BankAccount? @relation(fields: [accountId], references: [id])
 
   @@index([householdId, active])
   @@index([nextRunAt])

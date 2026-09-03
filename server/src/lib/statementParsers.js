@@ -28,15 +28,33 @@ export function detectFormat(filename = "", buffer) {
   return "csv";
 }
 
-/** Punto d'ingresso: qualunque file → righe stile CSV. */
+/**
+ * Numero di conto o IBAN citato nell'intestazione dell'estratto (per assegnare
+ * i movimenti al conto giusto). Preferisce l'IBAN; altrimenti "Conto Corrente
+ * 000070413523", "NUMERO 000070413523", "C/C=070413523".
+ */
+export function detectAccountNumber(text) {
+  const t = String(text || "");
+  const iban = t.match(/\bIT\s?\d{2}\s?[A-Z]\s?(?:\d\s?){10}(?:[A-Z0-9]\s?){12}\b/i);
+  if (iban) return iban[0].replace(/\s+/g, "").toUpperCase();
+  const cc = t.match(/(?:conto\s*corrente|c\/c|numero(?:\s+conto)?|n\.?\s*conto|account)\s*[:=]?\s*0*(\d{5,20})/i);
+  if (cc) return cc[1];
+  return null;
+}
+
+/** Punto d'ingresso: qualunque file → righe stile CSV (+ accountNumber se riconosciuto). */
 export async function parseStatement(filename, buffer, decode) {
   const format = detectFormat(filename, buffer);
-  if (format === "pdf") return parsePdf(buffer);
-  if (format === "xlsx" || format === "xls") return parseSheet(buffer, format);
-  if (format === "xml") return parseXml(buffer, decode);
-  const text = decode(buffer);
-  const delimiter = detectDelimiter(text);
-  return { format: "csv", delimiter, rows: parseCsv(text, delimiter) };
+  let out;
+  if (format === "pdf") out = await parsePdf(buffer);
+  else if (format === "xlsx" || format === "xls") out = parseSheet(buffer, format);
+  else if (format === "xml") out = parseXml(buffer, decode);
+  else {
+    const text = decode(buffer);
+    const delimiter = detectDelimiter(text);
+    out = { format: "csv", delimiter, rows: parseCsv(text, delimiter), accountNumber: detectAccountNumber(text.slice(0, 4000)) };
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------- Excel
@@ -50,7 +68,8 @@ function parseSheet(buffer, format) {
     if (!best || rows.length > best.length) best = rows;
   }
   const rows = trimToTable(best || []);
-  return { format, rows, suggestedMapping: rows.length ? guessMapping(rows[0]) : null };
+  const preamble = (best || []).slice(0, 30).map((r) => r.join(" ")).join("\n");
+  return { format, rows, suggestedMapping: rows.length ? guessMapping(rows[0]) : null, accountNumber: detectAccountNumber(preamble) };
 }
 
 function sheetRows(ws) {
@@ -122,12 +141,14 @@ function parseXml(buffer, decode) {
     const stmts = asArray(container.Stmt || container.Rpt || container.Ntfctn);
     const rows = [STD_HEADERS];
     for (const s of stmts) for (const e of asArray(s.Ntry)) rows.push(camtEntry(e));
-    return { format: "camt", rows, autoMapping: STD_MAPPING };
+    const acct = stmts[0]?.Acct?.Id;
+    const accountNumber = acct?.IBAN || acct?.Othr?.Id || null;
+    return { format: "camt", rows, autoMapping: STD_MAPPING, accountNumber };
   }
 
   // CBI e altri XML "tabellari": movimenti in elementi ripetuti.
   const generic = findRepeatedRecords(doc);
-  if (generic) return generic;
+  if (generic) return { ...generic, accountNumber: detectAccountNumber(text.slice(0, 6000)) };
   throw new Error("XML non riconosciuto: attesi camt.053 (ISO 20022), CBI o Excel XML");
 }
 
@@ -230,7 +251,8 @@ export async function parsePdf(buffer) {
       return "";
     },
   });
-  return { format: "pdf", ...parsePdfLines(lines), autoMapping: STD_MAPPING };
+  const head = lines.slice(0, 40).map((l) => l.map((t) => t.s).join(" ")).join("\n");
+  return { format: "pdf", ...parsePdfLines(lines), autoMapping: STD_MAPPING, accountNumber: detectAccountNumber(head) };
 }
 
 /**

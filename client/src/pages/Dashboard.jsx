@@ -66,9 +66,25 @@ function BreakdownSheet({ avail, onClose }) {
         </div>
         <ul className="divide-y divide-card-line text-[15px]">
           {avail.breakdown.map((b) => (
-            <li key={b.key} className="py-2.5 flex justify-between gap-3">
-              <span className="text-ink-600">{b.label}</span>
-              <span className="font-semibold nums">{b.sign < 0 ? "− " : ""}{eur(b.amount)}</span>
+            <li key={b.key} className="py-2.5">
+              <div className="flex justify-between gap-3">
+                <span className="text-ink-600">{b.label}</span>
+                <span className="font-semibold nums">{b.sign < 0 ? "− " : ""}{eur(b.amount)}</span>
+              </div>
+              {b.key === "balance" && avail.accounts?.length > 1 && (
+                <ul className="mt-1 text-[13px] text-ink-400">
+                  {avail.accounts.map((a) => (
+                    <li key={a.id} className="flex justify-between"><span>{a.name}</span><span className="nums">{eur(a.balance)}</span></li>
+                  ))}
+                </ul>
+              )}
+              {b.key === "periodic" && avail.periodicItems?.length > 0 && (
+                <ul className="mt-1 text-[13px] text-ink-400">
+                  {avail.periodicItems.map((i) => (
+                    <li key={i.ruleId} className="flex justify-between gap-2"><span className="truncate">{i.description} · {eur(i.monthlyEquivalent)}/mese</span><span className="nums shrink-0">{eur(i.accrued)}</span></li>
+                  ))}
+                </ul>
+              )}
             </li>
           ))}
           <li className="py-2.5 flex justify-between gap-3 font-bold">
@@ -208,7 +224,9 @@ export default function Dashboard() {
         {avail && (
           <div className={`text-[13px] mt-1.5 ${muted}`}>
             {avail.hasOpeningBalance ? (
-              <>Saldo effettivo {eur(avail.balance)} · tocca per il dettaglio</>
+              avail.accounts?.length > 1
+                ? <>Saldo effettivo {eur(avail.balance)} · {avail.accounts.map((a) => `${a.name} ${eur(a.balance)}`).join(" · ")}</>
+                : <>Saldo effettivo {eur(avail.balance)} · tocca per il dettaglio</>
             ) : (
               <span
                 role="link"

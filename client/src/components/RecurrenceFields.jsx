@@ -1,5 +1,22 @@
+import dayjs from "dayjs";
 import Segmented from "./Segmented.jsx";
 import { FREQUENCIES, FREQUENCY_LABELS, WEEKDAY_LABELS } from "../lib/constants.js";
+
+const MONTHS_PER_FREQ = { MONTHLY: 1, BIMONTHLY: 2, QUARTERLY: 3, SEMIANNUAL: 6, YEARLY: 12 };
+
+/** Prime `n` scadenze a partire da startDate con il giorno scelto (31 = ultimo del mese). */
+export function previewDates(v, startDate, n = 2) {
+  const step = MONTHS_PER_FREQ[v.frequency];
+  if (!step || !startDate) return [];
+  const start = dayjs(startDate);
+  const day = v.dayOfMonth === "" ? start.date() : Number(v.dayOfMonth);
+  const out = [];
+  for (let k = 0; k < n; k++) {
+    const m = start.add(k * step, "month").startOf("month");
+    out.push(m.date(Math.min(day, m.daysInMonth())));
+  }
+  return out;
+}
 
 // Campi di pianificazione di una ricorrenza (frequenza, giorno, fine, conferma
 // manuale). Condivisi tra il toggle "Ripeti" del TransactionForm e la pagina
@@ -12,9 +29,12 @@ export const emptyRecurrence = {
   autoPost: true,
 };
 
-export default function RecurrenceFields({ value, onChange }) {
+export default function RecurrenceFields({ value, onChange, startDate, amount }) {
   const set = (k, v) => onChange({ ...value, [k]: v });
   const weekly = value.frequency === "WEEKLY";
+  const step = MONTHS_PER_FREQ[value.frequency] || 1;
+  const dates = step > 1 ? previewDates(value, startDate, 2) : [];
+  const monthly = step > 1 && Number(amount) > 0 ? Number(amount) / step : null;
 
   return (
     <div className="space-y-3">
@@ -63,6 +83,13 @@ export default function RecurrenceFields({ value, onChange }) {
             />
           </div>
         </div>
+      )}
+      {step > 1 && dates.length > 0 && (
+        <p className="text-[13px] text-ink-600 bg-brand-50 rounded-lg p-2">
+          Scadenze: <span className="font-medium">{dates.map((d) => d.format("D MMM YYYY")).join(" · ")}</span>, poi ogni {step} mesi.
+          {monthly != null && <> Nel Disponibile pesa <span className="font-medium nums">{monthly.toLocaleString("it-IT", { style: "currency", currency: "EUR" })}</span> al mese: la quota si accumula fino alla scadenza.</>}
+          {" "}Per cambiare le date modifica la prima data o il giorno.
+        </p>
       )}
       {weekly && (
         <div>

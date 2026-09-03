@@ -111,12 +111,50 @@ export function occurrencesBetween(rule, from, to) {
   return out;
 }
 
+/**
+ * Quota già "maturata" di una spesa periodica (bimestrale, semestrale, annuale…):
+ * l'importo si accantona un dodicesimo/sesto alla volta e la quota cresce fino a
+ * coprire l'intero importo nel mese della scadenza. Con P mesi per occorrenza e
+ * la prossima scadenza fra M mesi (0 = questo mese): accantonato = amount × (P − M) / P,
+ * mai meno di una quota mensile. Mensili e settimanali → 0 (le gestisce "entro fine mese").
+ */
+export function accruedForPeriodic(rule, today = todayRomeUTC()) {
+  const P = monthsPerOccurrence(rule);
+  if (!P || P <= 1 || !rule.active) return 0;
+  const next = rule.nextRunAt ? utcDay(rule.nextRunAt) : firstOccurrenceOnOrAfter(rule, today);
+  if (!next) return 0;
+  const monthsToNext = Math.max(0, (next.getUTCFullYear() - today.getUTCFullYear()) * 12 + (next.getUTCMonth() - today.getUTCMonth()));
+  const share = Math.max(1, Math.min(P, P - monthsToNext));
+  return Number(((Number(rule.amount) * share) / P).toFixed(2));
+}
+
+/** Occorrenze da domani al 31/12 (residuo dell'anno). */
+export function remainingThisYear(rule, today = todayRomeUTC()) {
+  if (!rule.active) return { count: 0, total: 0, dates: [] };
+  const from = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+  const yearEnd = new Date(Date.UTC(today.getUTCFullYear(), 11, 31));
+  const start = rule.nextRunAt && utcDay(rule.nextRunAt) > from ? utcDay(rule.nextRunAt) : from;
+  const dates = start > yearEnd ? [] : occurrencesBetween(rule, start, yearEnd);
+  return { count: dates.length, total: Number((dates.length * Number(rule.amount)).toFixed(2)), dates };
+}
+
 /** Arricchisce una regola per la risposta API. */
 export function enrichRule(rule) {
+  const today = todayRomeUTC();
+  const P = monthsPerOccurrence(rule);
+  // Prossime 2 occorrenze: per le periodiche mostrano "le due date" (es. 30 giu · 30 dic).
+  let nextDates = [];
+  if (rule.active) {
+    const from = rule.nextRunAt ? utcDay(rule.nextRunAt) : today;
+    nextDates = occurrencesBetween(rule, from, new Date(Date.UTC(today.getUTCFullYear() + 2, 11, 31))).slice(0, 2);
+  }
   return {
     ...rule,
     monthlyEquivalent: monthlyEquivalent(rule),
-    monthsPerOccurrence: monthsPerOccurrence(rule),
+    monthsPerOccurrence: P,
+    accrued: accruedForPeriodic(rule, today),
+    remainingThisYear: remainingThisYear(rule, today),
+    nextDates,
   };
 }
 
@@ -146,6 +184,7 @@ export async function postOccurrence(rule, occurrence) {
       description: rule.description ?? null,
       date: when,
       recurringRuleId: rule.id,
+      accountId: rule.accountId ?? null,
     },
     include: { taxSaving: true, user: { select: { id: true, name: true } } },
   });

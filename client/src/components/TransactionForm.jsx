@@ -3,6 +3,7 @@ import api from "../lib/api.js";
 import { useTransactionStore } from "../store/transactionStore.js";
 import { useTreasuryStore } from "../store/treasuryStore.js";
 import { CATEGORIES, PAY_METHODS, PAY_METHOD_LABELS } from "../lib/constants.js";
+import AccountPicker from "./AccountPicker.jsx";
 import Segmented from "./Segmented.jsx";
 import RecurrenceFields, { emptyRecurrence, recurrenceToPayload } from "./RecurrenceFields.jsx";
 import { useRecurringStore } from "../store/recurringStore.js";
@@ -32,6 +33,7 @@ export default function TransactionForm({ initial, onClose, onDelete }) {
     date: initial?.date ? String(initial.date).slice(0, 10) : empty.date,
     taxPercent: initial?.taxPercent ?? "",
     description: initial?.description ?? "",
+    accountId: initial?.accountId ?? initial?.account?.id ?? "",
   }));
   const [ocrBusy, setOcrBusy] = useState(false);
   // "Ripeti": in creazione la transazione diventa una regola ricorrente
@@ -145,6 +147,7 @@ export default function TransactionForm({ initial, onClose, onDelete }) {
       description: form.description || null,
       date: new Date(form.date).toISOString(),
       taxPercent: form.type === "INCOME" && form.taxPercent ? Number(form.taxPercent) : null,
+      accountId: form.accountId || null,
     };
     try {
       if (isEdit) await updateTransaction(initial.id, payload);
@@ -155,6 +158,7 @@ export default function TransactionForm({ initial, onClose, onDelete }) {
           category: payload.category,
           method: payload.method,
           description: payload.description,
+          accountId: payload.accountId,
           startDate: payload.date,
           postFirst: true,
           ...recurrenceToPayload(recurrence),
@@ -249,6 +253,9 @@ export default function TransactionForm({ initial, onClose, onDelete }) {
             options={PAY_METHODS.map((m) => ({ value: m, label: PAY_METHOD_LABELS[m] }))}
           />
         </div>
+        <div className="mt-3">
+          <AccountPicker value={form.accountId} onChange={(v) => set("accountId", v)} />
+        </div>
 
         {/* Riconciliazione: l'importo coincide con una fattura in attesa */}
         {matchedInvoice && (
@@ -309,7 +316,7 @@ export default function TransactionForm({ initial, onClose, onDelete }) {
             </div>
             {repeat && (
               <div className="mt-3">
-                <RecurrenceFields value={recurrence} onChange={setRecurrence} />
+                <RecurrenceFields value={recurrence} onChange={setRecurrence} startDate={form.date} amount={form.amount} />
                 {form.type === "INCOME" && form.taxPercent !== "" && (
                   <p className="text-[11px] text-tax-600 mt-2">
                     Le entrate ricorrenti non accantonano tasse in automatico: la % va applicata a mano.

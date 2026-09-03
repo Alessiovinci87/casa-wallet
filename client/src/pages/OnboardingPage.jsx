@@ -5,6 +5,7 @@ import api from "../lib/api.js";
 import { eur } from "../lib/format.js";
 import { CATEGORIES } from "../lib/constants.js";
 import Segmented from "../components/Segmented.jsx";
+import AccountsManager from "../components/AccountsManager.jsx";
 import { useHouseholdStore } from "../store/householdStore.js";
 import { useTreasuryStore } from "../store/treasuryStore.js";
 import { useRecurringStore } from "../store/recurringStore.js";
@@ -127,6 +128,12 @@ export default function OnboardingPage() {
           <div className="flex justify-end">
             <button onClick={saveOpening} disabled={busy || opening.amount === ""} className="px-4 py-2 bg-brand-600 text-white rounded hover:bg-brand-700 disabled:opacity-50">Avanti</button>
           </div>
+          {household?.openingBalance != null && (
+            <details className="border-t border-card-line pt-3">
+              <summary className="text-sm text-brand-600 cursor-pointer min-h-[44px] flex items-center">Hai più di un conto (es. stipendi e mutuo)? Aggiungilo qui</summary>
+              <div className="mt-2"><AccountsManager compact /></div>
+            </details>
+          )}
         </div>
       )}
 

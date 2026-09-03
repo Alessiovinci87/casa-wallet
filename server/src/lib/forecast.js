@@ -93,7 +93,7 @@ export async function buildForecast({ householdId, userId, days = 90 }) {
   }
 
   // Aggregazione per giorno + saldo proiettato.
-  const startBalance = round2(avail.available + avail.committedUntilMonthEnd); // il libero oggi, prima delle fisse
+  const startBalance = round2(avail.available + avail.committedUntilMonthEnd + (avail.periodicAccrued || 0)); // il libero oggi, prima delle fisse
   const byDay = new Map();
   for (const e of events) {
     const k = dayKey(e.date);

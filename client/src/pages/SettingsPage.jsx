@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuthStore } from "../store/authStore.js";
 import { useHouseholdStore } from "../store/householdStore.js";
+import AccountsManager from "../components/AccountsManager.jsx";
 
 // Impostazioni famiglia: nome (editabile dall'OWNER), membri, codice invito
 // con copia + rigenerazione (OWNER), logout.
@@ -120,52 +121,13 @@ export default function SettingsPage() {
         )}
       </section>
 
-      {/* Punto zero: saldo iniziale */}
+      {/* Conti e punto zero */}
       <section className="card p-5">
         <div className="flex items-center justify-between mb-1">
-          <h2 className="text-sm font-semibold text-ink-600 uppercase tracking-wide">
-            Saldo iniziale (punto zero)
-          </h2>
+          <h2 className="text-sm font-semibold text-ink-600 uppercase tracking-wide">Conti e saldo iniziale</h2>
           <a href="/onboarding" className="text-[13px] text-brand-600 hover:underline inline-flex items-center min-h-[44px]">Apri la procedura guidata</a>
         </div>
-        <p className="text-sm text-ink-600 mb-3">
-          Il saldo effettivo parte da qui: saldo del conto a una data + entrate − uscite registrate da quel giorno.
-          Senza punto zero il saldo è la somma di tutte le transazioni.
-        </p>
-        <form onSubmit={saveOpening} className="flex flex-wrap gap-2 items-end">
-          <div>
-            <label className="block text-xs text-ink-600 mb-1">Saldo €</label>
-            <input
-              type="number" step="0.01"
-              value={opening.amount}
-              onChange={(e) => setOpening((o) => ({ ...o, amount: e.target.value }))}
-              placeholder="es. 2500"
-              className="w-36 px-3 py-2 border border-card-line rounded nums"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-ink-600 mb-1">Alla data</label>
-            <input
-              type="date"
-              value={opening.date}
-              onChange={(e) => setOpening((o) => ({ ...o, date: e.target.value }))}
-              className="px-3 py-2 border border-card-line rounded"
-            />
-          </div>
-          <button type="submit" disabled={openingSaving} className="px-4 py-2 bg-brand-600 text-white rounded hover:bg-brand-700 disabled:opacity-50">
-            {openingSaving ? "…" : "Salva"}
-          </button>
-          {household?.openingBalance != null && (
-            <button
-              type="button"
-              onClick={() => { setOpening((o) => ({ ...o, amount: "" })); setOpeningBalance(null).catch(() => {}); }}
-              className="px-3 py-2 text-sm text-ink-600 hover:text-rose-600"
-            >
-              Rimuovi
-            </button>
-          )}
-          {openingMsg && <span className="text-sm text-ink-600 self-center">{openingMsg}</span>}
-        </form>
+        <AccountsManager />
       </section>
 
       {/* Codice invito */}

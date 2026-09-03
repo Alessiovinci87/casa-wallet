@@ -1,6 +1,7 @@
 // Transaction routes — all protected. Broadcasts a WebSocket event after
 // every create/update/delete so both users stay in sync in real time.
 import { Router } from "express";
+import { resolveAccountId } from "../lib/accounts.js";
 import { prisma } from "../lib/prisma.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { broadcast } from "../lib/ws.js";
@@ -25,7 +26,7 @@ function emit(householdId, action, transaction) {
 // POST /api/transactions
 router.post("/", async (req, res) => {
   const {
-    amount, type, category, subcategory, method, description, date, taxPercent,
+    amount, type, category, subcategory, method, description, date, taxPercent, accountId,
   } = req.body || {};
 
   if (amount == null || !type || !category || !method || !date) {
@@ -53,11 +54,14 @@ router.post("/", async (req, res) => {
 
   const applies = taxApplies(type, taxPct);
   const taxAmount = applies ? Number((amountNum * taxPct) / 100) : null;
+  let account;
+  try { account = await resolveAccountId(req.user.householdId, accountId); } catch (err) { return res.status(400).json({ error: err.message }); }
 
   const transaction = await prisma.transaction.create({
     data: {
       userId: req.user.id,
       householdId: req.user.householdId,
+      accountId: account,
       amount: amountNum,
       type,
       category,
@@ -118,6 +122,7 @@ router.get("/", async (req, res) => {
       user: { select: { id: true, name: true } },
       invoice: { select: { id: true, numero: true } }, // badge "fattura n. X" in Entrate
       goalContribution: { select: { id: true, goalId: true } }, // chip "da obiettivo" in Uscite
+      account: { select: { id: true, name: true } },
     },
     orderBy: { date: "desc" },
   });
@@ -137,7 +142,7 @@ router.put("/:id", async (req, res) => {
   }
 
   const {
-    amount, type, category, subcategory, method, description, date, taxPercent,
+    amount, type, category, subcategory, method, description, date, taxPercent, accountId,
   } = req.body || {};
 
   if (type && !TX_TYPES.has(type)) {
@@ -180,6 +185,9 @@ router.put("/:id", async (req, res) => {
     taxPercent: applies ? nextTaxPercent : null,
     taxAmount,
   };
+  if (accountId !== undefined) {
+    try { data.accountId = await resolveAccountId(req.user.householdId, accountId); } catch (err) { return res.status(400).json({ error: err.message }); }
+  }
 
   // Keep the linked TaxSaving consistent with the updated transaction.
   if (applies) {

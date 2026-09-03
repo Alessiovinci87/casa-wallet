@@ -32,6 +32,7 @@ export default function ImportPage() {
   const [mapping, setMapping] = useState({ dateCol: "", descCol: "", amountCol: "", debitCol: "", creditCol: "", invertSign: false });
   const [rows, setRows] = useState([]);
   const [method, setMethod] = useState("TRANSFER");
+  const [accountId, setAccountId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
@@ -49,6 +50,7 @@ export default function ImportPage() {
       if (save) fd.append("saveMapping", "true");
       const { data } = await api.post("/api/import/bank-csv/preview", fd);
       setPreview(data);
+      if (data.accountId) setAccountId(data.accountId);
       if (data.mapping) {
         setMapping({
           dateCol: data.mapping.dateCol ?? "",
@@ -110,6 +112,7 @@ export default function ImportPage() {
       const { data } = await api.post("/api/import/bank-csv/commit", {
         rows: selected.map((r) => ({ date: r.date, amount: r.amount, type: r.type, description: r.description, category: r.category, hash: r.hash, learn: r.learn })),
         method,
+        accountId: accountId || null,
       });
       setResult(data);
       fetchTransactions();
@@ -170,6 +173,15 @@ export default function ImportPage() {
             {file.name} {preview && `· ${preview.totalRows} righe · ${FORMAT_LABELS[preview.format] || preview.format}`}
             {preview?.format === "csv" && ` · separatore "${preview.delimiter === "	" ? "TAB" : preview.delimiter}"`}
           </span>
+        )}
+        {preview?.accounts?.length > 1 && (
+          <div className="w-full flex flex-wrap items-center gap-2">
+            <span className="text-xs text-ink-600">Conto</span>
+            <Segmented size="sm" value={accountId} onChange={setAccountId} options={preview.accounts.map((a) => ({ value: a.id, label: a.name }))} />
+            <span className="text-xs text-ink-400">
+              {preview.accountMatched ? `riconosciuto dal numero …${String(preview.detectedAccountNumber).slice(-6)}` : preview.detectedAccountNumber ? `numero …${String(preview.detectedAccountNumber).slice(-6)} non associato a nessun conto: scegli tu` : "numero di conto non trovato nel file: scegli tu"}
+            </span>
+          </div>
         )}
         {preview?.format === "pdf" && (
           <p className="w-full text-xs text-tax-600">

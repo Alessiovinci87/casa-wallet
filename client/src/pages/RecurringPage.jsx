@@ -6,6 +6,8 @@ import { CATEGORIES, PAY_METHODS, PAY_METHOD_LABELS, FREQUENCY_LABELS, WEEKDAY_L
 import { eur } from "../lib/format.js";
 import Segmented from "../components/Segmented.jsx";
 import RecurrenceFields, { emptyRecurrence, recurrenceToPayload } from "../components/RecurrenceFields.jsx";
+import AccountPicker from "../components/AccountPicker.jsx";
+import { useAccountStore } from "../store/accountStore.js";
 
 // Ricorrenze: entrate/uscite fisse della famiglia. Lista con prossimo addebito,
 // importo mensile equivalente, totali fisse/mese, attiva/disattiva, modifica,
@@ -27,6 +29,7 @@ const emptyRule = {
   method: "CARD",
   description: "",
   startDate: new Date().toISOString().slice(0, 10),
+  accountId: "",
 };
 
 function RuleForm({ initial, onClose }) {
@@ -42,6 +45,7 @@ function RuleForm({ initial, onClose }) {
       method: initial.method,
       description: initial.description || "",
       startDate: String(initial.startDate).slice(0, 10),
+      accountId: initial.accountId || "",
     }),
   }));
   const [rec, setRec] = useState(() =>
@@ -71,6 +75,7 @@ function RuleForm({ initial, onClose }) {
       method: form.method,
       description: form.description || null,
       startDate: new Date(form.startDate).toISOString(),
+      accountId: form.accountId || null,
       ...recurrenceToPayload(rec),
     };
     try {
@@ -115,13 +120,14 @@ function RuleForm({ initial, onClose }) {
           <label className="block text-xs text-ink-600 mb-1">Metodo</label>
           <Segmented size="sm" value={form.method} onChange={(v) => set("method", v)} options={PAY_METHODS.map((m) => ({ value: m, label: PAY_METHOD_LABELS[m] }))} />
         </div>
+        <AccountPicker value={form.accountId} onChange={(v) => set("accountId", v)} />
         <div>
           <label className="block text-xs text-ink-600 mb-1">Descrizione</label>
           <input type="text" value={form.description} onChange={(e) => set("description", e.target.value)} placeholder="es. Rata auto" className="w-full px-2 py-2 border border-card-line rounded" />
         </div>
 
         <div className="border-t border-card-line pt-3">
-          <RecurrenceFields value={rec} onChange={setRec} />
+          <RecurrenceFields value={rec} onChange={setRec} startDate={form.startDate} amount={form.amount} />
         </div>
 
         <div className="flex justify-end gap-2 pt-2">
@@ -138,11 +144,16 @@ function RuleForm({ initial, onClose }) {
 export default function RecurringPage() {
   const { rules, monthlyFixedExpense, monthlyFixedIncome, loading, fetchRules, updateRule, deleteRule, confirmPending, skipPending } = useRecurringStore();
   const fetchTransactions = useTransactionStore((s) => s.fetchTransactions);
+  const yearRemainingExpense = useRecurringStore((s) => s.yearRemainingExpense);
+  const yearRemainingIncome = useRecurringStore((s) => s.yearRemainingIncome);
+  const accounts = useAccountStore((s) => s.accounts);
+  const fetchAccounts = useAccountStore((s) => s.fetchAccounts);
+  const accountName = (id) => accounts.find((a) => a.id === id)?.name;
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [filter, setFilter] = useState("ALL");
 
-  useEffect(() => { fetchRules(); }, [fetchRules]);
+  useEffect(() => { fetchRules(); fetchAccounts().catch(() => {}); }, [fetchRules, fetchAccounts]);
 
   const visible = rules.filter((r) => filter === "ALL" || r.type === filter);
   const pending = rules.filter((r) => r.pendingAt);
@@ -182,6 +193,13 @@ export default function RecurringPage() {
           <div className="text-xs text-ink-600">Entrate fisse / mese</div>
           <div className="text-xl font-bold nums text-brand-600">{eur(monthlyFixedIncome)}</div>
           <div className="text-[11px] text-ink-400 mt-0.5">netto fisso: {eur(monthlyFixedIncome - monthlyFixedExpense)}</div>
+        </div>
+        <div className="card p-4 col-span-2 flex items-center justify-between gap-3">
+          <div>
+            <div className="text-xs text-ink-600">Ancora da pagare entro fine anno</div>
+            <div className="text-[11px] text-ink-400 mt-0.5">somma delle scadenze da domani al 31 dicembre · entrate fisse attese {eur(yearRemainingIncome)}</div>
+          </div>
+          <div className="text-xl font-bold nums text-ink-900">{eur(yearRemainingExpense)}</div>
         </div>
       </div>
 
@@ -230,11 +248,21 @@ export default function RecurringPage() {
                   </div>
                   <div className="text-[13px] text-ink-400">
                     {r.category} · {scheduleLabel(r)}{r.endDate ? ` · fino al ${dayjs(r.endDate).format("DD/MM/YYYY")}` : ""}
+                    {accounts.length > 1 && <> · {accountName(r.accountId) || accountName(accounts.find((a) => a.isDefault)?.id) || "conto predefinito"}</>}
                   </div>
                   <div className="text-[13px] text-ink-600">
-                    {r.active && r.nextRunAt ? <>Prossima {dayjs(r.nextRunAt).format("DD/MM/YYYY")}</> : "Nessuna prossima"}
-                    {r.monthsPerOccurrence > 1 && <span className="text-ink-400"> · ≈ {eur(r.monthlyEquivalent)}/mese</span>}
+                    {r.active && r.nextRunAt
+                      ? r.monthsPerOccurrence > 1 && r.nextDates?.length > 1
+                        ? <>Scadenze {r.nextDates.map((d) => dayjs(d).format("D MMM")).join(" · ")}</>
+                        : <>Prossima {dayjs(r.nextRunAt).format("DD/MM/YYYY")}</>
+                      : "Nessuna prossima"}
+                    {r.monthsPerOccurrence > 1 && <span className="text-ink-400"> · {eur(r.monthlyEquivalent)}/mese{r.accrued > 0 ? `, maturati ${eur(r.accrued)}` : ""}</span>}
                   </div>
+                  {r.active && r.remainingThisYear?.count > 0 && (
+                    <div className="text-[13px] text-ink-400">
+                      Entro fine anno: {r.remainingThisYear.count} × {eur(r.amount)} = <span className="nums">{eur(r.remainingThisYear.total)}</span>
+                    </div>
+                  )}
                 </div>
                 <span className={`shrink-0 font-semibold nums ${r.type === "INCOME" ? "text-brand-600" : "text-ink-900"}`}>
                   {r.type === "INCOME" ? "+" : "−"}{eur(r.amount)}

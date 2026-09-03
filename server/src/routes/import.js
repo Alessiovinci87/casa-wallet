@@ -7,6 +7,7 @@
 import { Router } from "express";
 import multer from "multer";
 import { parseStatement } from "../lib/statementParsers.js";
+import { ensureAccounts, matchAccount, resolveAccountId } from "../lib/accounts.js";
 import { prisma } from "../lib/prisma.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { broadcast } from "../lib/ws.js";
@@ -57,7 +58,10 @@ router.post("/bank-csv/preview", upload.single("file"), async (req, res) => {
   } catch (err) {
     return res.status(400).json({ error: err.message || "File non leggibile" });
   }
-  const { format, rows, delimiter = null, autoMapping = null, suggestedMapping = null } = parsedFile;
+  const { format, rows, delimiter = null, autoMapping = null, suggestedMapping = null, accountNumber = null } = parsedFile;
+  // Conto di provenienza: riconosciuto dal numero/IBAN nell'intestazione del file.
+  const accounts = await ensureAccounts(req.user.householdId);
+  const matched = matchAccount(accounts, accountNumber);
   if (rows.length === 0) return res.status(400).json({ error: "Nessun movimento trovato nel file" });
   if (format === "pdf" && rows.length === 1) {
     return res.status(400).json({ error: "Nel PDF non ho trovato righe con data e importo. Se l'estratto è scansionato (immagine), chiedi alla banca il formato Excel o XML." });
@@ -73,6 +77,10 @@ router.post("/bank-csv/preview", upload.single("file"), async (req, res) => {
   const base = {
     format,
     autoMapped: Boolean(autoMapping),
+    detectedAccountNumber: accountNumber,
+    accountId: matched?.id ?? (accounts.find((a) => a.isDefault)?.id ?? null),
+    accountMatched: Boolean(matched),
+    accounts: accounts.map((a) => ({ id: a.id, name: a.name, number: a.number, isDefault: a.isDefault })),
     delimiter,
     headers: rows[0],
     sample: rows.slice(1, 6),
@@ -129,7 +137,9 @@ router.post("/bank-csv/preview", upload.single("file"), async (req, res) => {
 // POST /api/import/bank-csv/commit
 // body: { rows: [{ date, amount, type, description, category, method?, learn? }], method? }
 router.post("/bank-csv/commit", async (req, res) => {
-  const { rows, method: defaultMethod = "TRANSFER" } = req.body || {};
+  const { rows, method: defaultMethod = "TRANSFER", accountId } = req.body || {};
+  let account;
+  try { account = await resolveAccountId(req.user.householdId, accountId); } catch (err) { return res.status(400).json({ error: err.message }); }
   if (!Array.isArray(rows) || rows.length === 0) return res.status(400).json({ error: "rows vuoto" });
   if (!PAY_METHODS.has(defaultMethod)) return res.status(400).json({ error: "method non valido" });
   if (rows.length > 2000) return res.status(400).json({ error: "Massimo 2000 righe per import" });
@@ -150,6 +160,7 @@ router.post("/bank-csv/commit", async (req, res) => {
       index: i,
       data: {
         userId: req.user.id,
+        accountId: account,
         householdId: req.user.householdId,
         amount,
         type: r.type,

@@ -5,6 +5,7 @@ import { prisma } from "../lib/prisma.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { generateInviteCode } from "../lib/inviteCode.js";
 import { broadcast } from "../lib/ws.js";
+import { ensureAccounts } from "../lib/accounts.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -73,7 +74,26 @@ router.put("/opening-balance", async (req, res) => {
       openingBalanceDate: new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())),
     };
   }
-  const household = await prisma.household.update({ where: { id: req.user.householdId }, data });
+  const hh = req.user.householdId;
+  // Con i conti: il punto zero della famiglia coincide con quello del conto predefinito
+  // (gli altri conti si gestiscono da /api/accounts).
+  const accounts = await prisma.bankAccount.findMany({ where: { householdId: hh } });
+  if (accounts.length === 0) {
+    await prisma.household.update({ where: { id: hh }, data });
+    await ensureAccounts(hh); // crea "Conto principale" dal punto zero
+  } else {
+    const def = accounts.find((a) => a.isDefault) || accounts[0];
+    await prisma.bankAccount.update({ where: { id: def.id }, data });
+    const all = await prisma.bankAccount.findMany({ where: { householdId: hh } });
+    const withOpening = all.filter((a) => a.openingBalance != null);
+    await prisma.household.update({
+      where: { id: hh },
+      data: withOpening.length
+        ? { openingBalance: Number(withOpening.reduce((s, a) => s + a.openingBalance, 0).toFixed(2)), openingBalanceDate: withOpening.reduce((m, a) => (!m || a.openingBalanceDate < m ? a.openingBalanceDate : m), null) }
+        : { openingBalance: null, openingBalanceDate: null },
+    });
+  }
+  const household = await prisma.household.findUnique({ where: { id: hh } });
   res.json({ openingBalance: household.openingBalance, openingBalanceDate: household.openingBalanceDate });
 });
 
@@ -106,6 +126,7 @@ router.post("/reset", async (req, res) => {
     prisma.categoryRule.deleteMany({ where: { householdId: hh } }),
     prisma.recurringProduct.deleteMany({ where: { householdId: hh } }),
     prisma.shoppingListDismissal.deleteMany({ where: { householdId: hh } }),
+    prisma.bankAccount.deleteMany({ where: { householdId: hh } }),
     prisma.household.update({ where: { id: hh }, data: { openingBalance: null, openingBalanceDate: null, csvMapping: null } }),
   ]);
   broadcast(hh, { event: "transaction_update", payload: { action: "reset" } });

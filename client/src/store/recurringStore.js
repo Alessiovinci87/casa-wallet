@@ -6,6 +6,8 @@ export const useRecurringStore = create((set, get) => ({
   rules: [],
   monthlyFixedExpense: 0,
   monthlyFixedIncome: 0,
+  yearRemainingExpense: 0,
+  yearRemainingIncome: 0,
   loaded: false,
   loading: false,
 
@@ -17,6 +19,8 @@ export const useRecurringStore = create((set, get) => ({
         rules: data.rules,
         monthlyFixedExpense: data.monthlyFixedExpense,
         monthlyFixedIncome: data.monthlyFixedIncome,
+        yearRemainingExpense: data.yearRemainingExpense ?? 0,
+        yearRemainingIncome: data.yearRemainingIncome ?? 0,
         loaded: true,
       });
     } finally {

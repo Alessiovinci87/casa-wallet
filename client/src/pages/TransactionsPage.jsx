@@ -6,6 +6,7 @@ import { useTransactionStore } from "../store/transactionStore.js";
 import { eur } from "../lib/format.js";
 import { downloadTransactionsCsv } from "../lib/exportCsv.js";
 import TransactionForm from "../components/TransactionForm.jsx";
+import { useAccountStore } from "../store/accountStore.js";
 
 // Uscite / Entrate (dentro Movimenti): totale del mese con confronto, selettore
 // mese, blocchi Fisse/Variabili (Uscite) con subtotali. Riga: categoria,
@@ -20,6 +21,8 @@ function pctChange(curr, prev) {
 }
 
 function Row({ t, type, onEdit }) {
+  const accounts = useAccountStore((s) => s.accounts);
+  const accountName = accounts.length > 1 ? (accounts.find((a) => a.id === t.accountId) || accounts.find((a) => a.isDefault))?.name : null;
   return (
     <button type="button" onClick={() => onEdit(t)} className="w-full text-left px-4 py-3 min-h-[52px] flex items-center justify-between gap-3 hover:bg-paper">
       <div className="min-w-0">
@@ -29,6 +32,7 @@ function Row({ t, type, onEdit }) {
           {t.recurringRuleId && <span className="px-1.5 rounded-full bg-brand-50 text-brand-700">Ricorrente</span>}
           {t.invoice && <span className="px-1.5 rounded-full bg-paper text-ink-600">Fattura n. {t.invoice.numero}</span>}
           {t.goalContribution && <span className="px-1.5 rounded-full bg-paper text-ink-600">da obiettivo</span>}
+          {accountName && <span className="px-1.5 rounded-full bg-paper text-ink-600">{accountName}</span>}
           {type === "INCOME" && t.taxPercent > 0 && <span className="px-1.5 rounded-full bg-tax-50 text-tax-600 nums">{t.taxPercent}% tasse</span>}
         </div>
       </div>
@@ -66,6 +70,9 @@ export default function TransactionsPage({ type = "EXPENSE" }) {
 
   useEffect(() => { setFilters((f) => (f.type === type ? f : { ...f, type })); }, [type]);
   useEffect(() => { fetchTransactions(filters); }, [filters, fetchTransactions]);
+  const accountsLoaded = useAccountStore((s) => s.loaded);
+  const fetchAccounts = useAccountStore((s) => s.fetchAccounts);
+  useEffect(() => { if (!accountsLoaded) fetchAccounts().catch(() => {}); }, [accountsLoaded, fetchAccounts]);
   useEffect(() => {
     const prev = new Date(filters.year, filters.month - 2, 1);
     api.get("/api/transactions", { params: { month: prev.getMonth() + 1, year: prev.getFullYear(), type: filters.type } })
