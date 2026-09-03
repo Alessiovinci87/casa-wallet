@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>CasaWallet — Guida utente</title>
+<style>
+  /* Guida utente: A4 verticale, un capitolo per pagina, testo a sinistra e telefono a destra. */
+  @page { size: A4; margin: 14mm; }
+  :root { --brand: #0a6847; --brand-50: #eef5f1; --ink: #17211d; --ink-600: #5b6864; --ink-400: #8b9691; --line: #e4e9e6; --tax: #b3701a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; color: var(--ink); font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; font-size: 11.5pt; line-height: 1.45; }
+  h1, h2, h3 { color: var(--brand); margin: 0 0 6pt; line-height: 1.2; }
+  h1 { font-size: 30pt; }
+  h2 { font-size: 19pt; padding-bottom: 5pt; border-bottom: 2px solid var(--brand-50); margin-bottom: 9pt; }
+  p { margin: 0 0 7pt; }
+  ol, ul { margin: 0 0 8pt 0; padding-left: 1.35em; }
+  li { margin-bottom: 4pt; }
+  strong { color: var(--ink); }
+  section { page-break-after: always; break-after: page; }
+  section:last-of-type { page-break-after: auto; break-after: auto; }
+
+  /* Copertina */
+  .cover { min-height: 250mm; display: flex; flex-direction: column; justify-content: center; }
+  .cover h1 { font-size: 44pt; letter-spacing: -0.5pt; }
+  .cover h3 { border: none; font-size: 22pt; color: var(--ink-600); margin-bottom: 10pt; }
+  .cover p { font-size: 13pt; color: var(--ink-600); max-width: 120mm; }
+  .cover::before { content: ""; display: block; width: 22mm; height: 22mm; border-radius: 50%; background: var(--brand); margin-bottom: 12mm; }
+
+  /* Capitoli */
+  .cols { display: flex; gap: 8mm; align-items: flex-start; }
+  .cols .text { flex: 1; min-width: 0; }
+  .cols figure { margin: 0; flex: 0 0 62mm; }
+  .cols figure img { width: 62mm; height: auto; max-height: 185mm; object-fit: cover; object-position: top; border: 1px solid var(--line); border-radius: 5mm; box-shadow: 0 2mm 6mm rgba(0,0,0,.08); display: block; }
+  .chapter.wide .cols figure { display: none; }
+  .chapter.wide .text { font-size: 12pt; }
+  .chapter .text p:last-child, .chapter .text p:last-of-type { background: var(--brand-50); border-left: 3px solid var(--brand); padding: 5pt 8pt; border-radius: 0 3mm 3mm 0; margin-top: 8pt; }
+  .chapter.wide .text p:last-of-type { background: none; border: 0; padding: 0; }
+  .chapter .text > p:first-of-type { color: var(--ink-600); font-size: 12pt; }
+</style>
+</head>
+<body>
+{{content}}
+</body>
+</html>

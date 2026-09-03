@@ -1,0 +1,15 @@
+{
+  "name": "casawallet-monorepo",
+  "private": true,
+  "type": "module",
+  "description": "CasaWallet — tooling di root (guida utente in PDF). App in /client e /server.",
+  "scripts": {
+    "docs:guide": "node scripts/guide/generate.mjs",
+    "docs:guide:pdf": "node scripts/guide/generate.mjs --pdf-only",
+    "docs:guide:install": "npx playwright install chromium"
+  },
+  "devDependencies": {
+    "marked": "^15.0.0",
+    "playwright": "^1.62.1"
+  }
+}
