@@ -34,6 +34,8 @@ export default function TransactionForm({ initial, onClose, onDelete }) {
     taxPercent: initial?.taxPercent ?? "",
     description: initial?.description ?? "",
     accountId: initial?.accountId ?? initial?.account?.id ?? "",
+    merchant: initial?.merchant ?? "",
+    what: initial?.what ?? "",
   }));
   const [ocrBusy, setOcrBusy] = useState(false);
   // "Ripeti": in creazione la transazione diventa una regola ricorrente
@@ -148,6 +150,8 @@ export default function TransactionForm({ initial, onClose, onDelete }) {
       date: new Date(form.date).toISOString(),
       taxPercent: form.type === "INCOME" && form.taxPercent ? Number(form.taxPercent) : null,
       accountId: form.accountId || null,
+      merchant: form.merchant?.trim() || null,
+      what: form.what?.trim() || null,
     };
     try {
       if (isEdit) await updateTransaction(initial.id, payload);
@@ -244,6 +248,16 @@ export default function TransactionForm({ initial, onClose, onDelete }) {
           )}
         </div>
 
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs text-ink-600 mb-1">{form.type === "INCOME" ? "Da chi" : "Dove"}</label>
+            <input type="text" value={form.merchant} onChange={(e) => set("merchant", e.target.value)} placeholder="es. Amazon" className="w-full px-2 py-2 border border-card-line rounded" />
+          </div>
+          <div>
+            <label className="block text-xs text-ink-600 mb-1">{form.type === "INCOME" ? "Per cosa" : "Cosa"}</label>
+            <input type="text" value={form.what} onChange={(e) => set("what", e.target.value)} placeholder="es. cuffie" className="w-full px-2 py-2 border border-card-line rounded" />
+          </div>
+        </div>
         <div className="mt-3">
           <label className="block text-xs text-ink-600 mb-1">Metodo</label>
           <Segmented

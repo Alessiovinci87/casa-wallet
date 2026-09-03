@@ -27,7 +27,7 @@ function Row({ t, type, onEdit }) {
   return (
     <button type="button" onClick={() => onEdit(t)} className="w-full text-left px-4 py-3 min-h-[52px] flex items-center justify-between gap-3 hover:bg-paper">
       <div className="min-w-0">
-        <div className="font-medium truncate">{t.description || t.category}</div>
+        <div className="font-medium truncate">{t.merchant || t.what ? [t.merchant, t.what].filter(Boolean).join(" · ") : (t.description || t.category)}</div>
         <div className="text-[13px] text-ink-400 flex flex-wrap items-center gap-x-1.5">
           {t.description && <span>{t.category}</span>}
           {t.recurringRuleId && <span className="px-1.5 rounded-full bg-brand-50 text-brand-700">Ricorrente</span>}

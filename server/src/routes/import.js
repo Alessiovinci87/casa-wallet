@@ -12,7 +12,7 @@ import { prisma } from "../lib/prisma.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { broadcast } from "../lib/ws.js";
 import {
-  applyMapping, categorize, detectRecurrences, guessCategory, importHash,
+  applyMapping, categorize, detectRecurrences, guessCategory, guessMerchant, importHash,
   normalizeDescription,
 } from "../lib/bankImport.js";
 
@@ -160,6 +160,7 @@ router.post("/bank-csv/commit", async (req, res) => {
       index: i,
       data: {
         userId: req.user.id,
+        merchant: guessMerchant(r.description),
         accountId: account,
         householdId: req.user.householdId,
         amount,

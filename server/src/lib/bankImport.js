@@ -114,6 +114,31 @@ export function cleanDescription(s) {
   return d.slice(0, 100);
 }
 
+// Marchi/negozi riconoscibili nelle descrizioni bancarie → "Dove". Ordine: i
+// più specifici prima. Il nome canonico è quello mostrato nei resoconti.
+const MERCHANT_BRANDS = [
+  [/amazon|amzn/, "Amazon"], [/aliexpress/, "AliExpress"], [/temu/, "Temu"], [/shein/, "Shein"], [/zalando/, "Zalando"],
+  [/ebay/, "eBay"], [/paypal/, "PayPal"], [/klarna/, "Klarna"], [/apple\.com|itunes/, "Apple"], [/google/, "Google"],
+  [/netflix/, "Netflix"], [/spotify/, "Spotify"], [/disney/, "Disney+"], [/dazn/, "DAZN"], [/prime video/, "Prime Video"],
+  [/conad/, "Conad"], [/coop/, "Coop"], [/lidl/, "Lidl"], [/eurospin/, "Eurospin"], [/esselunga/, "Esselunga"], [/carrefour/, "Carrefour"],
+  [/\bmd\b/, "MD"], [/\bpam\b/, "Pam"], [/despar/, "Despar"], [/crai/, "Crai"], [/nonna isa/, "Nonna Isa"], [/penny/, "Penny"],
+  [/decathlon/, "Decathlon"], [/ikea/, "IKEA"], [/leroy/, "Leroy Merlin"], [/brico/, "Brico"], [/mediaworld/, "MediaWorld"], [/unieuro/, "Unieuro"],
+  [/zara/, "Zara"], [/h&m|\bhm\b/, "H&M"], [/ovs/, "OVS"], [/primark/, "Primark"], [/kiko/, "Kiko"], [/tedi/, "Tedi"],
+  [/mcdonald/, "McDonald's"], [/burger king/, "Burger King"], [/deliveroo/, "Deliveroo"], [/glovo/, "Glovo"], [/just eat/, "Just Eat"],
+  [/enel/, "Enel"], [/eni gas|plenitude/, "Eni Plenitude"], [/\btim\b|telecom/, "TIM"], [/vodafone/, "Vodafone"], [/iliad/, "Iliad"], [/wind|windtre/, "WindTre"], [/fastweb/, "Fastweb"],
+  [/\beni\b|eni\d/, "Eni"], [/\bq8\b/, "Q8"], [/esso/, "Esso"], [/\bip\b/, "IP"], [/tamoil/, "Tamoil"],
+  [/farmacia/, "Farmacia"], [/tabacch/, "Tabacchi"], [/compass/, "Compass"], [/findomestic/, "Findomestic"], [/agos/, "Agos"],
+  [/trenitalia/, "Trenitalia"], [/italo/, "Italo"], [/ryanair/, "Ryanair"], [/easyjet/, "easyJet"], [/booking/, "Booking"], [/airbnb/, "Airbnb"],
+  [/inps/, "INPS"], [/agenzia entrate|f24/, "Agenzia Entrate"], [/sumup/, "SumUp"], [/satispay/, "Satispay"], [/hype/, "Hype"],
+];
+
+/** "Dove" dedotto dalla descrizione bancaria (marchio noto), altrimenti null. */
+export function guessMerchant(description) {
+  const d = String(description || "").toLowerCase();
+  for (const [re, name] of MERCHANT_BRANDS) if (re.test(d)) return name;
+  return null;
+}
+
 export function importHash({ date, amount, description }) {
   const key = `${date.toISOString().slice(0, 10)}|${Number(amount).toFixed(2)}|${normalizeDescription(description)}`;
   return createHash("sha1").update(key).digest("hex");

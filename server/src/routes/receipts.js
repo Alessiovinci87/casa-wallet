@@ -58,6 +58,8 @@ router.post("/", async (req, res) => {
           category: category || "Spesa",
           method: payMethod,
           description: store ?? null,
+          merchant: store ?? null,
+          what: items.length ? `${items.length} prodotti` : null,
           date: receiptDate,
         },
       });

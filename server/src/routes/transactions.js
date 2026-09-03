@@ -23,10 +23,55 @@ function emit(householdId, action, transaction) {
   broadcast(householdId, { event: "transaction_update", payload: { action, transaction } });
 }
 
+const cleanText = (v, max) => {
+  if (v == null) return null;
+  const s = String(v).replace(/\s+/g, " ").trim();
+  return s ? s.slice(0, max) : null;
+};
+
+// GET /api/transactions/merchants?type=EXPENSE — "Dove" già usati dalla famiglia,
+// con categoria/metodo più frequenti e le "Cosa" più recenti: alimentano i
+// suggerimenti della schermata Nuova spesa. Ordinati per uso recente.
+router.get("/merchants", async (req, res) => {
+  const type = TX_TYPES.has(req.query.type) ? req.query.type : "EXPENSE";
+  const rows = await prisma.transaction.findMany({
+    where: { householdId: req.user.householdId, type, merchant: { not: null } },
+    select: { merchant: true, what: true, category: true, method: true, date: true, amount: true },
+    orderBy: { date: "desc" },
+    take: 2000,
+  });
+  const byKey = new Map();
+  for (const r of rows) {
+    const key = r.merchant.toLowerCase();
+    let m = byKey.get(key);
+    if (!m) { m = { merchant: r.merchant, count: 0, lastAt: r.date, cats: {}, methods: {}, whats: new Map(), total: 0 }; byKey.set(key, m); }
+    m.count += 1;
+    m.total += r.amount;
+    m.cats[r.category] = (m.cats[r.category] || 0) + 1;
+    m.methods[r.method] = (m.methods[r.method] || 0) + 1;
+    if (r.what && !m.whats.has(r.what.toLowerCase())) m.whats.set(r.what.toLowerCase(), r.what);
+  }
+  const mode = (o) => Object.entries(o).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  const merchants = [...byKey.values()]
+    .sort((a, b) => b.lastAt - a.lastAt)
+    .map((m) => ({ merchant: m.merchant, count: m.count, total: Number(m.total.toFixed(2)), lastAt: m.lastAt, category: mode(m.cats), method: mode(m.methods), whats: [...m.whats.values()].slice(0, 8) }));
+  const recentWhats = [];
+  const seenW = new Set();
+  for (const r of rows) {
+    if (!r.what) continue;
+    const k = r.what.toLowerCase();
+    if (seenW.has(k)) continue;
+    seenW.add(k);
+    recentWhats.push(r.what);
+    if (recentWhats.length >= 20) break;
+  }
+  res.json({ merchants, recentWhats });
+});
+
 // POST /api/transactions
 router.post("/", async (req, res) => {
   const {
-    amount, type, category, subcategory, method, description, date, taxPercent, accountId,
+    amount, type, category, subcategory, method, description, date, taxPercent, accountId, merchant, what,
   } = req.body || {};
 
   if (amount == null || !type || !category || !method || !date) {
@@ -67,7 +112,10 @@ router.post("/", async (req, res) => {
       category,
       subcategory: subcategory ?? null,
       method,
-      description: description ?? null,
+      merchant: cleanText(merchant, 80),
+      what: cleanText(what, 120),
+      // Senza descrizione esplicita: "Dove · Cosa" (resta leggibile nelle liste e negli export).
+      description: cleanText(description, 200) ?? [cleanText(merchant, 80), cleanText(what, 120)].filter(Boolean).join(" · ") ?? null,
       date: when,
       taxPercent: applies ? taxPct : null,
       taxAmount,
@@ -151,7 +199,7 @@ router.put("/:id", async (req, res) => {
   }
 
   const {
-    amount, type, category, subcategory, method, description, date, taxPercent, accountId,
+    amount, type, category, subcategory, method, description, date, taxPercent, accountId, merchant, what,
   } = req.body || {};
 
   if (type && !TX_TYPES.has(type)) {
@@ -196,6 +244,14 @@ router.put("/:id", async (req, res) => {
   };
   if (accountId !== undefined) {
     try { data.accountId = await resolveAccountId(req.user.householdId, accountId); } catch (err) { return res.status(400).json({ error: err.message }); }
+  }
+  if (merchant !== undefined) data.merchant = cleanText(merchant, 80);
+  if (what !== undefined) data.what = cleanText(what, 120);
+  if (description === undefined && (merchant !== undefined || what !== undefined)) {
+    const m = merchant !== undefined ? cleanText(merchant, 80) : existing.merchant;
+    const w = what !== undefined ? cleanText(what, 120) : existing.what;
+    const derived = [m, w].filter(Boolean).join(" · ");
+    if (derived) data.description = derived;
   }
 
   // Keep the linked TaxSaving consistent with the updated transaction.

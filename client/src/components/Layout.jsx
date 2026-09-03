@@ -30,6 +30,8 @@ const TITLES = [
   ["/treasury", "Tesoreria"],
   ["/invoices", "Fatture"],
   ["/ocr", "Nuova spesa"],
+  ["/add", "Nuovo movimento"],
+  ["/spending", "Dove vanno i soldi"],
   ["/import", "Importa estratto conto"],
   ["/analytics", "Analisi"],
   ["/shopping-list", "Lista spesa"],
@@ -43,7 +45,7 @@ const ROOTS = new Set(["/", "/movements", "/goals", "/forecast", "/more"]);
 const pageTitle = (path) => (path === "/" ? "Home" : TITLES.find(([p]) => path.startsWith(p))?.[1] || "");
 
 // Il FAB non compare sulle pagine che sono già un form.
-const NO_FAB = ["/ocr", "/onboarding", "/import"];
+const NO_FAB = ["/ocr", "/onboarding", "/import", "/add"];
 
 function ActionSheet({ onClose, onPick }) {
   const items = [
@@ -110,7 +112,7 @@ export default function Layout() {
   const pick = (key) => {
     setSheet(false);
     if (key === "ocr") navigate("/ocr");
-    else setForm({ type: key === "income" ? "INCOME" : "EXPENSE" });
+    else navigate(`/add?type=${key === "income" ? "income" : "expense"}`);
   };
 
   const showFab = !NO_FAB.some((p) => location.pathname.startsWith(p));
@@ -184,7 +186,7 @@ export default function Layout() {
       )}
 
       {/* Bottom tab bar mobile */}
-      {!keyboard && (
+      {!keyboard && !location.pathname.startsWith("/add") && (
         <nav className="md:hidden fixed inset-x-0 bottom-0 z-30 bg-white border-t border-card-line pb-[env(safe-area-inset-bottom)]">
           <div className="flex h-14">
             {TABS.map(({ to, label, Icon, end }) => (

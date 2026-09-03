@@ -105,8 +105,11 @@ model Transaction {
   importHash  String?     // dedupe import CSV: sha1(data|importo|descrizione normalizzata)
   accountId   String?     // conto di provenienza (null = conto predefinito)
   account     BankAccount? @relation(fields: [accountId], references: [id])
+  merchant    String?     // "Dove": negozio / venditore / controparte (Amazon, Conad, AliExpress…)
+  what        String?     // "Cosa": cosa hai comprato, testo libero breve (cuffie, spesa settimanale…)
 
   @@index([householdId, date])
+  @@index([householdId, merchant])
   @@index([accountId, date])
   @@index([recurringRuleId, date])
   @@index([householdId, importHash])

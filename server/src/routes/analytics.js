@@ -16,6 +16,47 @@ function dateRange(from, to) {
   return range;
 }
 
+// GET /api/analytics/spending?from=&to=&accountId=&type=EXPENSE
+// "Dove vanno i soldi": sulle TRANSAZIONI (manuali, import, scontrini, ricorrenze).
+// → { total, count, byCategory[], byMerchant[{merchant,total,count,category}], byWhat[], withoutMerchant {total,count} }
+router.get("/spending", async (req, res) => {
+  const type = req.query.type === "INCOME" ? "INCOME" : "EXPENSE";
+  const where = { householdId: req.user.householdId, type };
+  const range = dateRange(req.query.from, req.query.to);
+  if (range) where.date = range;
+  if (req.query.accountId) {
+    const acc = await prisma.bankAccount.findFirst({ where: { id: String(req.query.accountId), householdId: req.user.householdId }, select: { id: true, isDefault: true } });
+    if (!acc) return res.status(400).json({ error: "Conto non trovato" });
+    if (acc.isDefault) where.OR = [{ accountId: acc.id }, { accountId: null }];
+    else where.accountId = acc.id;
+  }
+  const rows = await prisma.transaction.findMany({ where, select: { amount: true, category: true, merchant: true, what: true, description: true, date: true, recurringRuleId: true } });
+  const agg = (keyFn) => {
+    const m = new Map();
+    for (const r of rows) {
+      const k = keyFn(r);
+      if (!k) continue;
+      const kk = String(k).toLowerCase();
+      const e = m.get(kk) || { key: k, total: 0, count: 0, cats: {} };
+      e.total += r.amount; e.count += 1; e.cats[r.category] = (e.cats[r.category] || 0) + 1;
+      m.set(kk, e);
+    }
+    return [...m.values()].sort((a, b) => b.total - a.total).map((e) => ({ ...e, total: Number(e.total.toFixed(2)), category: Object.entries(e.cats).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null, cats: undefined }));
+  };
+  const total = Number(rows.reduce((s, r) => s + r.amount, 0).toFixed(2));
+  const byCategory = agg((r) => r.category).map((e) => ({ category: e.key, total: e.total, count: e.count }));
+  const byMerchant = agg((r) => r.merchant).map((e) => ({ merchant: e.key, total: e.total, count: e.count, category: e.category }));
+  const byWhat = agg((r) => r.what).map((e) => ({ what: e.key, total: e.total, count: e.count, category: e.category }));
+  const noMerchant = rows.filter((r) => !r.merchant);
+  const fixed = rows.filter((r) => r.recurringRuleId).reduce((s, r) => s + r.amount, 0);
+  res.json({
+    type, total, count: rows.length,
+    fixed: Number(fixed.toFixed(2)), variable: Number((total - fixed).toFixed(2)),
+    byCategory, byMerchant, byWhat,
+    withoutMerchant: { total: Number(noMerchant.reduce((s, r) => s + r.amount, 0).toFixed(2)), count: noMerchant.length },
+  });
+});
+
 // GET /api/analytics/by-category?from=&to=  → [{ category, total, count }]
 router.get("/by-category", async (req, res) => {
   const range = dateRange(req.query.from, req.query.to);

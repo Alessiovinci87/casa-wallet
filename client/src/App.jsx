@@ -24,6 +24,8 @@ const ImportPage = lazy(() => import("./pages/ImportPage.jsx"));
 const OnboardingPage = lazy(() => import("./pages/OnboardingPage.jsx"));
 const MovementsPage = lazy(() => import("./pages/MovementsPage.jsx"));
 const MorePage = lazy(() => import("./pages/MorePage.jsx"));
+const AddTransactionPage = lazy(() => import("./pages/AddTransactionPage.jsx"));
+const SpendingPage = lazy(() => import("./pages/SpendingPage.jsx"));
 
 const Spinner = () => (
   <div className="min-h-[40vh] flex items-center justify-center">
@@ -81,6 +83,8 @@ function App() {
             <Route path="/goals" element={<GoalsPage />} />
             <Route path="/forecast" element={<ForecastPage />} />
             <Route path="/import" element={<ImportPage />} />
+            <Route path="/add" element={<AddTransactionPage />} />
+            <Route path="/spending" element={<SpendingPage />} />
             <Route path="/onboarding" element={<OnboardingPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>
