@@ -363,6 +363,11 @@ export default function Dashboard() {
         </button>
         {monthOpen && (
           <div className="px-4 pb-4 space-y-4">
+            {/* Registrare qui un'entrata o un'uscita del mese (es. un versamento fatto oggi). */}
+            <div className="flex gap-2">
+              <button type="button" onClick={() => navigate("/add?type=income")} className="flex-1 min-h-[44px] rounded-lg border border-card-line text-brand-600 text-[13px] font-medium">+ Entrata</button>
+              <button type="button" onClick={() => navigate("/add?type=expense")} className="flex-1 min-h-[44px] rounded-lg border border-card-line text-ink-600 text-[13px] font-medium">+ Uscita</button>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <button type="button" onClick={() => navigate("/movements?tab=income")} className="text-left">
                 <div className="text-[13px] text-ink-600">Entrate</div>

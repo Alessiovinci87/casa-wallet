@@ -33,6 +33,9 @@ function AccountForm({ initial, onSave, onCancel, saving }) {
         <label className="block text-xs text-ink-600 mb-1">Numero di conto o IBAN <span className="text-ink-400">(per riconoscere gli estratti)</span></label>
         <input type="text" value={f.number} onChange={(e) => set("number", e.target.value)} placeholder="IT60X0542811101000000123456" className="w-full px-2 py-2 border border-card-line rounded nums" />
       </div>
+      <p className="col-span-2 text-[13px] text-ink-400">
+        Il saldo iniziale è quello di inizio giornata: i movimenti del giorno scelto e dei giorni dopo si registrano a parte e si sommano. Metti il saldo di ieri sera con la data di oggi, poi registra entrate e uscite di oggi (versamenti compresi).
+      </p>
       <div>
         <label className="block text-xs text-ink-600 mb-1">Saldo iniziale €</label>
         <input type="number" step="0.01" value={f.openingBalance} onChange={(e) => set("openingBalance", e.target.value)} placeholder="es. 2500" className="w-full px-2 py-2 border border-card-line rounded nums" />
