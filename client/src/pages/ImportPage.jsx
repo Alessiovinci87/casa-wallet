@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import api from "../lib/api.js";
 import { CATEGORIES, PAY_METHODS, PAY_METHOD_LABELS } from "../lib/constants.js";
@@ -23,6 +23,8 @@ const COLS = [
 
 export default function ImportPage() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const fromOnboarding = params.get("from") === "onboarding";
   const createRule = useRecurringStore((s) => s.createRule);
   const fetchTransactions = useTransactionStore((s) => s.fetchTransactions);
   const [file, setFile] = useState(null);
@@ -261,7 +263,11 @@ export default function ImportPage() {
           <div className="font-semibold text-brand-700">Import completato</div>
           <div className="text-ink-600 mt-1">{result.created} transazioni create · {result.skipped} saltate (già presenti){result.errors.length ? ` · ${result.errors.length} errori` : ""}</div>
           <div className="mt-2 flex gap-2">
-            <button onClick={() => navigate("/movements?tab=expenses")} className="px-3 py-1.5 border border-card-line rounded-lg text-ink-600 text-xs">Vai a Uscite</button>
+            {fromOnboarding ? (
+              <button onClick={() => navigate("/onboarding?step=2")} className="px-3 py-1.5 bg-brand-600 text-white rounded-lg text-xs font-semibold">Torna al Punto zero</button>
+            ) : (
+              <button onClick={() => navigate("/movements?tab=expenses")} className="px-3 py-1.5 border border-card-line rounded-lg text-ink-600 text-xs">Vai a Uscite</button>
+            )}
             <button onClick={() => { setResult(null); setPreview(null); setFile(null); setRows([]); }} className="px-3 py-1.5 border border-card-line rounded-lg text-ink-600 text-xs">Nuovo import</button>
           </div>
         </div>

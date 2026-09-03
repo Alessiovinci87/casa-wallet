@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import api from "../lib/api.js";
 import { eur } from "../lib/format.js";
@@ -16,16 +16,17 @@ import { useAuthStore } from "../store/authStore.js";
 // Al termine la Dashboard mostra già Disponibile reale e quota obiettivi.
 export const ONBOARDING_KEY = "onboardingSeen";
 
-const STEPS = ["Saldo", "Ricorrenze", "Tasse", "Obiettivi", "Partner"];
+const STEPS = ["Saldo", "Estratto conto", "Ricorrenze", "Tasse", "Obiettivi", "Partner"];
 
 export default function OnboardingPage() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const user = useAuthStore((s) => s.user);
   const { household, fetchHousehold, setOpeningBalance } = useHouseholdStore();
   const { fiscalProfile, fetchFiscalProfile, saveFiscalProfile } = useTreasuryStore();
   const { rules, fetchRules, createRule } = useRecurringStore();
   const { goals, fetchGoals, createGoal } = useGoalStore();
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(() => Math.min(STEPS.length - 1, Math.max(0, Number(params.get("step")) || 0)));
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -80,7 +81,7 @@ export default function OnboardingPage() {
     if (hasVat && taxPct !== "") {
       await saveFiscalProfile({ ...(fiscalProfile || {}), regime: fiscalProfile?.regime || "FORFETTARIO", defaultTaxPercent: Number(taxPct) });
     }
-    setStep(3);
+    setStep(4);
   });
   const addGoal = () => wrap(async () => {
     if (!goal.name || !goal.amount || !goal.date) throw new Error("Compila nome, importo e data");
@@ -131,6 +132,22 @@ export default function OnboardingPage() {
 
       {step === 1 && (
         <div className="card p-5 space-y-3">
+          <h2 className="font-semibold">Hai l'estratto conto? <span className="text-[13px] font-normal text-ink-400">(facoltativo)</span></h2>
+          <p className="text-sm text-ink-600">
+            Scaricalo dalla tua banca in PDF, Excel, XML o CSV e caricalo: l'app legge i movimenti, propone le categorie e riconosce le spese che si ripetono ogni mese.
+          </p>
+          <p className="text-xs text-ink-400">
+            I movimenti precedenti alla data del saldo iniziale servono solo per le analisi e le ricorrenze: il saldo non cambia.
+          </p>
+          <div className="flex justify-between">
+            <button onClick={() => navigate("/import?from=onboarding")} className="px-4 py-2 bg-brand-600 text-white rounded hover:bg-brand-700">Carica estratto conto</button>
+            <button onClick={() => setStep(2)} className="px-4 py-2 border border-card-line rounded text-ink-600">Non ora</button>
+          </div>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="card p-5 space-y-3">
           <h2 className="font-semibold">Le spese fisse che conosci</h2>
           <p className="text-sm text-ink-600">Rata, affitto, internet, abbonamenti: l'app le registrerà da sola ogni mese e le toglierà dal disponibile.</p>
           {rules.length > 0 && (
@@ -150,12 +167,12 @@ export default function OnboardingPage() {
           <Segmented size="sm" value={rule.category} onChange={(v) => setRule((r) => ({ ...r, category: v }))} options={CATEGORIES[rule.type].map((c) => ({ value: c, label: c }))} />
           <div className="flex justify-between">
             <button onClick={addRule} disabled={busy} className="px-4 py-2 border border-card-line rounded text-ink-600 disabled:opacity-50">+ Aggiungi</button>
-            <button onClick={() => setStep(2)} className="px-4 py-2 bg-brand-600 text-white rounded hover:bg-brand-700">Avanti</button>
+            <button onClick={() => setStep(3)} className="px-4 py-2 bg-brand-600 text-white rounded hover:bg-brand-700">Avanti</button>
           </div>
         </div>
       )}
 
-      {step === 2 && (
+      {step === 3 && (
         <div className="card p-5 space-y-3">
           <h2 className="font-semibold">Hai la Partita IVA?</h2>
           <p className="text-sm text-ink-600">Se sì, su ogni entrata l'app mette da parte una % per le tasse in un salvadanaio personale. Ogni membro imposta la propria.</p>
@@ -173,7 +190,7 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      {step === 3 && (
+      {step === 4 && (
         <div className="card p-5 space-y-3">
           <h2 className="font-semibold">Un primo obiettivo</h2>
           <p className="text-sm text-ink-600">Dimmi cosa vuoi e quando: ti dico quanto mettere via ogni mese.</p>
@@ -192,12 +209,12 @@ export default function OnboardingPage() {
           )}
           <div className="flex justify-between">
             <button onClick={addGoal} disabled={busy} className="px-4 py-2 border border-card-line rounded text-ink-600 disabled:opacity-50">+ Aggiungi</button>
-            <button onClick={() => setStep(4)} className="px-4 py-2 bg-brand-600 text-white rounded hover:bg-brand-700">Avanti</button>
+            <button onClick={() => setStep(5)} className="px-4 py-2 bg-brand-600 text-white rounded hover:bg-brand-700">Avanti</button>
           </div>
         </div>
       )}
 
-      {step === 4 && (
+      {step === 5 && (
         <div className="card p-5 space-y-3">
           <h2 className="font-semibold">Invita il partner</h2>
           <p className="text-sm text-ink-600">Con questo codice entra nella famiglia <strong>{household?.name}</strong>: vedrete le stesse spese, entrate e obiettivi. Il salvadanaio tasse resta personale.</p>

@@ -138,24 +138,30 @@ export function categorize(description, rules, type) {
 
 // Fallback keyword → categoria (italiano, niente AI).
 const DEFAULT_KEYWORDS = [
-  [/(conad|coop|esselunga|carrefour|lidl|eurospin|md |pam |supermerc|iper)/, "Spesa"],
-  [/(farmac|medic|ospedal|dott)/, "Salute"],
-  [/(benzin|carbur|eni |q8|esso|ip |autostrad|telepass|treno|trenitalia|italo|atm |atac|bus)/, "Trasporti"],
-  [/(enel|eni gas|a2a|hera|iren|acea|luce|gas|acqua|tim |vodafone|wind|iliad|fastweb|internet|telefon)/, "Bollette"],
-  [/(affitto|mutuo|condomin|canone)/, "Casa"],
-  [/(ristor|pizz|trattor|bar |caff|deliveroo|glovo|just eat)/, "Ristorante"],
-  [/(zara|h&m|decathlon|abbigl|scarpe)/, "Abbigliamento"],
-  [/(netflix|spotify|cinema|amazon prime|disney|dazn|palestra|gym)/, "Svago"],
-  [/(f24|agenzia entrate|inps|imposta|tributi)/, "Tasse"],
-  [/(stipendio|emolument|salary)/, "Stipendio"],
-  [/(fattura|bonifico a favore|accredito)/, "Fatture"],
+  // Ordine = priorità: i pattern più specifici prima di quelli generici.
+  [/(f24|agenzia entrate|inps|imposta|tributi|delega unificata)/, "Tasse"],
+  [/(farmac|parafarm|medic|ospedal|dott|dentist|ottic|veterinar|analisi)/, "Salute"],
+  [/(conad|coop|esselunga|carrefour|lidl|eurospin|md |pam |supermerc|iper|despar|crai|penny|aldi|todis|sigma|nonna isa|panific|macell|frutta|ortofrutt|alimentar|market)/, "Spesa"],
+  [/(benzin|carbur|eni |q8|esso|ip |tamoil|autostrad|telepass|treno|trenitalia|italo|atm |atac|arst|bus|parcheggio|parking|taxi|uber|traghett|moby|tirrenia|grimaldi|ryanair|easyjet|volotea|ita airways)/, "Trasporti"],
+  [/(enel|eni gas|a2a|hera|iren|acea|edison|sorgenia|plenitude|abbanoa|luce|gas|acqua|tim |vodafone|wind|iliad|fastweb|internet|telefon|algonet|sky |aruba|hosting)/, "Bollette"],
+  [/(affitto|mutuo|condomin|canone|leroy|brico|ikea|mondo convenienza|arredo|idraul|elettricist)/, "Casa"],
+  [/(ristor|pizz|trattor|osteria|bar |caff|pub |mcdonald|burger|kebab|sushi|gelat|pasticc|deliveroo|glovo|just eat|bottega|vineria|viner|panin)/, "Ristorante"],
+  [/(zara|h&m|decathlon|abbigl|scarpe|shein|zalando|ovs|primark|bershka|intimissimi|calzedonia|nike|adidas)/, "Abbigliamento"],
+  [/(netflix|spotify|cinema|amazon prime|disney|dazn|palestra|gym|steam|playstation|nintendo|giocheria|kinderpark|parco|lido|teatro|concert|libreria|feltrinelli|suno|chatgpt|openai|apple\.com|google \*|youtube)/, "Svago"],
+  [/(finanziament|compass|findomestic|agos|prestito|rata |amazon|klarna|paypal|ebay|aliexpress|temu|mediaworld|unieuro|euronics|tabacch|edicola|profumeria|douglas|sephora|beauty|parrucch|barbier|estetic)/, "Altro"],
+  [/(stipendio|emolument|salary|pensione|cedolino)/, "Stipendio"],
+  [/(fattura|fatt\.|onorari|compenso|parcella)/, "Fatture"],
+  [/(rimborso|storno|refund|riaccredito)/, "Rimborso"],
+  [/(bonifico|accredito|versamento)/, "Altro", "INCOME"],
 ];
 export function guessCategory(description, type) {
   const d = String(description || "").toLowerCase();
-  for (const [re, cat] of DEFAULT_KEYWORDS) {
+  const INCOME_ONLY = ["Stipendio", "Fatture", "Rimborso"];
+  for (const [re, cat, onlyType] of DEFAULT_KEYWORDS) {
+    if (onlyType && onlyType !== type) continue;
     if (re.test(d)) {
-      if (type === "INCOME" && !["Stipendio", "Fatture"].includes(cat)) continue;
-      if (type === "EXPENSE" && ["Stipendio", "Fatture"].includes(cat)) continue;
+      if (type === "INCOME" && !INCOME_ONLY.includes(cat) && cat !== "Altro") continue;
+      if (type === "EXPENSE" && INCOME_ONLY.includes(cat)) continue;
       return cat;
     }
   }

@@ -257,10 +257,13 @@ export function parsePdfLines(lines) {
   let current = null;
   let prevBalance = null;
   let cols = null; // { debitX, creditX, balanceX } dall'intestazione tabellare
+  let descX = null; // X della colonna descrizione dell'ultimo movimento
   for (const line of lines) {
     const toks = tokens(line);
     if (!toks.length) continue;
     const text = toks.map((t) => t.s).join(" ");
+    // Intestazioni con lettere spaziate ("D e s c r i z i o n e"): non sono testo utile.
+    if (toks.length >= 6 && toks.filter((t) => t.s.length === 1).length >= toks.length * 0.8) { current = null; continue; }
     let nDates = 0;
     while (nDates < toks.length && DATE_TOKEN.test(toks[nDates].s)) nDates++;
     if (!nDates) {
@@ -278,9 +281,13 @@ export function parsePdfLines(lines) {
         current = null;
         continue;
       }
+      // Continuazione della descrizione: stessa colonna X del testo del movimento
+      // (nei PDF a colonne le righe seguenti possono contenere importi e date).
+      const sameCol = current && descX != null && Math.abs(toks[0].x - descX) <= 4;
       const hasAmount = toks.some((t) => AMOUNT_TOKEN.test(t.s));
-      if (current && !hasAmount && !/^(saldo|totale|pagina|estratto|data|movimenti|pag\.)/i.test(text) && text.length < 120) {
-        current[1] = `${current[1]} ${text}`.trim();
+      const cont = descX != null ? sameCol : !hasAmount;
+      if (current && cont && !/^(saldo|totale|pagina|estratto|data|movimenti|pag\.)/i.test(text) && text.length < 120) {
+        current[1] = `${current[1]} ${text}`;
       } else if (hasAmount || /^(saldo|totale)/i.test(text)) current = null;
       continue;
     }
@@ -292,7 +299,9 @@ export function parsePdfLines(lines) {
       current = null;
       continue;
     }
-    const desc = toks.slice(nDates, amounts[0].i).map((t) => t.s).join(" ").trim();
+    const descToks = toks.slice(nDates, amounts[0].i);
+    const desc = descToks.map((t) => t.s).join(" ");
+    descX = descToks.length ? descToks[0].x : null;
     const explicit = amounts.find((a) => /^[-+]|^\(|-$/.test(a.s));
     let value;
     if (amounts.length === 1) {
@@ -322,10 +331,32 @@ export function parsePdfLines(lines) {
       } else value = movement;
       prevBalance = last;
     }
-    current = [normalizeDate(toks[0].s), desc || "Movimento", value.toFixed(2).replace(".", ",")];
+    current = [normalizeDate(toks[0].s), desc, value.toFixed(2).replace(".", ",")];
     rows.push(current);
   }
+  for (let i = 1; i < rows.length; i++) rows[i][1] = cleanDescription(rows[i][1]) || "Movimento";
   return { rows };
+}
+
+/**
+ * Toglie dalla descrizione la coda tecnica (numero carta, riferimenti bonifico,
+ * commissioni) che le banche accodano al nome della controparte.
+ */
+export function cleanDescription(s) {
+  let d = String(s || "").replace(/\s+/g, " ").trim();
+  // "o/c: MARIO ROSSI ABI-CAB: ..." → " da MARIO ROSSI"
+  d = d.replace(/\s*o\/c:\s*([^:]*?)\s+ABI-CAB:\s*\S+/i, " da $1");
+  // Importo in chiaro nel testo ("EUR 910,00 Affitto Settembre") → separatore prima della causale.
+  d = d.replace(/\s+EUR\s+[\d.]+,\d{2}\s*/g, " · ");
+  // Code tecniche: numero carta e data operazione, commissioni, riferimenti bonifico, mandati SDD.
+  d = d.replace(/\s*(Operazione\s+carta|Comm\.\s*bonifico|Comm\.\s*di\s+maggiorazione|Num\.\s*Bon(?:ifico|\.\s*Sepa)|RIF\.\s|SDD\/RID|\bN:\s*\d|ID:\S+|DEB:).*$/i, "");
+  d = d.replace(/\s*\*{2,}\d{2,}.*$/, "");
+  d = d.replace(/\s*\b\d{6,}\b.*$/, "");
+  d = d.replace(/\s+del\s+\d{2}\.\d{2}\.\d{4}.*$/, "");
+  d = d.replace(/\s*·\s*$/, "").replace(/\s+/g, " ").trim();
+  // Parole monche rimaste in coda ("… S.a.r.l. e", "ENEL ENERGIA S P A N:", "F24 - CBI DEL :").
+  for (let i = 0; i < 3; i++) d = d.replace(/\s+(e|a|di|del|da|per|N:|DEL|CBI|-|:)$/i, "");
+  return d.slice(0, 100);
 }
 
 function toNumber(raw) {
