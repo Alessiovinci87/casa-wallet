@@ -16,6 +16,9 @@ export default function MovementsPage({ tab: forced }) {
   const [params, setParams] = useSearchParams();
   const tab = forced || params.get("tab") || "expenses";
   const account = params.get("account") || "";
+  const noMerchant = params.get("noMerchant") === "1";
+  const initialMonth = params.get("month") ? { month: Number(params.get("month")), year: Number(params.get("year")) } : null;
+  const clearNoMerchant = () => setParams(account ? { tab, account } : { tab });
   const accounts = useAccountStore((s) => s.accounts);
   const accountsLoaded = useAccountStore((s) => s.loaded);
   const fetchAccounts = useAccountStore((s) => s.fetchAccounts);
@@ -37,7 +40,7 @@ export default function MovementsPage({ tab: forced }) {
           options={[{ value: "", label: "Tutti i conti" }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}
         />
       )}
-      {tab === "recurring" ? <RecurringPage embedded accountId={account} /> : <TransactionsPage type={tab === "income" ? "INCOME" : "EXPENSE"} embedded accountId={account} hideAccountFilter />}
+      {tab === "recurring" ? <RecurringPage embedded accountId={account} /> : <TransactionsPage type={tab === "income" ? "INCOME" : "EXPENSE"} embedded accountId={account} hideAccountFilter noMerchant={noMerchant} onClearNoMerchant={clearNoMerchant} initialMonth={initialMonth} />}
     </div>
   );
 }

@@ -110,9 +110,13 @@ export default function SpendingPage() {
         })()}
         {!data && <div className="text-3xl font-bold nums text-center">…</div>}
         {data && data.withoutMerchant.count > 0 && (
-          <p className="text-[13px] text-tax-600 mt-2">
-            {eur(data.withoutMerchant.total)} in {data.withoutMerchant.count} movimenti senza "Dove": aprili e aggiungilo per un resoconto completo.
-          </p>
+          <button
+            type="button"
+            onClick={() => navigate(`/movements?tab=expenses&noMerchant=1&month=${period.mode === "month" ? period.month + 1 : now.month() + 1}&year=${period.year}${accountId ? `&account=${accountId}` : ""}`)}
+            className="mt-2 w-full text-left min-h-[44px] text-[13px] text-tax-600 underline"
+          >
+            {eur(data.withoutMerchant.total)} in {data.withoutMerchant.count} movimenti senza "Dove": tocca per completarli
+          </button>
         )}
         {data?.planned?.length > 0 && (
           <p className="text-[13px] text-ink-400 mt-2">

@@ -88,20 +88,45 @@ export default function AddTransactionPage() {
   }, [type, fiscalProfile]);
   const hasGoals = goals.some((g) => g.active && g.status !== "DONE");
 
-  // Suggerimenti "Dove": i negozi usati, filtrati da ciò che stai scrivendo.
+  // Suggerimenti "Dove"/"Cosa": stessa voce per la stessa cosa. Una voce già usata
+  // viene proposta se contiene ciò che scrivi O se condivide una parola (3+ lettere)
+  // con quello che scrivi: "acquisto sigarette" propone "sigarette".
+  const words = (s) => String(s).toLowerCase().split(/[^a-z0-9àèéìòù]+/).filter((w) => w.length >= 3);
+  const similar = (q, cand) => {
+    const ql = q.toLowerCase();
+    const cl = cand.toLowerCase();
+    if (cl.includes(ql) || ql.includes(cl)) return true;
+    const qw = words(ql);
+    const cw = words(cl);
+    return qw.some((w) => cw.some((c) => c.startsWith(w) || w.startsWith(c)));
+  };
   const merchantMatches = useMemo(() => {
-    const q = merchant.trim().toLowerCase();
+    const q = merchant.trim();
     const list = suggest.merchants.map((m) => m.merchant);
     if (!q) return list.slice(0, 12);
-    return list.filter((m) => m.toLowerCase().includes(q)).slice(0, 12);
+    return list.filter((m) => similar(q, m)).slice(0, 12);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [merchant, suggest]);
   const known = useMemo(() => suggest.merchants.find((m) => m.merchant.toLowerCase() === merchant.trim().toLowerCase()) || null, [merchant, suggest]);
+  // "Intendevi ...?": voce esistente simile ma non identica a quello che hai scritto.
+  const merchantHint = useMemo(() => {
+    const q = merchant.trim();
+    if (!q || known) return null;
+    return merchantMatches.find((m) => m.toLowerCase() !== q.toLowerCase()) || null;
+  }, [merchant, known, merchantMatches]);
   const whatMatches = useMemo(() => {
-    const q = what.trim().toLowerCase();
+    const q = what.trim();
     const base = [...(known?.whats || []), ...suggest.recentWhats];
     const uniq = [...new Map(base.map((w) => [w.toLowerCase(), w])).values()];
-    return (q ? uniq.filter((w) => w.toLowerCase().includes(q)) : uniq).slice(0, 12);
+    return (q ? uniq.filter((w) => similar(q, w)) : uniq).slice(0, 12);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [what, known, suggest]);
+  const whatHint = useMemo(() => {
+    const q = what.trim();
+    if (!q) return null;
+    if (whatMatches.some((w) => w.toLowerCase() === q.toLowerCase())) return null;
+    return whatMatches[0] || null;
+  }, [what, whatMatches]);
 
   // Scegliere un negozio conosciuto precompila categoria e metodo (se non già scelti a mano).
   const pickMerchant = (m) => {
@@ -220,6 +245,11 @@ export default function AddTransactionPage() {
           className="w-full px-3 py-2 border border-card-line rounded-lg min-h-[44px]"
           autoCapitalize="words"
         />
+        {merchantHint && (
+          <button type="button" onClick={() => pickMerchant(merchantHint)} className="w-full text-left min-h-[44px] px-3 rounded-lg bg-tax-50 text-tax-600 text-[13px]">
+            Intendevi <span className="font-semibold">{merchantHint}</span>? Tocca per usare la stessa voce.
+          </button>
+        )}
         <Chips items={merchantMatches} value={merchant} onPick={pickMerchant} empty={suggest.merchants.length ? null : "I negozi che usi compariranno qui come scorciatoie."} />
         {known && <p className="text-[13px] text-ink-400">{known.count} {known.count === 1 ? "volta" : "volte"} · in tutto {eur(known.total)}{known.category ? ` · di solito ${known.category}` : ""}</p>}
       </div>
@@ -234,6 +264,11 @@ export default function AddTransactionPage() {
           placeholder={isExpense ? "es. cuffie, spesa settimanale, regalo Mia" : "es. fattura n. 12, stipendio agosto"}
           className="w-full px-3 py-2 border border-card-line rounded-lg min-h-[44px]"
         />
+        {whatHint && (
+          <button type="button" onClick={() => setWhat(whatHint)} className="w-full text-left min-h-[44px] px-3 rounded-lg bg-tax-50 text-tax-600 text-[13px]">
+            Intendevi <span className="font-semibold">{whatHint}</span>? Tocca per usare la stessa voce.
+          </button>
+        )}
         <Chips items={whatMatches} value={what} onPick={setWhat} />
       </div>
 

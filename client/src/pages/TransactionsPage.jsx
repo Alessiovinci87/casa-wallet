@@ -61,11 +61,11 @@ function DayGroups({ items, type, onEdit, empty }) {
   ));
 }
 
-export default function TransactionsPage({ type = "EXPENSE", accountId = "", onAccountChange, hideAccountFilter = false }) {
+export default function TransactionsPage({ type = "EXPENSE", accountId = "", onAccountChange, hideAccountFilter = false, noMerchant = false, onClearNoMerchant, initialMonth = null }) {
   const { transactions, loading, fetchTransactions, deleteTransaction } = useTransactionStore();
   const location = useLocation();
   const accounts = useAccountStore((s) => s.accounts);
-  const [filters, setFilters] = useState({ month: now.getMonth() + 1, year: now.getFullYear(), type, accountId });
+  const [filters, setFilters] = useState({ month: initialMonth?.month || now.getMonth() + 1, year: initialMonth?.year || now.getFullYear(), type, accountId });
   const [prevTotal, setPrevTotal] = useState(null);
   const [formInitial, setFormInitial] = useState(location.state?.prefill ?? null);
   const [showForm, setShowForm] = useState(Boolean(location.state?.prefill));
@@ -93,12 +93,14 @@ export default function TransactionsPage({ type = "EXPENSE", accountId = "", onA
     try { await deleteTransaction(t.id); } catch { window.alert("Eliminazione non riuscita, riprova."); }
   };
 
+  // Filtro "senza Dove" (da Dove vanno i soldi): solo i movimenti da completare.
+  const shown = useMemo(() => (noMerchant ? transactions.filter((t) => !t.merchant) : transactions), [transactions, noMerchant]);
   const { total, fixed, variable } = useMemo(() => {
     let total = 0;
     const fixed = [], variable = [];
-    for (const t of transactions) { total += t.amount; (t.recurringRuleId ? fixed : variable).push(t); }
+    for (const t of shown) { total += t.amount; (t.recurringRuleId ? fixed : variable).push(t); }
     return { total, fixed, variable };
-  }, [transactions]);
+  }, [shown]);
   const fixedTotal = fixed.reduce((s, t) => s + t.amount, 0);
   const delta = prevTotal == null ? null : pctChange(total, prevTotal);
   const goodWhenUp = type === "INCOME";
@@ -127,6 +129,13 @@ export default function TransactionsPage({ type = "EXPENSE", accountId = "", onA
           onChange={(v) => (onAccountChange ? onAccountChange(v) : setFilters((f) => ({ ...f, accountId: v })))}
           options={[{ value: "", label: "Tutti i conti" }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}
         />
+      )}
+
+      {noMerchant && (
+        <div className="card p-3 flex items-center justify-between gap-3 border-tax-600/30 bg-tax-50/40 text-[13px]">
+          <span className="text-tax-600">Movimenti senza "Dove": toccane uno, compila Dove e Cosa, poi Salva.</span>
+          <button type="button" onClick={onClearNoMerchant} className="shrink-0 min-h-[44px] px-2 text-ink-600">Mostra tutti</button>
+        </div>
       )}
 
       {/* Totale del mese + selettore mese */}
