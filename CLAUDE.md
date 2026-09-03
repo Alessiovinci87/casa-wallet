@@ -186,6 +186,7 @@ Tutte le route (eccetto login) richiedono header `Authorization: Bearer <token>`
 - `GET /` → `{ id, name, inviteCode, createdAt, members: [{id, name, email, role, createdAt}] }`
 - `PUT /` body `{ name }` → rename (403 se non OWNER)
 - `POST /regenerate-invite` → nuovo codice, il vecchio muore (403 se non OWNER)
+- `POST /reset` body `{ confirm: "RICOMINCIA" }` → **ricomincia da capo** (solo OWNER, 400 senza la parola): cancella tutti i dati economici della famiglia e dei membri (movimenti, tax saving, scontrini, ricorrenze, obiettivi, budget, regole CSV, prodotti ricorrenti, fatture, scadenze, prestiti, profili fiscali, connessione Aruba, saldo iniziale, mapping CSV); restano account, famiglia, codice invito, push subscription. Voce "Ricomincia da capo" in Altro → riapre il Punto zero
 
 ### Transactions (`/api/transactions`) — protette
 - `POST /` → crea transazione; se `type=INCOME` e `taxPercent>0` crea anche il TaxSaving collegato

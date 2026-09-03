@@ -4,6 +4,7 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { generateInviteCode } from "../lib/inviteCode.js";
+import { broadcast } from "../lib/ws.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -74,6 +75,43 @@ router.put("/opening-balance", async (req, res) => {
   }
   const household = await prisma.household.update({ where: { id: req.user.householdId }, data });
   res.json({ openingBalance: household.openingBalance, openingBalanceDate: household.openingBalanceDate });
+});
+
+// POST /api/household/reset { confirm: "RICOMINCIA" } — ricomincia da capo (solo OWNER):
+// cancella TUTTI i dati economici della famiglia e dei suoi membri (movimenti, tasse
+// accantonate, scontrini, ricorrenze, obiettivi, budget, regole CSV, fatture, scadenze,
+// prestiti, profili fiscali, saldo iniziale). Restano account, famiglia e codice invito.
+router.post("/reset", async (req, res) => {
+  if (!requireOwner(req, res)) return;
+  if (req.body?.confirm !== "RICOMINCIA") {
+    return res.status(400).json({ error: 'Per confermare scrivi esattamente "RICOMINCIA"' });
+  }
+  const hh = req.user.householdId;
+  const users = await prisma.user.findMany({ where: { householdId: hh }, select: { id: true } });
+  const ids = users.map((u) => u.id);
+  await prisma.$transaction([
+    prisma.goalContribution.deleteMany({ where: { goal: { householdId: hh } } }),
+    prisma.savingsGoal.deleteMany({ where: { householdId: hh } }),
+    prisma.internalLoan.deleteMany({ where: { userId: { in: ids } } }),
+    prisma.invoice.deleteMany({ where: { userId: { in: ids } } }),
+    prisma.taxDeadline.deleteMany({ where: { userId: { in: ids } } }),
+    prisma.fiscalProfile.deleteMany({ where: { userId: { in: ids } } }),
+    prisma.arubaConnection.deleteMany({ where: { userId: { in: ids } } }),
+    prisma.receiptItem.deleteMany({ where: { receipt: { householdId: hh } } }),
+    prisma.receipt.deleteMany({ where: { householdId: hh } }),
+    prisma.taxSaving.deleteMany({ where: { transaction: { householdId: hh } } }),
+    prisma.transaction.deleteMany({ where: { householdId: hh } }),
+    prisma.recurringRule.deleteMany({ where: { householdId: hh } }),
+    prisma.categoryBudget.deleteMany({ where: { householdId: hh } }),
+    prisma.categoryRule.deleteMany({ where: { householdId: hh } }),
+    prisma.recurringProduct.deleteMany({ where: { householdId: hh } }),
+    prisma.shoppingListDismissal.deleteMany({ where: { householdId: hh } }),
+    prisma.household.update({ where: { id: hh }, data: { openingBalance: null, openingBalanceDate: null, csvMapping: null } }),
+  ]);
+  broadcast(hh, { event: "transaction_update", payload: { action: "reset" } });
+  broadcast(hh, { event: "goal_update", payload: { action: "reset" } });
+  broadcast(hh, { event: "recurring_update", payload: { action: "reset" } });
+  res.json({ ok: true });
 });
 
 // POST /api/household/regenerate-invite — nuovo codice invito (solo OWNER).
