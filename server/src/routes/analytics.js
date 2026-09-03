@@ -3,6 +3,7 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
+import { occurrencesBetween, todayRomeUTC } from "../lib/recurrence.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -16,44 +17,77 @@ function dateRange(from, to) {
   return range;
 }
 
-// GET /api/analytics/spending?from=&to=&accountId=&type=EXPENSE
-// "Dove vanno i soldi": sulle TRANSAZIONI (manuali, import, scontrini, ricorrenze).
-// → { total, count, byCategory[], byMerchant[{merchant,total,count,category}], byWhat[], withoutMerchant {total,count} }
+// GET /api/analytics/spending?from=&to=&accountId=
+// "Dove vanno i soldi": sulle TRANSAZIONI (manuali, import, scontrini, ricorrenze
+// già scattate) + le ricorrenze del periodo NON ancora scattate ("in arrivo"),
+// così il mese è completo anche il giorno 3. Entrate e uscite insieme.
+// → { expense{actual,planned,total,count}, income{...}, net, byCategory[], byMerchant[], byWhat[],
+//     planned[{date, description, amount, type}], withoutMerchant{total,count} }
 router.get("/spending", async (req, res) => {
-  const type = req.query.type === "INCOME" ? "INCOME" : "EXPENSE";
-  const where = { householdId: req.user.householdId, type };
+  const hh = req.user.householdId;
+  const where = { householdId: hh };
   const range = dateRange(req.query.from, req.query.to);
   if (range) where.date = range;
+  let acc = null;
   if (req.query.accountId) {
-    const acc = await prisma.bankAccount.findFirst({ where: { id: String(req.query.accountId), householdId: req.user.householdId }, select: { id: true, isDefault: true } });
+    acc = await prisma.bankAccount.findFirst({ where: { id: String(req.query.accountId), householdId: hh }, select: { id: true, isDefault: true } });
     if (!acc) return res.status(400).json({ error: "Conto non trovato" });
     if (acc.isDefault) where.OR = [{ accountId: acc.id }, { accountId: null }];
     else where.accountId = acc.id;
   }
-  const rows = await prisma.transaction.findMany({ where, select: { amount: true, category: true, merchant: true, what: true, description: true, date: true, recurringRuleId: true } });
+  const rows = await prisma.transaction.findMany({ where, select: { amount: true, type: true, category: true, merchant: true, what: true, date: true, recurringRuleId: true } });
+
+  // Ricorrenze non ancora registrate nel periodo (da domani in poi).
+  const today = todayRomeUTC();
+  const from = new Date(Math.max(today.getTime() + 24 * 60 * 60 * 1000, range?.gte ? new Date(range.gte).getTime() : 0));
+  const to = range?.lte ? new Date(range.lte) : null;
+  const planned = [];
+  if (to && from <= to) {
+    const rules = await prisma.recurringRule.findMany({ where: { householdId: hh, active: true } });
+    for (const r of rules) {
+      const mine = !acc || r.accountId === acc.id || (acc.isDefault && !r.accountId);
+      if (!mine) continue;
+      const start = r.nextRunAt && r.nextRunAt > from ? r.nextRunAt : from;
+      if (start > to) continue;
+      for (const date of occurrencesBetween(r, start, to)) {
+        planned.push({ date, type: r.type, amount: r.amount, category: r.category, description: r.description || r.category, merchant: r.description || r.category, what: null, recurringRuleId: r.id, planned: true });
+      }
+    }
+  }
+  const all = [...rows.map((r) => ({ ...r, planned: false })), ...planned];
+  const sum = (list) => Number(list.reduce((s, r) => s + r.amount, 0).toFixed(2));
+  const side = (type) => {
+    const list = all.filter((r) => r.type === type);
+    const act = list.filter((r) => !r.planned);
+    const pl = list.filter((r) => r.planned);
+    return { actual: sum(act), planned: sum(pl), total: sum(list), count: list.length, fixed: sum(list.filter((r) => r.recurringRuleId)), variable: sum(list.filter((r) => !r.recurringRuleId)) };
+  };
+  const expense = side("EXPENSE");
+  const income = side("INCOME");
+  const exp = all.filter((r) => r.type === "EXPENSE");
   const agg = (keyFn) => {
     const m = new Map();
-    for (const r of rows) {
+    for (const r of exp) {
       const k = keyFn(r);
       if (!k) continue;
       const kk = String(k).toLowerCase();
-      const e = m.get(kk) || { key: k, total: 0, count: 0, cats: {} };
-      e.total += r.amount; e.count += 1; e.cats[r.category] = (e.cats[r.category] || 0) + 1;
+      const e = m.get(kk) || { key: k, total: 0, planned: 0, count: 0, cats: {} };
+      e.total += r.amount; e.count += 1; if (r.planned) e.planned += r.amount; e.cats[r.category] = (e.cats[r.category] || 0) + 1;
       m.set(kk, e);
     }
-    return [...m.values()].sort((a, b) => b.total - a.total).map((e) => ({ ...e, total: Number(e.total.toFixed(2)), category: Object.entries(e.cats).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null, cats: undefined }));
+    return [...m.values()].sort((a, b) => b.total - a.total).map((e) => ({ key: e.key, total: Number(e.total.toFixed(2)), planned: Number(e.planned.toFixed(2)), count: e.count, category: Object.entries(e.cats).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null }));
   };
-  const total = Number(rows.reduce((s, r) => s + r.amount, 0).toFixed(2));
-  const byCategory = agg((r) => r.category).map((e) => ({ category: e.key, total: e.total, count: e.count }));
-  const byMerchant = agg((r) => r.merchant).map((e) => ({ merchant: e.key, total: e.total, count: e.count, category: e.category }));
-  const byWhat = agg((r) => r.what).map((e) => ({ what: e.key, total: e.total, count: e.count, category: e.category }));
-  const noMerchant = rows.filter((r) => !r.merchant);
-  const fixed = rows.filter((r) => r.recurringRuleId).reduce((s, r) => s + r.amount, 0);
+  const byCategory = agg((r) => r.category).map((e) => ({ category: e.key, total: e.total, planned: e.planned, count: e.count }));
+  const byMerchant = agg((r) => r.merchant).map((e) => ({ merchant: e.key, total: e.total, planned: e.planned, count: e.count, category: e.category }));
+  const byWhat = agg((r) => r.what).map((e) => ({ what: e.key, total: e.total, planned: e.planned, count: e.count, category: e.category }));
+  const noMerchant = exp.filter((r) => !r.merchant && !r.planned);
   res.json({
-    type, total, count: rows.length,
-    fixed: Number(fixed.toFixed(2)), variable: Number((total - fixed).toFixed(2)),
+    expense, income, net: Number((income.total - expense.total).toFixed(2)),
+    // compatibilità con la prima versione
+    total: expense.total, count: expense.count, fixed: expense.fixed, variable: expense.variable,
     byCategory, byMerchant, byWhat,
-    withoutMerchant: { total: Number(noMerchant.reduce((s, r) => s + r.amount, 0).toFixed(2)), count: noMerchant.length },
+    planned: planned.sort((a, b) => a.date - b.date).map((p) => ({ date: p.date, type: p.type, amount: p.amount, description: p.description, category: p.category })),
+    withoutMerchant: { total: sum(noMerchant), count: noMerchant.length },
   });
 });
 
