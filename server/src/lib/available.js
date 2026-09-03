@@ -7,7 +7,7 @@
 // Il saldo effettivo parte dal punto zero (Household.openingBalance alla data)
 // oppure, senza punto zero, dalla somma di tutte le transazioni.
 import { prisma } from "./prisma.js";
-import { accruedForPeriodic, monthlyEquivalent, monthsPerOccurrence, occurrencesBetween, todayRomeUTC } from "./recurrence.js";
+import { accrualInfo, accruedForPeriodic, monthlyEquivalent, monthsPerOccurrence, occurrencesBetween, todayRomeUTC } from "./recurrence.js";
 import { computeAccountBalances } from "./accounts.js";
 
 const round2 = (n) => Number((Math.round(n * 100) / 100).toFixed(2));
@@ -93,7 +93,7 @@ export async function computeAvailable({ householdId, userId }) {
   // la rata semestrale pesa un sesto al mese e non tutta nel mese della scadenza.
   const periodicItems = fixedRules
     .filter((r) => (monthsPerOccurrence(r) || 1) > 1 && !r.pendingAt)
-    .map((r) => ({ ruleId: r.id, description: r.description || r.category, amount: r.amount, monthlyEquivalent: monthlyEquivalent(r), accrued: accruedForPeriodic(r, today), nextRunAt: r.nextRunAt }))
+    .map((r) => { const a = accrualInfo(r, today); return { ruleId: r.id, description: r.description || r.category, amount: r.amount, monthlyEquivalent: a.monthlyQuota, accrued: a.accrued, catchUp: a.catchUp, nextRunAt: r.nextRunAt }; })
     .filter((i) => i.accrued > 0);
   const periodicAccrued = round2(periodicItems.reduce((s, i) => s + i.accrued, 0));
 

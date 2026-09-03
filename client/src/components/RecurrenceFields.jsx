@@ -27,6 +27,7 @@ export const emptyRecurrence = {
   weekday: "",
   endDate: "",
   autoPost: true,
+  accrualStart: "", // periodiche: "" = quote passate già da parte, data = parto da quel giorno
 };
 
 const MONTH_NAMES = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
@@ -112,7 +113,8 @@ export default function RecurrenceFields({ value, onChange, startDate, amount, o
       {step > 1 && dates.length > 0 && (
         <p className="text-[13px] text-ink-600 bg-brand-50 rounded-lg p-2">
           Scadenze: <span className="font-medium">{dates.map((d) => d.format("D MMM YYYY")).join(" · ")}</span>, poi ogni {step} mesi.
-          {monthly != null && <> Nel Disponibile pesa <span className="font-medium nums">{monthly.toLocaleString("it-IT", { style: "currency", currency: "EUR" })}</span> al mese: la quota si accumula fino alla scadenza.</>}
+          {monthly != null && !value.accrualStart && <> Nel Disponibile pesa <span className="font-medium nums">{monthly.toLocaleString("it-IT", { style: "currency", currency: "EUR" })}</span> al mese: la quota si accumula fino alla scadenza.</>}
+          {monthly != null && value.accrualStart && dates[0] && (() => { const n = Math.max(1, dates[0].diff(dayjs(value.accrualStart).startOf("month"), "month") + 1); return <> Da oggi alla prima scadenza restano {n} mesi: nel Disponibile pesa <span className="font-medium nums">{(Number(amount) / n).toLocaleString("it-IT", { style: "currency", currency: "EUR" })}</span> al mese, poi {monthly.toLocaleString("it-IT", { style: "currency", currency: "EUR" })}.</>; })()}
           {" "}Per cambiare le date scegli il mese della prima scadenza e il giorno.
         </p>
       )}
@@ -125,6 +127,26 @@ export default function RecurrenceFields({ value, onChange, startDate, amount, o
             onChange={(e) => set("endDate", e.target.value)}
             className="w-full px-2 py-2 border border-card-line rounded"
           />
+        </div>
+      )}
+
+      {step > 1 && (
+        <div>
+          <label className="block text-xs text-ink-600 mb-1">Accantonamento</label>
+          <Segmented
+            size="sm"
+            value={value.accrualStart ? "today" : "ongoing"}
+            onChange={(v) => set("accrualStart", v === "today" ? dayjs().format("YYYY-MM-DD") : "")}
+            options={[
+              { value: "ongoing", label: "Già in corso" },
+              { value: "today", label: "Parto da oggi" },
+            ]}
+          />
+          <p className="text-[11px] text-ink-400 mt-1">
+            {value.accrualStart
+              ? "Non hai ancora messo da parte nulla: l'importo si divide per i mesi che restano alla prima scadenza."
+              : "Le quote dei mesi passati sono già da parte: si accantona un mese alla volta dall'ultima scadenza."}
+          </p>
         </div>
       )}
 
@@ -157,5 +179,6 @@ export function recurrenceToPayload(v) {
     weekday: v.frequency !== "WEEKLY" || v.weekday === "" ? null : Number(v.weekday),
     endDate: v.endDate ? new Date(v.endDate).toISOString() : null,
     autoPost: Boolean(v.autoPost),
+    accrualStart: v.accrualStart ? new Date(v.accrualStart).toISOString() : null,
   };
 }

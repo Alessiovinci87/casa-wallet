@@ -119,13 +119,35 @@ export function occurrencesBetween(rule, from, to) {
  * mai meno di una quota mensile. Mensili e settimanali → 0 (le gestisce "entro fine mese").
  */
 export function accruedForPeriodic(rule, today = todayRomeUTC()) {
+  return accrualInfo(rule, today).accrued;
+}
+
+const monthDiff = (a, b) => (b.getUTCFullYear() - a.getUTCFullYear()) * 12 + (b.getUTCMonth() - a.getUTCMonth());
+
+/**
+ * { accrued, monthlyQuota, monthsTotal, catchUp }. Con `accrualStart` (l'utente
+ * ha detto "parto da oggi") e la prossima scadenza è la prima dopo quella data,
+ * l'importo si divide per i mesi da accrualStart alla scadenza (inclusi) e
+ * matura un mese alla volta; altrimenti quota = amount / P (vedi sopra).
+ */
+export function accrualInfo(rule, today = todayRomeUTC()) {
   const P = monthsPerOccurrence(rule);
-  if (!P || P <= 1 || !rule.active) return 0;
+  const amount = Number(rule.amount) || 0;
+  const none = { accrued: 0, monthlyQuota: P && P > 1 ? Number((amount / P).toFixed(2)) : 0, monthsTotal: P, catchUp: false };
+  if (!P || P <= 1 || !rule.active) return none;
   const next = rule.nextRunAt ? utcDay(rule.nextRunAt) : firstOccurrenceOnOrAfter(rule, today);
-  if (!next) return 0;
-  const monthsToNext = Math.max(0, (next.getUTCFullYear() - today.getUTCFullYear()) * 12 + (next.getUTCMonth() - today.getUTCMonth()));
+  if (!next) return none;
+  const monthsToNext = Math.max(0, monthDiff(today, next));
+  if (rule.accrualStart) {
+    const start = utcDay(rule.accrualStart);
+    const total = monthDiff(start, next) + 1; // mesi da start alla scadenza, inclusi
+    if (total >= 1 && total <= P && start <= next) {
+      const elapsed = Math.max(1, Math.min(total, monthDiff(start, today) + 1));
+      return { accrued: Number(((amount * elapsed) / total).toFixed(2)), monthlyQuota: Number((amount / total).toFixed(2)), monthsTotal: total, catchUp: true };
+    }
+  }
   const share = Math.max(1, Math.min(P, P - monthsToNext));
-  return Number(((Number(rule.amount) * share) / P).toFixed(2));
+  return { accrued: Number(((amount * share) / P).toFixed(2)), monthlyQuota: Number((amount / P).toFixed(2)), monthsTotal: P, catchUp: false };
 }
 
 /** Occorrenze da domani al 31/12 (residuo dell'anno). */
@@ -153,6 +175,7 @@ export function enrichRule(rule) {
     monthlyEquivalent: monthlyEquivalent(rule),
     monthsPerOccurrence: P,
     accrued: accruedForPeriodic(rule, today),
+    accrual: accrualInfo(rule, today),
     remainingThisYear: remainingThisYear(rule, today),
     nextDates,
   };

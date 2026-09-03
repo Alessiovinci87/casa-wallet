@@ -60,6 +60,14 @@ function parseBody(body, { partial = false } = {}) {
   }
   if (b.description !== undefined) data.description = b.description ? String(b.description).trim() : null;
   if (b.accountId !== undefined) data.accountId = b.accountId ? String(b.accountId) : null; // validato dopo (famiglia)
+  if (b.accrualStart !== undefined) {
+    if (!b.accrualStart) data.accrualStart = null;
+    else {
+      const d = new Date(b.accrualStart);
+      if (Number.isNaN(d.getTime())) return { error: "accrualStart non valida" };
+      data.accrualStart = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+    }
+  }
   if (b.frequency !== undefined) {
     if (!FREQUENCIES.has(b.frequency)) return { error: "frequency non valida" };
     data.frequency = b.frequency;

@@ -56,6 +56,7 @@ function RuleForm({ initial, onClose }) {
           weekday: initial.weekday ?? "",
           endDate: initial.endDate ? String(initial.endDate).slice(0, 10) : "",
           autoPost: initial.autoPost,
+          accrualStart: initial.accrualStart ? String(initial.accrualStart).slice(0, 10) : "",
         }
       : emptyRecurrence
   );
@@ -256,7 +257,7 @@ export default function RecurringPage() {
                         ? <>Scadenze {r.nextDates.map((d) => dayjs(d).format("D MMM")).join(" · ")}</>
                         : <>Prossima {dayjs(r.nextRunAt).format("DD/MM/YYYY")}</>
                       : "Nessuna prossima"}
-                    {r.monthsPerOccurrence > 1 && <span className="text-ink-400"> · {eur(r.monthlyEquivalent)}/mese{r.accrued > 0 ? `, maturati ${eur(r.accrued)}` : ""}</span>}
+                    {r.monthsPerOccurrence > 1 && <span className="text-ink-400"> · {eur(r.accrual?.monthlyQuota ?? r.monthlyEquivalent)}/mese{r.accrual?.catchUp ? " fino alla prima scadenza" : ""}{r.accrued > 0 ? `, maturati ${eur(r.accrued)}` : ""}</span>}
                   </div>
                   {r.active && r.remainingThisYear?.count > 0 && (
                     <div className="text-[13px] text-ink-400">

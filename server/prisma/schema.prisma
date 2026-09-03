@@ -319,6 +319,7 @@ model RecurringRule {
   pendingAt    DateTime? // occorrenza in attesa di conferma (solo autoPost=false)
   autoPost     Boolean   @default(true)
   active       Boolean   @default(true)
+  accrualStart DateTime? // periodiche: da quando accantonare (null = quote dei mesi passati già da parte)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   transactions Transaction[]
