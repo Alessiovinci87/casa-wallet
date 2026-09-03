@@ -47,6 +47,7 @@ model BankAccount {
   openingBalance     Float?
   openingBalanceDate DateTime?
   isDefault          Boolean   @default(false)
+  sortOrder          Int       @default(0) // posizione in Home (scelta dall'utente)
   createdAt          DateTime  @default(now())
   transactions       Transaction[]
   recurringRules     RecurringRule[]

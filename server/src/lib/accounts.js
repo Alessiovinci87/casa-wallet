@@ -28,7 +28,7 @@ export function matchAccount(accounts, detectedNumber) {
 
 /** Conti della famiglia; crea il predefinito dal punto zero se non ne esiste nessuno. */
 export async function ensureAccounts(householdId) {
-  let accounts = await prisma.bankAccount.findMany({ where: { householdId }, orderBy: [{ isDefault: "desc" }, { createdAt: "asc" }] });
+  let accounts = await prisma.bankAccount.findMany({ where: { householdId }, orderBy: [{ sortOrder: "asc" }, { isDefault: "desc" }, { createdAt: "asc" }] });
   if (accounts.length === 0) {
     const hh = await prisma.household.findUnique({ where: { id: householdId }, select: { openingBalance: true, openingBalanceDate: true } });
     if (hh?.openingBalance != null) {
@@ -87,7 +87,7 @@ export async function computeAccountBalances(householdId, today = todayRomeUTC()
   }
   const rows = await Promise.all(accounts.map((a) => accountBalance(householdId, a, a.isDefault, today)));
   const out = accounts.map((a, i) => ({
-    id: a.id, name: a.name, number: a.number, isDefault: a.isDefault,
+    id: a.id, name: a.name, number: a.number, isDefault: a.isDefault, sortOrder: a.sortOrder,
     openingBalance: a.openingBalance, openingBalanceDate: a.openingBalanceDate,
     balance: rows[i].balance, income: rows[i].income, expense: rows[i].expense,
   }));

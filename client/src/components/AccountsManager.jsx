@@ -50,7 +50,14 @@ function AccountForm({ initial, onSave, onCancel, saving }) {
 }
 
 export default function AccountsManager({ compact = false }) {
-  const { accounts, balance, loaded, fetchAccounts, createAccount, updateAccount, removeAccount } = useAccountStore();
+  const { accounts, balance, loaded, fetchAccounts, createAccount, updateAccount, removeAccount, reorder } = useAccountStore();
+  const move = async (i, dir) => {
+    const ids = accounts.map((a) => a.id);
+    const j = i + dir;
+    if (j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    try { await reorder(ids); } catch { window.alert("Riordino non riuscito"); }
+  };
   const fetchHousehold = useHouseholdStore((s) => s.fetchHousehold);
   const [editing, setEditing] = useState(null); // null | "new" | account
   const [saving, setSaving] = useState(false);
@@ -84,7 +91,7 @@ export default function AccountsManager({ compact = false }) {
     <div className="space-y-3">
       {!compact && (
         <p className="text-sm text-ink-600">
-          Il saldo effettivo è la somma dei conti. Ogni conto parte dal suo saldo iniziale a una data; con il numero di conto o l'IBAN l'app riconosce da sola a quale conto appartiene un estratto importato.
+          Ogni conto parte dal suo saldo iniziale a una data; con il numero di conto o l'IBAN l'app riconosce da sola a quale conto appartiene un estratto importato. L'ordine qui è l'ordine in Home (↑ su / ↓ giù).
         </p>
       )}
       {error && <div className="text-sm text-rose-600 bg-rose-50 rounded p-2">{error}</div>}
@@ -92,7 +99,7 @@ export default function AccountsManager({ compact = false }) {
         <p className="text-sm text-ink-400">Nessun conto: imposta il saldo iniziale oppure aggiungi un conto.</p>
       )}
       <ul className="divide-y divide-card-line">
-        {accounts.map((a) => (
+        {accounts.map((a, i) => (
           <li key={a.id} className="py-2.5">
             {editing && editing !== "new" && editing.id === a.id ? (
               <AccountForm initial={a} onSave={save} onCancel={() => setEditing(null)} saving={saving} />
@@ -111,6 +118,12 @@ export default function AccountsManager({ compact = false }) {
                     <button type="button" onClick={() => setEditing(a)} className="px-2 text-ink-600 hover:text-brand-600">Modifica</button>
                     {!a.isDefault && <button type="button" onClick={() => makeDefault(a)} className="px-2 text-ink-600 hover:text-brand-600">Rendi predefinito</button>}
                     {accounts.length > 1 && <button type="button" onClick={() => remove(a)} className="px-2 text-ink-600 hover:text-rose-600">Elimina</button>}
+                    {accounts.length > 1 && (
+                      <>
+                        <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="px-2 text-ink-600 hover:text-brand-600 disabled:opacity-30" aria-label="Sposta su">↑ su</button>
+                        <button type="button" onClick={() => move(i, 1)} disabled={i === accounts.length - 1} className="px-2 text-ink-600 hover:text-brand-600 disabled:opacity-30" aria-label="Sposta giù">↓ giù</button>
+                      </>
+                    )}
                   </div>
                 </div>
                 <span className="shrink-0 font-semibold nums">{eur(a.balance)}</span>

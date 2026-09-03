@@ -127,7 +127,7 @@ function RuleForm({ initial, onClose }) {
         </div>
 
         <div className="border-t border-card-line pt-3">
-          <RecurrenceFields value={rec} onChange={setRec} startDate={form.startDate} amount={form.amount} />
+          <RecurrenceFields value={rec} onChange={setRec} startDate={form.startDate} amount={form.amount} onStartDateChange={(d) => set("startDate", d)} />
         </div>
 
         <div className="flex justify-end gap-2 pt-2">

@@ -215,7 +215,40 @@ export default function Dashboard() {
         </button>
       )}
 
-      {/* 1. Disponibile reale */}
+      {/* 1. Con più conti: una card grande per conto, nell'ordine scelto in Impostazioni.
+             Con un solo conto: il Disponibile reale come numero grande. */}
+      {avail?.accounts?.length > 1 ? (
+        <>
+          {avail.accounts.map((a) => {
+            let inc = 0, exp = 0;
+            for (const t of transactions) {
+              const mine = t.accountId === a.id || (a.isDefault && !t.accountId);
+              if (!mine) continue;
+              if (t.type === "INCOME") inc += t.amount; else exp += t.amount;
+            }
+            return (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => navigate(`/movements?tab=expenses&account=${a.id}`)}
+                className={`w-full text-left rounded-2xl p-5 ${a.balance < 0 ? "bg-rose-50 text-rose-700" : "bg-white border border-card-line text-ink-900"}`}
+              >
+                <div className="text-[13px] uppercase tracking-widest text-ink-600">{a.name}</div>
+                <div className="text-4xl sm:text-5xl font-bold tracking-tight mt-1 nums">{eur(a.balance)}</div>
+                <div className="text-[13px] mt-1.5 text-ink-600 flex flex-wrap gap-x-2">
+                  <span className="text-brand-600 nums">+{eur(inc)}</span>
+                  <span className="nums">−{eur(exp)}</span>
+                  <span className="text-ink-400">{MONTH_NAME} · tocca per i movimenti</span>
+                </div>
+              </button>
+            );
+          })}
+          <button type="button" onClick={() => setSheet(true)} className="w-full text-left px-1 py-2 min-h-[44px] flex items-center justify-between gap-3 text-[13px] text-ink-600">
+            <span>Disponibile reale <span className="text-ink-400">(totale meno impegni)</span></span>
+            <span className="shrink-0"><span className={`font-semibold nums ${avail.available < 0 ? "text-rose-600" : "text-ink-900"}`}>{eur(avail.available)}</span> <span className="text-ink-400">›</span></span>
+          </button>
+        </>
+      ) : (
       <button type="button" onClick={() => avail && setSheet(true)} className={`w-full text-left rounded-2xl p-5 ${tone}`}>
         <div className={`text-[13px] uppercase tracking-widest ${muted}`}>Disponibile reale</div>
         <div className="text-4xl sm:text-5xl font-bold tracking-tight mt-1 nums">
@@ -224,9 +257,7 @@ export default function Dashboard() {
         {avail && (
           <div className={`text-[13px] mt-1.5 ${muted}`}>
             {avail.hasOpeningBalance ? (
-              avail.accounts?.length > 1
-                ? <>Saldo effettivo {eur(avail.balance)} · {avail.accounts.map((a) => `${a.name} ${eur(a.balance)}`).join(" · ")}</>
-                : <>Saldo effettivo {eur(avail.balance)} · tocca per il dettaglio</>
+              <>Saldo effettivo {eur(avail.balance)} · tocca per il dettaglio</>
             ) : (
               <span
                 role="link"
@@ -239,36 +270,6 @@ export default function Dashboard() {
           </div>
         )}
       </button>
-
-      {/* 1b. Un riquadro per conto, come nell'home banking: saldo + entrate/uscite del mese */}
-      {avail?.accounts?.length > 1 && (
-        <div className="grid grid-cols-2 gap-3">
-          {avail.accounts.map((a) => {
-            const isDef = a.isDefault;
-            let inc = 0, exp = 0;
-            for (const t of transactions) {
-              const mine = t.accountId === a.id || (isDef && !t.accountId);
-              if (!mine) continue;
-              if (t.type === "INCOME") inc += t.amount; else exp += t.amount;
-            }
-            return (
-              <button
-                key={a.id}
-                type="button"
-                onClick={() => navigate(`/movements?tab=expenses&account=${a.id}`)}
-                className="card p-3.5 text-left hover:border-brand-200 transition"
-              >
-                <div className="text-[13px] text-ink-600 truncate">{a.name}</div>
-                <div className={`text-xl font-bold nums mt-0.5 ${a.balance < 0 ? "text-rose-600" : "text-ink-900"}`}>{eur(a.balance)}</div>
-                <div className="text-[13px] mt-1 flex flex-wrap gap-x-2">
-                  <span className="text-brand-600 nums">+{eur(inc)}</span>
-                  <span className="text-ink-600 nums">−{eur(exp)}</span>
-                </div>
-                <div className="text-[13px] text-ink-400">{MONTH_NAME} · tocca per i movimenti</div>
-              </button>
-            );
-          })}
-        </div>
       )}
 
       {/* 2. Tre card compatte (scroll orizzontale su mobile) */}

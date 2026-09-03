@@ -29,12 +29,24 @@ export const emptyRecurrence = {
   autoPost: true,
 };
 
-export default function RecurrenceFields({ value, onChange, startDate, amount }) {
+const MONTH_NAMES = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
+
+export default function RecurrenceFields({ value, onChange, startDate, amount, onStartDateChange }) {
   const set = (k, v) => onChange({ ...value, [k]: v });
   const weekly = value.frequency === "WEEKLY";
   const step = MONTHS_PER_FREQ[value.frequency] || 1;
   const dates = step > 1 ? previewDates(value, startDate, 2) : [];
   const monthly = step > 1 && Number(amount) > 0 ? Number(amount) / step : null;
+  // Mese della prima scadenza (solo periodiche): sposta la data di inizio al primo
+  // mese scelto non ancora passato, con il giorno indicato.
+  const pickMonth = (m0) => {
+    const today = dayjs();
+    const day = value.dayOfMonth === "" ? dayjs(startDate || today).date() : Number(value.dayOfMonth);
+    let d = today.year(today.year()).month(m0).startOf("month");
+    d = d.date(Math.min(day, d.daysInMonth()));
+    if (d.isBefore(today, "day")) { d = d.add(1, "year").startOf("month"); d = d.date(Math.min(day, d.daysInMonth())); }
+    onStartDateChange?.(d.format("YYYY-MM-DD"));
+  };
 
   return (
     <div className="space-y-3">
@@ -84,11 +96,24 @@ export default function RecurrenceFields({ value, onChange, startDate, amount })
           </div>
         </div>
       )}
+      {step > 1 && onStartDateChange && (
+        <div>
+          <label className="block text-xs text-ink-600 mb-1">Mese della prima scadenza</label>
+          {/* Tendina: 12 mesi sono troppi per i pulsanti; etichette in italiano. */}
+          <select
+            value={startDate ? dayjs(startDate).month() : ""}
+            onChange={(e) => pickMonth(Number(e.target.value))}
+            className="w-full px-2 py-2 border border-card-line rounded min-h-[44px]"
+          >
+            {MONTH_NAMES.map((n, i) => <option key={n} value={i}>{n}</option>)}
+          </select>
+        </div>
+      )}
       {step > 1 && dates.length > 0 && (
         <p className="text-[13px] text-ink-600 bg-brand-50 rounded-lg p-2">
           Scadenze: <span className="font-medium">{dates.map((d) => d.format("D MMM YYYY")).join(" · ")}</span>, poi ogni {step} mesi.
           {monthly != null && <> Nel Disponibile pesa <span className="font-medium nums">{monthly.toLocaleString("it-IT", { style: "currency", currency: "EUR" })}</span> al mese: la quota si accumula fino alla scadenza.</>}
-          {" "}Per cambiare le date modifica la prima data o il giorno.
+          {" "}Per cambiare le date scegli il mese della prima scadenza e il giorno.
         </p>
       )}
       {weekly && (

@@ -42,6 +42,7 @@ function parseBody(body, partial = false) {
     out.openingBalanceDate = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
   }
   if (body.isDefault !== undefined) out.isDefault = Boolean(body.isDefault);
+  if (body.sortOrder !== undefined) out.sortOrder = Number(body.sortOrder) || 0;
   return out;
 }
 
@@ -78,6 +79,17 @@ router.post("/", async (req, res) => {
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
   }
+});
+
+// PUT /api/accounts/reorder { ids: [...] } → posizione in Home = indice nell'array
+router.put("/reorder", async (req, res) => {
+  const hh = req.user.householdId;
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(String) : [];
+  const mine = await prisma.bankAccount.findMany({ where: { householdId: hh }, select: { id: true } });
+  const allowed = new Set(mine.map((a) => a.id));
+  await prisma.$transaction(ids.filter((id) => allowed.has(id)).map((id, i) => prisma.bankAccount.update({ where: { id }, data: { sortOrder: i } })));
+  broadcast(hh, { event: "transaction_update", payload: { action: "account_reordered" } });
+  res.json(await computeAccountBalances(hh));
 });
 
 router.put("/:id", async (req, res) => {

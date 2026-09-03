@@ -32,5 +32,9 @@ export const useAccountStore = create((set, get) => ({
     await api.delete(`/api/accounts/${id}`);
     await get().fetchAccounts();
   },
+  reorder: async (ids) => {
+    const { data } = await api.put("/api/accounts/reorder", { ids });
+    set({ accounts: data.accounts, balance: data.balance });
+  },
   defaultId: () => get().accounts.find((a) => a.isDefault)?.id ?? get().accounts[0]?.id ?? null,
 }));

@@ -316,7 +316,7 @@ export default function TransactionForm({ initial, onClose, onDelete }) {
             </div>
             {repeat && (
               <div className="mt-3">
-                <RecurrenceFields value={recurrence} onChange={setRecurrence} startDate={form.date} amount={form.amount} />
+                <RecurrenceFields value={recurrence} onChange={setRecurrence} startDate={form.date} amount={form.amount} onStartDateChange={(d) => set("date", d)} />
                 {form.type === "INCOME" && form.taxPercent !== "" && (
                   <p className="text-[11px] text-tax-600 mt-2">
                     Le entrate ricorrenti non accantonano tasse in automatico: la % va applicata a mano.
