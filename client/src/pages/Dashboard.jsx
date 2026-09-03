@@ -55,6 +55,12 @@ export default function Dashboard() {
   const [incoming, setIncoming] = useState(null);
   // Banner verifica email: "sent" dopo il reinvio.
   const [resendState, setResendState] = useState("idle");
+  // Disponibile reale (saldo − tasse pending − obiettivi − fisse residue − prestiti).
+  const [avail, setAvail] = useState(null);
+  const [showBreakdown, setShowBreakdown] = useState(false);
+  useEffect(() => {
+    api.get("/api/dashboard/available").then(({ data }) => setAvail(data)).catch(() => setAvail(null));
+  }, [transactions]);
 
   useEffect(() => {
     fetchTransactions({ month: MONTH, year: YEAR });
@@ -144,14 +150,46 @@ export default function Dashboard() {
 
       <NotificationsToggle />
 
-      {/* Hero: saldo disponibile del mese (tasse accantonate escluse) */}
-      <div className="bg-brand-600 text-white rounded-2xl p-6 shadow-sm">
-        <div className="text-[11px] uppercase tracking-widest text-white/70">
-          Disponibile a {MONTH_NAME}
-        </div>
-        <div className="text-4xl sm:text-5xl font-bold tracking-tight mt-1 nums">
-          {eur(saldo)}
-        </div>
+      {/* Hero: Disponibile reale (tap → breakdown). Colore: verde / giallo (< 20% delle fisse) / rosso (< 0) */}
+      <div className={`text-white rounded-2xl p-6 shadow-sm ${
+        avail?.status === "NEGATIVE" ? "bg-rose-600" : avail?.status === "LOW" ? "bg-tax-600" : "bg-brand-600"
+      }`}>
+        <button type="button" onClick={() => setShowBreakdown((v) => !v)} className="text-left w-full">
+          <div className="text-[11px] uppercase tracking-widest text-white/70">
+            Disponibile reale {avail ? "· tocca per il dettaglio" : ""}
+          </div>
+          <div className="text-4xl sm:text-5xl font-bold tracking-tight mt-1 nums">
+            {eur(avail ? avail.available : saldo)}
+          </div>
+          {avail && (
+            <div className="text-sm text-white/75 mt-1 nums">
+              Saldo effettivo {eur(avail.balance)}
+              {!avail.hasOpeningBalance && (
+                <span className="text-white/60"> · imposta il saldo iniziale in Impostazioni</span>
+              )}
+            </div>
+          )}
+        </button>
+        {showBreakdown && avail && (
+          <ul className="mt-3 bg-white/10 rounded-xl p-3 text-sm space-y-1">
+            {avail.breakdown.map((b) => (
+              <li key={b.key} className="flex justify-between gap-3">
+                <span className="text-white/85">{b.label}</span>
+                <span className="font-semibold nums">{b.sign < 0 ? "− " : ""}{eur(b.amount)}</span>
+              </li>
+            ))}
+            <li className="flex justify-between gap-3 border-t border-white/20 pt-1 mt-1">
+              <span>Disponibile reale</span>
+              <span className="font-bold nums">{eur(avail.available)}</span>
+            </li>
+            {avail.committedItems.length > 0 && (
+              <li className="text-xs text-white/70 pt-1">
+                Fisse in arrivo: {avail.committedItems.map((i) => `${i.description} ${dayjs(i.date).format("D/M")}`).join(", ")}
+              </li>
+            )}
+          </ul>
+        )}
+        <div className="text-xs text-white/60 mt-3 uppercase tracking-widest">{MONTH_NAME}</div>
         <div className="flex gap-6 mt-4 text-sm text-white/85">
           <button
             type="button"

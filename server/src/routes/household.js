@@ -35,6 +35,8 @@ router.get("/", async (req, res) => {
     name: household.name,
     inviteCode: household.inviteCode,
     createdAt: household.createdAt,
+    openingBalance: household.openingBalance,
+    openingBalanceDate: household.openingBalanceDate,
     members: household.users,
   });
 });
@@ -51,6 +53,27 @@ router.put("/", async (req, res) => {
     data: { name: name.trim() },
   });
   res.json({ id: household.id, name: household.name });
+});
+
+// PUT /api/household/opening-balance { openingBalance, openingBalanceDate } —
+// "punto zero" del saldo effettivo (qualsiasi membro; null per rimuoverlo).
+router.put("/opening-balance", async (req, res) => {
+  const { openingBalance, openingBalanceDate } = req.body || {};
+  let data;
+  if (openingBalance == null || openingBalance === "") {
+    data = { openingBalance: null, openingBalanceDate: null };
+  } else {
+    const n = Number(openingBalance);
+    if (!Number.isFinite(n)) return res.status(400).json({ error: "openingBalance deve essere un numero" });
+    const d = openingBalanceDate ? new Date(openingBalanceDate) : new Date();
+    if (Number.isNaN(d.getTime())) return res.status(400).json({ error: "openingBalanceDate non valida" });
+    data = {
+      openingBalance: n,
+      openingBalanceDate: new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())),
+    };
+  }
+  const household = await prisma.household.update({ where: { id: req.user.householdId }, data });
+  res.json({ openingBalance: household.openingBalance, openingBalanceDate: household.openingBalanceDate });
 });
 
 // POST /api/household/regenerate-invite — nuovo codice invito (solo OWNER).

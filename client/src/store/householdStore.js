@@ -21,6 +21,12 @@ export const useHouseholdStore = create((set) => ({
     return data;
   },
 
+  setOpeningBalance: async (openingBalance, openingBalanceDate) => {
+    const { data } = await api.put("/api/household/opening-balance", { openingBalance, openingBalanceDate });
+    set((s) => ({ household: s.household ? { ...s.household, ...data } : s.household }));
+    return data;
+  },
+
   regenerateInvite: async () => {
     const { data } = await api.post("/api/household/regenerate-invite");
     set((s) => ({

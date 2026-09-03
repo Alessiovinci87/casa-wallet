@@ -17,6 +17,10 @@ model Household {
   name       String
   inviteCode String   @unique // codice condivisibile per far entrare un nuovo membro
   createdAt  DateTime @default(now())
+  // Punto zero: saldo effettivo = openingBalance + Σ entrate − Σ uscite dalla data.
+  // Null = saldo calcolato da tutte le transazioni (senza punto zero).
+  openingBalance     Float?
+  openingBalanceDate DateTime?
 
   users             User[]
   transactions      Transaction[]
