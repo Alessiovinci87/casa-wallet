@@ -90,7 +90,7 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-2xl mx-auto p-4 space-y-6">
-      <h1 className="text-xl font-bold text-ink-900">Impostazioni</h1>
+      <h1 className="sr-only">Impostazioni</h1>
 
       {error && <div className="text-sm text-rose-600 bg-rose-50 rounded p-2">{error}</div>}
 
@@ -126,7 +126,7 @@ export default function SettingsPage() {
           <h2 className="text-sm font-semibold text-ink-600 uppercase tracking-wide">
             Saldo iniziale (punto zero)
           </h2>
-          <a href="/onboarding" className="text-xs text-brand-600 hover:underline">Apri la procedura guidata</a>
+          <a href="/onboarding" className="text-[13px] text-brand-600 hover:underline inline-flex items-center min-h-[44px]">Apri la procedura guidata</a>
         </div>
         <p className="text-sm text-ink-600 mb-3">
           Il saldo effettivo parte da qui: saldo del conto a una data + entrate − uscite registrate da quel giorno.

@@ -21,7 +21,7 @@ const empty = {
 
 // Modal form to create OR edit a transaction. `initial` pre-fills fields
 // (from OCR, or an existing transaction to edit when it carries an `id`).
-export default function TransactionForm({ initial, onClose }) {
+export default function TransactionForm({ initial, onClose, onDelete }) {
   const addTransaction = useTransactionStore((s) => s.addTransaction);
   const updateTransaction = useTransactionStore((s) => s.updateTransaction);
   const isEdit = Boolean(initial?.id);
@@ -321,7 +321,12 @@ export default function TransactionForm({ initial, onClose }) {
         )}
 
         <div className="flex justify-end gap-2 mt-6">
-          <button type="button" onClick={onClose} className="px-4 py-2 text-ink-600 hover:text-ink-900">
+          {isEdit && onDelete && (
+            <button type="button" onClick={onDelete} className="mr-auto px-3 py-2 min-h-[44px] text-rose-600 hover:bg-rose-50 rounded">
+              Elimina
+            </button>
+          )}
+          <button type="button" onClick={onClose} className="px-4 py-2 min-h-[44px] text-ink-600 hover:text-ink-900">
             Annulla
           </button>
           <button type="submit" className="px-4 py-2 bg-brand-600 text-white rounded hover:bg-brand-700">

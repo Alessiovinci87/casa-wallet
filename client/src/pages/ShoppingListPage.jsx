@@ -63,7 +63,7 @@ export default function ShoppingListPage() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <h1 className="text-2xl font-bold">Lista della spesa</h1>
+      <h1 className="sr-only">Lista della spesa</h1>
       {loading && <p className="text-sm text-ink-400">Caricamento…</p>}
 
       {/* Da ricomprare */}

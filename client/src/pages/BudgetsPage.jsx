@@ -86,7 +86,7 @@ export default function BudgetsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Budget per categoria</h1>
+      <h1 className="sr-only">Budget per categoria</h1>
       <p className="text-sm text-ink-600">
         Imposta un tetto di spesa mensile per categoria. La barra mostra la spesa del mese corrente.
       </p>

@@ -24,8 +24,8 @@ export default function ForecastChart({ daily, threshold }) {
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke="#E4E9E6" />
-        <XAxis dataKey="day" tick={{ fontSize: 11, fill: "#8B9691" }} stroke="#E4E9E6" interval={Math.max(0, Math.floor(data.length / 8))} />
-        <YAxis tick={{ fontSize: 11, fill: "#8B9691" }} stroke="#E4E9E6" width={56} domain={[min, "auto"]} />
+        <XAxis dataKey="day" tick={{ fontSize: 13, fill: "#8B9691" }} stroke="#E4E9E6" interval={Math.max(0, Math.floor(data.length / 8))} />
+        <YAxis tick={{ fontSize: 13, fill: "#8B9691" }} stroke="#E4E9E6" width={64} domain={[min, "auto"]} tickFormatter={(v) => new Intl.NumberFormat("it-IT", { maximumFractionDigits: 0 }).format(v)} />
         <Tooltip formatter={(v) => [eur(v), "Saldo proiettato"]} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
         <ReferenceLine y={0} stroke="#E11D48" strokeDasharray="4 4" />
         {threshold > 0 && <ReferenceLine y={threshold} stroke="#B3701A" strokeDasharray="2 4" />}

@@ -35,7 +35,7 @@ export default function SummaryPage() {
 
   return (
     <div className="space-y-4 max-w-md mx-auto">
-      <h1 className="text-2xl font-bold">Riepilogo rapido</h1>
+      <h1 className="sr-only">Riepilogo rapido</h1>
 
       {/* Saldo mese */}
       <Link to="/" className="block card p-5 text-center">

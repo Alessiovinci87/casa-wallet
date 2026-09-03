@@ -77,7 +77,8 @@ export function enrichGoal(goal, today = new Date()) {
   const recent = contributions
     .filter((c) => c.amount > 0 && new Date(c.date) >= since)
     .reduce((s, c) => s + c.amount, 0);
-  const paceMonthly = round2(recent / 3);
+  const monthsObserved = Math.min(3, Math.max(1, (today.getTime() - new Date(goal.startDate || goal.createdAt).getTime()) / MS_PER_MONTH));
+  const paceMonthly = round2(recent / monthsObserved);
   let projectedDate = null;
   if (remaining === 0) projectedDate = today;
   else if (paceMonthly > 0) {

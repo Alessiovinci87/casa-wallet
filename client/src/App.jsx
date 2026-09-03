@@ -12,18 +12,18 @@ import Dashboard from "./pages/Dashboard.jsx";
 const SettingsPage = lazy(() => import("./pages/SettingsPage.jsx"));
 const TreasuryPage = lazy(() => import("./pages/TreasuryPage.jsx"));
 const InvoicesPage = lazy(() => import("./pages/InvoicesPage.jsx"));
-const TransactionsPage = lazy(() => import("./pages/TransactionsPage.jsx"));
 const TaxSavingsPage = lazy(() => import("./pages/TaxSavingsPage.jsx"));
 const OcrPage = lazy(() => import("./pages/OcrPage.jsx"));
 const AnalyticsPage = lazy(() => import("./pages/AnalyticsPage.jsx"));
 const ShoppingListPage = lazy(() => import("./pages/ShoppingListPage.jsx"));
 const BudgetsPage = lazy(() => import("./pages/BudgetsPage.jsx"));
 const SummaryPage = lazy(() => import("./pages/SummaryPage.jsx"));
-const RecurringPage = lazy(() => import("./pages/RecurringPage.jsx"));
 const GoalsPage = lazy(() => import("./pages/GoalsPage.jsx"));
 const ForecastPage = lazy(() => import("./pages/ForecastPage.jsx"));
 const ImportPage = lazy(() => import("./pages/ImportPage.jsx"));
 const OnboardingPage = lazy(() => import("./pages/OnboardingPage.jsx"));
+const MovementsPage = lazy(() => import("./pages/MovementsPage.jsx"));
+const MorePage = lazy(() => import("./pages/MorePage.jsx"));
 
 const Spinner = () => (
   <div className="min-h-[40vh] flex items-center justify-center">
@@ -64,9 +64,11 @@ function App() {
             }
           >
             <Route path="/" element={<Dashboard />} />
-            <Route path="/expenses" element={<TransactionsPage type="EXPENSE" />} />
-            <Route path="/income" element={<TransactionsPage type="INCOME" />} />
-            <Route path="/transactions" element={<Navigate to="/expenses" replace />} />
+            <Route path="/movements" element={<MovementsPage />} />
+            <Route path="/expenses" element={<Navigate to="/movements?tab=expenses" replace />} />
+            <Route path="/income" element={<Navigate to="/movements?tab=income" replace />} />
+            <Route path="/transactions" element={<Navigate to="/movements?tab=expenses" replace />} />
+            <Route path="/more" element={<MorePage />} />
             <Route path="/tax-savings" element={<TaxSavingsPage />} />
             <Route path="/treasury" element={<TreasuryPage />} />
             <Route path="/invoices" element={<InvoicesPage />} />
@@ -75,7 +77,7 @@ function App() {
             <Route path="/shopping-list" element={<ShoppingListPage />} />
             <Route path="/budgets" element={<BudgetsPage />} />
             <Route path="/summary" element={<SummaryPage />} />
-            <Route path="/recurring" element={<RecurringPage />} />
+            <Route path="/recurring" element={<Navigate to="/movements?tab=recurring" replace />} />
             <Route path="/goals" element={<GoalsPage />} />
             <Route path="/forecast" element={<ForecastPage />} />
             <Route path="/import" element={<ImportPage />} />

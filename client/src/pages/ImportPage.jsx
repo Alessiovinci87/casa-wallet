@@ -145,7 +145,7 @@ export default function ImportPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Importa estratto conto</h1>
+      <h1 className="sr-only">Importa estratto conto</h1>
       <p className="text-sm text-ink-600">
         Esporta il CSV dalla tua banca e caricalo qui. Mappi le colonne una volta sola, l'app riconosce i doppioni e propone le categorie.
       </p>

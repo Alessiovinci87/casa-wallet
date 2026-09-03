@@ -156,7 +156,7 @@ export default function OcrPage() {
 
   return (
     <div className="space-y-4 max-w-2xl">
-      <h1 className="text-2xl font-bold">Nuova spesa da scontrino</h1>
+      <h1 className="sr-only">Nuova spesa da scontrino</h1>
       {error && <div className="text-sm text-rose-600 bg-rose-50 rounded p-2">{error}</div>}
 
       {phase === "capture" && (

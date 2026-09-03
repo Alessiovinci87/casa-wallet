@@ -165,8 +165,8 @@ export default function RecurringPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">Ricorrenze</h1>
-        <button onClick={() => { setEditing(null); setShowForm(true); }} className="px-4 py-2 bg-brand-600 text-white rounded hover:bg-brand-700">
+        <h1 className="sr-only">Ricorrenze</h1>
+        <button onClick={() => { setEditing(null); setShowForm(true); }} className="ml-auto px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700">
           + Nuova ricorrenza
         </button>
       </div>
@@ -220,31 +220,30 @@ export default function RecurringPage() {
           <p className="p-4 text-sm text-ink-400">Nessuna ricorrenza. Crea la prima: rata, affitto, abbonamento, stipendio…</p>
         ) : (
           visible.map((r) => (
-            <div key={r.id} className={`p-3 flex items-center justify-between gap-3 ${r.active ? "" : "opacity-50"}`}>
-              <div className="text-sm min-w-0">
-                <div className="font-medium truncate">
-                  {r.description || r.category}
-                  {!r.active && <span className="ml-2 text-xs text-ink-400">(sospesa)</span>}
-                  {!r.autoPost && <span className="ml-2 text-[10px] uppercase tracking-wide text-tax-600">conferma</span>}
+            <div key={r.id} className={`p-3 ${r.active ? "" : "opacity-60"}`}>
+              <button type="button" onClick={() => { setEditing(r); setShowForm(true); }} className="w-full text-left flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-medium truncate">
+                    {r.description || r.category}
+                    {!r.active && <span className="ml-2 text-[13px] text-ink-400">(sospesa)</span>}
+                    {!r.autoPost && <span className="ml-2 text-[13px] text-tax-600">con conferma</span>}
+                  </div>
+                  <div className="text-[13px] text-ink-400">
+                    {r.category} · {scheduleLabel(r)}{r.endDate ? ` · fino al ${dayjs(r.endDate).format("DD/MM/YYYY")}` : ""}
+                  </div>
+                  <div className="text-[13px] text-ink-600">
+                    {r.active && r.nextRunAt ? <>Prossima {dayjs(r.nextRunAt).format("DD/MM/YYYY")}</> : "Nessuna prossima"}
+                    {r.monthsPerOccurrence > 1 && <span className="text-ink-400"> · ≈ {eur(r.monthlyEquivalent)}/mese</span>}
+                  </div>
                 </div>
-                <div className="text-xs text-ink-400">
-                  {r.category} · {scheduleLabel(r)}
-                  {r.endDate ? ` · fino al ${dayjs(r.endDate).format("DD/MM/YYYY")}` : ""}
-                </div>
-                <div className="text-xs text-ink-600 mt-0.5">
-                  {r.active && r.nextRunAt ? <>Prossima: <span className="font-medium">{dayjs(r.nextRunAt).format("DD/MM/YYYY")}</span></> : "Nessuna prossima"}
-                  {r.monthsPerOccurrence > 1 && <span className="ml-2 text-ink-400">≈ {eur(r.monthlyEquivalent)}/mese</span>}
-                </div>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <span className={`font-semibold nums ${r.type === "INCOME" ? "text-brand-600" : "text-ink-900"}`}>
+                <span className={`shrink-0 font-semibold nums ${r.type === "INCOME" ? "text-brand-600" : "text-ink-900"}`}>
                   {r.type === "INCOME" ? "+" : "−"}{eur(r.amount)}
                 </span>
-                <button onClick={() => toggleActive(r)} className="text-ink-400 hover:text-brand-600 text-xs" title={r.active ? "Sospendi" : "Riattiva"}>
-                  {r.active ? "⏸" : "▶"}
-                </button>
-                <button onClick={() => { setEditing(r); setShowForm(true); }} className="text-ink-400 hover:text-brand-600" title="Modifica">✎</button>
-                <button onClick={() => remove(r)} className="text-ink-400 hover:text-rose-600" title="Elimina">✕</button>
+              </button>
+              <div className="flex gap-1 -ml-2 mt-1 text-[13px]">
+                <button onClick={() => toggleActive(r)} className="px-2 text-ink-600 hover:text-brand-600">{r.active ? "Sospendi" : "Riattiva"}</button>
+                <button onClick={() => { setEditing(r); setShowForm(true); }} className="px-2 text-ink-600 hover:text-brand-600">Modifica</button>
+                <button onClick={() => remove(r)} className="px-2 text-ink-600 hover:text-rose-600">Elimina</button>
               </div>
             </div>
           ))

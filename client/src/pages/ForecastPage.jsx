@@ -30,14 +30,20 @@ export default function ForecastPage() {
       .catch((err) => setError(err.response?.data?.error || "Previsione non disponibile"));
   }, [days]);
 
-  const eventsByDay = data
-    ? data.daily.filter((d) => d.events && d.events.length)
-    : [];
+  const eventsByDay = data ? data.daily.filter((d) => d.events && d.events.length) : [];
+  // Timeline per settimana, con il minimo della settimana in testa.
+  const weeks = [];
+  for (const d of eventsByDay) {
+    const start = dayjs(d.date).startOf("week");
+    const k = start.format("YYYY-MM-DD");
+    if (!weeks.length || weeks[weeks.length - 1].k !== k) weeks.push({ k, start, days: [] });
+    weeks[weeks.length - 1].days.push(d);
+  }
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">Prossimi {days} giorni</h1>
+        <h1 className="sr-only">Prossimi {days} giorni</h1>
         <Segmented
           size="sm"
           value={days}
@@ -92,12 +98,18 @@ export default function ForecastPage() {
             ))}
           </div>
 
-          {/* Timeline eventi */}
-          <div className="card divide-y divide-card-line">
+          {/* Timeline eventi, per settimana */}
+          <div className="space-y-3">
             {eventsByDay.length === 0 ? (
-              <p className="p-4 text-sm text-ink-400">Nessun evento previsto. Aggiungi ricorrenze e scadenze per una previsione utile.</p>
+              <p className="card p-4 text-sm text-ink-400">Nessun evento previsto. Aggiungi ricorrenze e scadenze per una previsione utile.</p>
             ) : (
-              eventsByDay.map((d) => (
+              weeks.map((w) => (
+              <div key={w.k} className="card divide-y divide-card-line">
+                <div className="px-3 py-2 text-[13px] font-semibold text-ink-600 flex justify-between">
+                  <span>Settimana {w.start.format("D MMM")} – {w.start.add(6, "day").format("D MMM")}</span>
+                  <span className={`nums ${Math.min(...w.days.map((d) => d.balance)) < 0 ? "text-rose-600" : ""}`}>min {eur(Math.min(...w.days.map((d) => d.balance)))}</span>
+                </div>
+              {w.days.map((d) => (
                 <div key={d.date} className={`p-3 ${d.flag === "NEGATIVE" ? "bg-rose-50/60" : d.flag === "LOW" ? "bg-tax-50/40" : ""}`}>
                   <div className="flex items-center justify-between text-xs mb-1">
                     <span className="font-semibold text-ink-900">{dayjs(d.date).format("ddd D MMMM")}</span>
@@ -112,7 +124,7 @@ export default function ForecastPage() {
                           <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full ${KIND[e.kind]?.cls}`}>{KIND[e.kind]?.label}</span>
                           <span className="truncate">{e.label}{e.estimated ? " (stima)" : ""}</span>
                         </div>
-                        <span className={`shrink-0 nums font-medium ${e.amount < 0 ? "text-ink-900" : "text-brand-600"}`}>
+                        <span className={`shrink-0 nums font-medium ${d.flag === "NEGATIVE" && e.amount < 0 ? "text-rose-600" : e.amount < 0 ? "text-ink-900" : "text-brand-600"}`}>
                           {e.amount > 0 ? "+" : e.amount < 0 ? "−" : ""}{eur(Math.abs(e.amount))}
                           {e.kind === "deadline" && e.coveredByFund > 0 && (
                             <span className="text-[10px] text-ink-400 ml-1">({eur(e.coveredByFund)} dal fondo)</span>
@@ -122,12 +134,14 @@ export default function ForecastPage() {
                     ))}
                   </ul>
                 </div>
+              ))}
+              </div>
               ))
             )}
           </div>
 
           <div className="flex flex-wrap gap-2 text-xs">
-            <button onClick={() => navigate("/recurring")} className="px-3 py-1.5 border border-card-line rounded-lg text-ink-600">Ricorrenze</button>
+            <button onClick={() => navigate("/movements?tab=recurring")} className="px-3 py-1.5 border border-card-line rounded-lg text-ink-600">Ricorrenze</button>
             <button onClick={() => navigate("/treasury")} className="px-3 py-1.5 border border-card-line rounded-lg text-ink-600">Scadenze</button>
             <button onClick={() => navigate("/goals")} className="px-3 py-1.5 border border-card-line rounded-lg text-ink-600">Obiettivi</button>
           </div>

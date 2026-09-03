@@ -13,9 +13,12 @@ const round2 = (n) => Number((Math.round(n * 100) / 100).toFixed(2));
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /** Saldo effettivo: opening + Σ INCOME − Σ EXPENSE dalla data di apertura. */
-export async function computeBalance(household) {
-  const where = { householdId: household.id };
-  if (household.openingBalanceDate) where.date = { gte: household.openingBalanceDate };
+export async function computeBalance(household, today = todayRomeUTC()) {
+  // Fino a oggi incluso: una transazione datata nel futuro (es. rata già registrata)
+  // non è ancora uscita dal conto e vive nella previsione, non nel saldo.
+  const endOfToday = new Date(today.getTime() + MS_PER_DAY - 1);
+  const where = { householdId: household.id, date: { lte: endOfToday } };
+  if (household.openingBalanceDate) where.date.gte = household.openingBalanceDate;
   const [inc, exp] = await Promise.all([
     prisma.transaction.aggregate({ where: { ...where, type: "INCOME" }, _sum: { amount: true } }),
     prisma.transaction.aggregate({ where: { ...where, type: "EXPENSE" }, _sum: { amount: true } }),
@@ -52,7 +55,7 @@ export async function computeAvailable({ householdId, userId }) {
   if (!household) throw new Error("Famiglia non trovata");
 
   const [bal, taxAgg, goals, committed, fixedRules, loansAgg] = await Promise.all([
-    computeBalance(household),
+    computeBalance(household, today),
     prisma.taxSaving.aggregate({
       where: { transferred: false, transaction: { householdId } },
       _sum: { amount: true },

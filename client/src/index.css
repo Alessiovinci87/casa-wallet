@@ -31,7 +31,14 @@ body {
   background-color: var(--color-paper);
   color: var(--color-ink-900);
   -webkit-font-smoothing: antialiased;
+  /* Regole di stile A4: cifre tabulari ovunque, mai sotto 13px */
+  font-variant-numeric: tabular-nums;
 }
+.text-xs, .text-\[11px\], .text-\[10px\] { font-size: 13px; line-height: 1.25rem; }
+button, [role="button"] { touch-action: manipulation; }
+/* Tap target ≥ 44px per ogni bottone dell'app (icone comprese) */
+main button, header button, nav a { min-height: 44px; }
+main button:not(.w-full):not([class*="w-1"]):not([class*="flex-1"]) { min-width: 44px; }
 
 /* Importi e cifre: sempre tabulari (innesto dalla direzione "Registro") */
 .nums {

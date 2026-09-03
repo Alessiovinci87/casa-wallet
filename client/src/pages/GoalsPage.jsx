@@ -6,6 +6,8 @@ import { useTransactionStore } from "../store/transactionStore.js";
 import { eur } from "../lib/format.js";
 import Segmented from "../components/Segmented.jsx";
 import AllocateModal from "../components/AllocateModal.jsx";
+import { useTaxStore } from "../store/taxStore.js";
+import { useNavigate } from "react-router-dom";
 
 // Obiettivi: card con barra progresso, quota mensile, stato colorato,
 // versa/preleva, "Distribuisci". Wizard nuovo obiettivo: nome → importo → data
@@ -257,8 +259,13 @@ export default function GoalsPage() {
   const [wizard, setWizard] = useState(false);
   const [editing, setEditing] = useState(null);
   const [allocateAmount, setAllocateAmount] = useState(null);
+  const navigate = useNavigate();
+  // Tasse: salvadanaio personale, vive qui come voce (dettaglio e trasferimenti in /tax-savings).
+  const taxSummary = useTaxStore((s) => s.summary);
+  const fetchTaxSummary = useTaxStore((s) => s.fetchSummary);
+  const monthName = new Intl.DateTimeFormat("it-IT", { month: "long" }).format(new Date());
 
-  useEffect(() => { fetchGoals(); }, [fetchGoals]);
+  useEffect(() => { fetchGoals(); fetchTaxSummary().catch(() => {}); }, [fetchGoals, fetchTaxSummary]);
 
   const deposit = async (g) => {
     const raw = window.prompt(`Quanto versi su "${g.name}"?`, g.monthRemaining > 0 ? String(g.monthRemaining) : "");
@@ -293,7 +300,7 @@ export default function GoalsPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">Obiettivi</h1>
+        <h1 className="sr-only">Obiettivi</h1>
         <div className="flex w-full sm:w-auto gap-2">
           <button onClick={distribute} disabled={goals.length === 0} className="flex-1 sm:flex-none px-4 py-2 border border-card-line text-ink-600 rounded hover:bg-paper disabled:opacity-40">
             Distribuisci
@@ -305,15 +312,26 @@ export default function GoalsPage() {
       </div>
 
       {summary && summary.count > 0 && (
-        <div className="bg-brand-600 text-white rounded-2xl p-5">
-          <div className="text-[11px] uppercase tracking-widest text-white/70">Parcheggiati negli obiettivi</div>
-          <div className="text-3xl font-bold tracking-tight mt-1 nums">{eur(summary.parked)}</div>
-          <div className="mt-2 text-sm text-white/85">
-            Quota del mese <span className="font-semibold nums">{eur(summary.monthQuota)}</span> · versati <span className="font-semibold nums">{eur(summary.monthContributed)}</span>
-            {summary.behind > 0 && <span className="ml-2 text-rose-200">· {summary.behind} in ritardo</span>}
+        <div className="card p-4">
+          <div className="text-[13px] text-ink-600">Parcheggiati totali</div>
+          <div className="text-3xl font-bold tracking-tight nums">{eur(summary.parked)}</div>
+          <div className="mt-1 text-[13px] text-ink-600">
+            Quota di <span className="capitalize">{monthName}</span> <span className="font-semibold nums">{eur(summary.monthQuota)}</span> · versati{" "}
+            <span className={`font-semibold nums ${summary.monthContributed > summary.monthQuota ? "text-emerald-700" : summary.behind ? "text-rose-600" : "text-brand-600"}`}>{eur(summary.monthContributed)}</span>
+            {summary.monthContributed > summary.monthQuota && <span className="text-emerald-700"> · in anticipo</span>}
+            {summary.behind > 0 && <span className="text-rose-600"> · {summary.behind} in ritardo</span>}
           </div>
         </div>
       )}
+
+      {/* Tasse: salvadanaio personale */}
+      <button type="button" onClick={() => navigate("/tax-savings")} className="card w-full p-4 text-left flex items-center justify-between gap-3 min-h-[64px] hover:border-brand-200">
+        <div>
+          <div className="font-semibold">Tasse <span className="text-[13px] font-normal text-ink-400">· personale</span></div>
+          <div className="text-[13px] text-ink-400">Accantonate, non ancora trasferite · scadenze e simulatore in Tesoreria</div>
+        </div>
+        <span className="text-xl font-bold text-tax-600 nums shrink-0">{eur(taxSummary?.totalPending)}</span>
+      </button>
 
       {loading && goals.length === 0 ? (
         <div className="card p-4 text-sm text-ink-400">Caricamento…</div>

@@ -117,6 +117,7 @@ router.get("/", async (req, res) => {
       taxSaving: true,
       user: { select: { id: true, name: true } },
       invoice: { select: { id: true, numero: true } }, // badge "fattura n. X" in Entrate
+      goalContribution: { select: { id: true, goalId: true } }, // chip "da obiettivo" in Uscite
     },
     orderBy: { date: "desc" },
   });

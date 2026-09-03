@@ -97,7 +97,7 @@ export default function OnboardingPage() {
   return (
     <div className="max-w-xl mx-auto space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Punto zero</h1>
+        <h1 className="sr-only">Punto zero</h1>
         <button onClick={finish} className="text-sm text-ink-600 hover:text-ink-900">Salta</button>
       </div>
       <div className="flex gap-1">

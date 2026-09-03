@@ -12,7 +12,7 @@ export default function TaxSavingsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Salvadanaio tasse</h1>
+      <h1 className="sr-only">Salvadanaio tasse</h1>
 
       <div className="bg-tax-50 border border-card-line rounded-xl p-6 text-center">
         <div className="text-sm text-tax-600">Da accantonare (non trasferito)</div>
