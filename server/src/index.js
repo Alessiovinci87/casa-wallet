@@ -12,6 +12,7 @@ import { startCronJobs } from "./jobs/cron.js";
 import authRouter from "./routes/auth.js";
 import householdRouter from "./routes/household.js";
 import accountsRouter from "./routes/accounts.js";
+import advisorRouter from "./routes/advisor.js";
 import transactionsRouter from "./routes/transactions.js";
 import taxSavingsRouter from "./routes/taxSavings.js";
 import ocrRouter from "./routes/ocr.js";
@@ -97,6 +98,7 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/auth", authRouter);
 app.use("/api/household", householdRouter);
 app.use("/api/accounts", accountsRouter);
+app.use("/api/advisor", advisorRouter);
 app.use("/api/transactions", transactionsRouter);
 app.use("/api/tax-savings", taxSavingsRouter);
 app.use("/api/ocr", ocrRouter);

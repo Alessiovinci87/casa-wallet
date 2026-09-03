@@ -76,3 +76,11 @@ main button:not(.w-full):not([class*="w-1"]):not([class*="flex-1"]) { min-width:
   .modal-backdrop { align-items: center; padding: 1rem; }
   .modal-panel { max-height: calc(var(--vvh, 100dvh) - 2rem); }
 }
+
+/* Stampa / salva PDF (Consulente): niente barre, colori pieni, testo nero. */
+@media print {
+  nav, header, .fixed, button[aria-label="Nuovo movimento"] { display: none !important; }
+  body { background: #fff; color: #000; }
+  main { padding: 0 !important; }
+  .card { border: 1px solid #ccc; break-inside: avoid; }
+}

@@ -8,6 +8,7 @@ import { hardRefresh } from "../lib/refresh.js";
 const ITEMS = [
   { to: "/treasury", label: "Tesoreria", hint: "Scadenze fiscali, simulatore, prestito interno, profilo fiscale" },
   { to: "/invoices", label: "Fatture", hint: "Import XML, incassi, connettore Aruba" },
+  { to: "/advisor", label: "Consulente", hint: "Obiettivi sostenibili? Dove tagliare, quote saltate, resoconto trimestrale" },
   { to: "/spending", label: "Dove vanno i soldi", hint: "Uscite per negozio, categoria e cosa hai comprato" },
   { to: "/analytics", label: "Analisi scontrini", hint: "Prodotti e prezzi dagli scontrini fotografati" },
   { to: "/shopping-list", label: "Lista spesa", hint: "Cosa ricomprare, prevista dagli scontrini" },

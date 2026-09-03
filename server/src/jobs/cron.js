@@ -4,8 +4,25 @@ import { sendTaxAlerts } from "../lib/taxAlert.js";
 import { sendDeadlineReminders } from "../lib/deadlineReminder.js";
 import { runDueRules } from "../lib/recurrence.js";
 import { checkInternalLoans } from "../lib/loans.js";
+import { sendQuarterlyReports } from "../lib/advisor.js";
+import { sendPushToHousehold } from "../lib/push.js";
+import { sendEmail } from "../lib/email.js";
 
 export function startCronJobs() {
+  // Consulente: resoconto trimestrale il 1° di gennaio/aprile/luglio/ottobre alle 09:30 Europe/Rome.
+  cron.schedule(
+    "30 9 1 1,4,7,10 *",
+    async () => {
+      try {
+        const result = await sendQuarterlyReports({ sendPushToHousehold, sendEmail });
+        console.log("[cron] resoconto trimestrale:", result);
+      } catch (err) {
+        console.error("[cron] resoconto trimestrale fallito:", err);
+      }
+    },
+    { timezone: "Europe/Rome" }
+  );
+
   // Tax reminder: 1st day of every month at 09:00 Europe/Rome.
   cron.schedule(
     "0 9 1 * *",

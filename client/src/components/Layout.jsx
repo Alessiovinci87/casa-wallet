@@ -32,6 +32,7 @@ const TITLES = [
   ["/ocr", "Nuova spesa"],
   ["/add", "Nuovo movimento"],
   ["/spending", "Dove vanno i soldi"],
+  ["/advisor", "Consulente"],
   ["/import", "Importa estratto conto"],
   ["/analytics", "Analisi"],
   ["/shopping-list", "Lista spesa"],

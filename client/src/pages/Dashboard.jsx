@@ -323,6 +323,13 @@ export default function Dashboard() {
       {/* 2. Tre card compatte (scroll orizzontale su mobile) */}
       <div className="flex gap-3 overflow-x-auto snap-x -mx-4 px-4 sm:mx-0 sm:px-0 pb-1">
         <MiniCard
+          label="Consulente"
+          value={goalSummary?.behind ? `${goalSummary.behind} in ritardo` : "Resoconto"}
+          sub="Obiettivi sostenibili? Dove tagliare"
+          tone={goalSummary?.behind ? "text-rose-600" : "text-ink-900"}
+          onClick={() => navigate("/advisor")}
+        />
+        <MiniCard
           label="Obiettivi"
           value={goalSummary?.count ? `${eur(goalSummary.parked)} parcheggiati` : "Nessuno"}
           sub={goalSummary?.count ? `quota di ${MONTH_NAME} ${eur(goalSummary.monthQuota)} · versati ${eur(goalSummary.monthContributed)}` : "Crea il primo obiettivo"}
