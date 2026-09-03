@@ -61,6 +61,13 @@ export default function Dashboard() {
   useEffect(() => {
     api.get("/api/dashboard/available").then(({ data }) => setAvail(data)).catch(() => setAvail(null));
   }, [transactions]);
+  // Primo accesso: nessun punto zero e nessuna transazione → wizard "Punto zero" (una volta sola).
+  useEffect(() => {
+    if (!avail || avail.hasOpeningBalance || transactions.length > 0 || avail.balance !== 0) return;
+    let seen = "1";
+    try { seen = localStorage.getItem("onboardingSeen"); } catch { /* storage non disponibile */ }
+    if (!seen) navigate("/onboarding");
+  }, [avail, transactions, navigate]);
 
   useEffect(() => {
     fetchTransactions({ month: MONTH, year: YEAR });

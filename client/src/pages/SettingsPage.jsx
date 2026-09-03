@@ -122,9 +122,12 @@ export default function SettingsPage() {
 
       {/* Punto zero: saldo iniziale */}
       <section className="card p-5">
-        <h2 className="text-sm font-semibold text-ink-600 uppercase tracking-wide mb-1">
-          Saldo iniziale (punto zero)
-        </h2>
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-sm font-semibold text-ink-600 uppercase tracking-wide">
+            Saldo iniziale (punto zero)
+          </h2>
+          <a href="/onboarding" className="text-xs text-brand-600 hover:underline">Apri la procedura guidata</a>
+        </div>
         <p className="text-sm text-ink-600 mb-3">
           Il saldo effettivo parte da qui: saldo del conto a una data + entrate − uscite registrate da quel giorno.
           Senza punto zero il saldo è la somma di tutte le transazioni.
