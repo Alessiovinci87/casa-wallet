@@ -13,15 +13,16 @@ const TABS = [
 export default function MovementsPage({ tab: forced }) {
   const [params, setParams] = useSearchParams();
   const tab = forced || params.get("tab") || "expenses";
+  const account = params.get("account") || "";
   return (
     <div className="space-y-4">
       <Segmented
         value={tab}
-        onChange={(v) => setParams({ tab: v })}
+        onChange={(v) => setParams(account ? { tab: v, account } : { tab: v })}
         options={TABS}
         className="[&>button]:flex-1 [&>button]:min-h-[44px]"
       />
-      {tab === "recurring" ? <RecurringPage embedded /> : <TransactionsPage type={tab === "income" ? "INCOME" : "EXPENSE"} embedded />}
+      {tab === "recurring" ? <RecurringPage embedded /> : <TransactionsPage type={tab === "income" ? "INCOME" : "EXPENSE"} embedded accountId={account} onAccountChange={(id) => setParams(id ? { tab, account: id } : { tab })} />}
     </div>
   );
 }

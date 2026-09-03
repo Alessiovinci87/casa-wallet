@@ -100,6 +100,15 @@ router.get("/", async (req, res) => {
   const { month, year, type, category, method } = req.query;
   const where = { householdId: req.user.householdId };
 
+  // Filtro per conto: il predefinito comprende anche le transazioni senza conto.
+  const { accountId } = req.query;
+  if (accountId) {
+    const acc = await prisma.bankAccount.findFirst({ where: { id: String(accountId), householdId: req.user.householdId }, select: { id: true, isDefault: true } });
+    if (!acc) return res.status(400).json({ error: "Conto non trovato" });
+    if (acc.isDefault) where.OR = [{ accountId: acc.id }, { accountId: null }];
+    else where.accountId = acc.id;
+  }
+
   if (type) where.type = type;
   if (category) where.category = category;
   if (method) where.method = method;

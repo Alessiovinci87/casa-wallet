@@ -6,6 +6,7 @@ import { useTransactionStore } from "../store/transactionStore.js";
 import { eur } from "../lib/format.js";
 import { downloadTransactionsCsv } from "../lib/exportCsv.js";
 import TransactionForm from "../components/TransactionForm.jsx";
+import Segmented from "../components/Segmented.jsx";
 import { useAccountStore } from "../store/accountStore.js";
 
 // Uscite / Entrate (dentro Movimenti): totale del mese con confronto, selettore
@@ -60,25 +61,27 @@ function DayGroups({ items, type, onEdit, empty }) {
   ));
 }
 
-export default function TransactionsPage({ type = "EXPENSE" }) {
+export default function TransactionsPage({ type = "EXPENSE", accountId = "", onAccountChange }) {
   const { transactions, loading, fetchTransactions, deleteTransaction } = useTransactionStore();
   const location = useLocation();
-  const [filters, setFilters] = useState({ month: now.getMonth() + 1, year: now.getFullYear(), type });
+  const accounts = useAccountStore((s) => s.accounts);
+  const [filters, setFilters] = useState({ month: now.getMonth() + 1, year: now.getFullYear(), type, accountId });
   const [prevTotal, setPrevTotal] = useState(null);
   const [formInitial, setFormInitial] = useState(location.state?.prefill ?? null);
   const [showForm, setShowForm] = useState(Boolean(location.state?.prefill));
 
   useEffect(() => { setFilters((f) => (f.type === type ? f : { ...f, type })); }, [type]);
+  useEffect(() => { setFilters((f) => (f.accountId === accountId ? f : { ...f, accountId })); }, [accountId]);
   useEffect(() => { fetchTransactions(filters); }, [filters, fetchTransactions]);
   const accountsLoaded = useAccountStore((s) => s.loaded);
   const fetchAccounts = useAccountStore((s) => s.fetchAccounts);
   useEffect(() => { if (!accountsLoaded) fetchAccounts().catch(() => {}); }, [accountsLoaded, fetchAccounts]);
   useEffect(() => {
     const prev = new Date(filters.year, filters.month - 2, 1);
-    api.get("/api/transactions", { params: { month: prev.getMonth() + 1, year: prev.getFullYear(), type: filters.type } })
+    api.get("/api/transactions", { params: { month: prev.getMonth() + 1, year: prev.getFullYear(), type: filters.type, ...(filters.accountId && { accountId: filters.accountId }) } })
       .then(({ data }) => setPrevTotal(data.reduce((s, t) => s + t.amount, 0)))
       .catch(() => setPrevTotal(null));
-  }, [filters.month, filters.year, filters.type]);
+  }, [filters.month, filters.year, filters.type, filters.accountId]);
 
   const shiftMonth = (n) => setFilters((f) => {
     const d = new Date(f.year, f.month - 1 + n, 1);
@@ -105,6 +108,16 @@ export default function TransactionsPage({ type = "EXPENSE" }) {
   return (
     <div className="space-y-4">
       <h1 className="sr-only">{TITLES[type]}</h1>
+
+      {/* Filtro per conto (solo con più conti) */}
+      {accounts.length > 1 && (
+        <Segmented
+          size="sm"
+          value={accountId || ""}
+          onChange={(v) => (onAccountChange ? onAccountChange(v) : setFilters((f) => ({ ...f, accountId: v })))}
+          options={[{ value: "", label: "Tutti i conti" }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}
+        />
+      )}
 
       {/* Totale del mese + selettore mese */}
       <div className="card p-4">

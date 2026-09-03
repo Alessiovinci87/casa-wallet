@@ -240,6 +240,37 @@ export default function Dashboard() {
         )}
       </button>
 
+      {/* 1b. Un riquadro per conto, come nell'home banking: saldo + entrate/uscite del mese */}
+      {avail?.accounts?.length > 1 && (
+        <div className="grid grid-cols-2 gap-3">
+          {avail.accounts.map((a) => {
+            const isDef = a.isDefault;
+            let inc = 0, exp = 0;
+            for (const t of transactions) {
+              const mine = t.accountId === a.id || (isDef && !t.accountId);
+              if (!mine) continue;
+              if (t.type === "INCOME") inc += t.amount; else exp += t.amount;
+            }
+            return (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => navigate(`/movements?tab=expenses&account=${a.id}`)}
+                className="card p-3.5 text-left hover:border-brand-200 transition"
+              >
+                <div className="text-[13px] text-ink-600 truncate">{a.name}</div>
+                <div className={`text-xl font-bold nums mt-0.5 ${a.balance < 0 ? "text-rose-600" : "text-ink-900"}`}>{eur(a.balance)}</div>
+                <div className="text-[13px] mt-1 flex flex-wrap gap-x-2">
+                  <span className="text-brand-600 nums">+{eur(inc)}</span>
+                  <span className="text-ink-600 nums">−{eur(exp)}</span>
+                </div>
+                <div className="text-[13px] text-ink-400">{MONTH_NAME} · tocca per i movimenti</div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* 2. Tre card compatte (scroll orizzontale su mobile) */}
       <div className="flex gap-3 overflow-x-auto snap-x -mx-4 px-4 sm:mx-0 sm:px-0 pb-1">
         <MiniCard
