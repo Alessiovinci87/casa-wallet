@@ -1,23 +1,24 @@
 // Import estratto conto CSV (scoped famiglia).
-//   POST /api/import/bank-csv/preview  multipart `file` (+ mapping JSON opz.) → intestazioni,
+//   POST /api/import/bank-csv/preview  multipart `file` (CSV, xls/xlsx, XML camt/CBI, PDF; + mapping JSON opz.) → intestazioni,
 //        righe di esempio e, con mapping, le righe parse (dedupe + categoria proposta)
 //   POST /api/import/bank-csv/commit   { rows: [...], method?, learn?: bool } → crea le transazioni
 //   GET  /api/import/category-rules · POST · DELETE /:id
 //   GET  /api/import/recurrence-candidates?months=12 → proposte "Crea ricorrenza"
 import { Router } from "express";
 import multer from "multer";
+import { parseStatement } from "../lib/statementParsers.js";
 import { prisma } from "../lib/prisma.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { broadcast } from "../lib/ws.js";
 import {
-  applyMapping, categorize, detectDelimiter, detectRecurrences, guessCategory, importHash,
-  normalizeDescription, parseCsv,
+  applyMapping, categorize, detectRecurrences, guessCategory, importHash,
+  normalizeDescription,
 } from "../lib/bankImport.js";
 
 const router = Router();
 router.use(authMiddleware);
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 1 } });
 const TX_TYPES = new Set(["INCOME", "EXPENSE"]);
 const PAY_METHODS = new Set(["CASH", "POS", "CARD", "TRANSFER"]);
 
@@ -48,17 +49,29 @@ function parseMapping(raw) {
 
 // POST /api/import/bank-csv/preview
 router.post("/bank-csv/preview", upload.single("file"), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: "File CSV mancante (campo `file`)" });
-  const text = decode(req.file.buffer);
-  const delimiter = detectDelimiter(text);
-  const rows = parseCsv(text, delimiter);
-  if (rows.length === 0) return res.status(400).json({ error: "CSV vuoto" });
+  if (!req.file) return res.status(400).json({ error: "File mancante (campo `file`)" });
+  // CSV, Excel (xls/xlsx), XML (camt.053, CBI, Excel XML) o PDF → righe stile CSV.
+  let parsedFile;
+  try {
+    parsedFile = await parseStatement(req.file.originalname, req.file.buffer, decode);
+  } catch (err) {
+    return res.status(400).json({ error: err.message || "File non leggibile" });
+  }
+  const { format, rows, delimiter = null, autoMapping = null } = parsedFile;
+  if (rows.length === 0) return res.status(400).json({ error: "Nessun movimento trovato nel file" });
+  if (format === "pdf" && rows.length === 1) {
+    return res.status(400).json({ error: "Nel PDF non ho trovato righe con data e importo. Se l'estratto è scansionato (immagine), chiedi alla banca il formato Excel o XML." });
+  }
 
   const household = await prisma.household.findUnique({ where: { id: req.user.householdId }, select: { csvMapping: true } });
   const saved = household?.csvMapping ? parseMapping(household.csvMapping) : null;
-  const mapping = parseMapping(req.body?.mapping) || saved;
+  // I formati strutturati (camt, PDF) hanno colonne fisse: il mapping salvato del
+  // CSV non si applica e non va sovrascritto.
+  const mapping = autoMapping || parseMapping(req.body?.mapping) || saved;
 
   const base = {
+    format,
+    autoMapped: Boolean(autoMapping),
     delimiter,
     headers: rows[0],
     sample: rows.slice(1, 6),
@@ -96,7 +109,7 @@ router.post("/bank-csv/preview", upload.single("file"), async (req, res) => {
     };
   });
 
-  if (req.body?.saveMapping === "true" || req.body?.saveMapping === true) {
+  if (!autoMapping && (req.body?.saveMapping === "true" || req.body?.saveMapping === true)) {
     await prisma.household.update({ where: { id: req.user.householdId }, data: { csvMapping: JSON.stringify(mapping) } });
   }
 

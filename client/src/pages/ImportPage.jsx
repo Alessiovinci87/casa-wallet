@@ -8,8 +8,10 @@ import Segmented from "../components/Segmented.jsx";
 import { useRecurringStore } from "../store/recurringStore.js";
 import { useTransactionStore } from "../store/transactionStore.js";
 
-// Import estratto conto CSV: 1) file → 2) mappa colonne (salvata sulla famiglia)
+// Import estratto conto (CSV, Excel, XML, PDF): 1) file → 2) mappa colonne (salvata sulla famiglia; saltata per PDF/camt)
 // → 3) anteprima con categorie proposte e duplicati → 4) esito + ricorrenze rilevate.
+
+const FORMAT_LABELS = { csv: "CSV", xlsx: "Excel", xls: "Excel", "xml-excel": "Excel XML", xml: "XML", camt: "XML camt.053", pdf: "PDF" };
 
 const COLS = [
   { key: "dateCol", label: "Data" },
@@ -151,21 +153,31 @@ export default function ImportPage() {
     <div className="space-y-4">
       <h1 className="sr-only">Importa estratto conto</h1>
       <p className="text-sm text-ink-600">
-        Esporta il CSV dalla tua banca e caricalo qui. Mappi le colonne una volta sola, l'app riconosce i doppioni e propone le categorie.
+        Scarica l'estratto conto dalla tua banca (CSV, Excel, XML o PDF) e caricalo qui. Per CSV ed Excel mappi le colonne una volta sola; l'app riconosce i doppioni e propone le categorie.
       </p>
       {error && <div className="text-sm text-rose-600 bg-rose-50 rounded p-2">{error}</div>}
 
       {/* 1) File */}
       <div className="card p-4 flex flex-wrap items-center gap-3">
         <label className="px-4 py-2 bg-brand-600 text-white rounded cursor-pointer hover:bg-brand-700">
-          {busy && !preview ? "Leggo…" : "Scegli CSV"}
-          <input type="file" accept=".csv,text/csv,.txt" className="hidden" onChange={onFile} />
+          {busy && !preview ? "Leggo…" : "Scegli file"}
+          <input type="file" accept=".csv,text/csv,.txt,.xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xml,text/xml,application/xml,.pdf,application/pdf" className="hidden" onChange={onFile} />
         </label>
-        {file && <span className="text-sm text-ink-600">{file.name} {preview && `· ${preview.totalRows} righe · separatore "${preview.delimiter === "\t" ? "TAB" : preview.delimiter}"`}</span>}
+        {file && (
+          <span className="text-sm text-ink-600">
+            {file.name} {preview && `· ${preview.totalRows} righe · ${FORMAT_LABELS[preview.format] || preview.format}`}
+            {preview?.format === "csv" && ` · separatore "${preview.delimiter === "	" ? "TAB" : preview.delimiter}"`}
+          </span>
+        )}
+        {preview?.format === "pdf" && (
+          <p className="w-full text-xs text-tax-600">
+            Dal PDF leggo data, descrizione e importo riga per riga: controlla nell'anteprima che il segno (entrata/uscita) sia giusto. Se puoi, preferisci Excel o XML.
+          </p>
+        )}
       </div>
 
       {/* 2) Mappa colonne */}
-      {preview && (
+      {preview && !preview.autoMapped && (
         <div className="card p-4 space-y-3">
           <h2 className="text-sm font-semibold text-ink-600">Colonne {preview.savedMapping && <span className="text-ink-400 font-normal">· mapping salvato</span>}</h2>
           <div className="overflow-x-auto">
@@ -249,7 +261,7 @@ export default function ImportPage() {
           <div className="font-semibold text-brand-700">Import completato</div>
           <div className="text-ink-600 mt-1">{result.created} transazioni create · {result.skipped} saltate (già presenti){result.errors.length ? ` · ${result.errors.length} errori` : ""}</div>
           <div className="mt-2 flex gap-2">
-            <button onClick={() => navigate("/expenses")} className="px-3 py-1.5 border border-card-line rounded-lg text-ink-600 text-xs">Vai a Uscite</button>
+            <button onClick={() => navigate("/movements?tab=expenses")} className="px-3 py-1.5 border border-card-line rounded-lg text-ink-600 text-xs">Vai a Uscite</button>
             <button onClick={() => { setResult(null); setPreview(null); setFile(null); setRows([]); }} className="px-3 py-1.5 border border-card-line rounded-lg text-ink-600 text-xs">Nuovo import</button>
           </div>
         </div>

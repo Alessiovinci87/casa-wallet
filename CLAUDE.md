@@ -128,6 +128,7 @@ App di gestione economia domestica **multi-tenant** (famiglie/household). Nata p
 
 ### Da fare 📋
 - [ ] Verifica manuale nel browser (login + UI) — ultimo residuo di Task 4
+- [ ] Import PDF: provare con l'estratto conto reale di Alessio (l'euristica è stata testata solo su PDF generati)
 - [ ] Configurare `OPENAI_API_KEY` (e riavviare il server) per testare l'OCR
 - [ ] Task 5: deploy Railway (PostgreSQL prod) + Vercel (client)
   - **Config preparata (18 giu 2026)** — vedi sezione "Deploy (produzione)" più sotto. Deploy manuale da dashboard ancora da eseguire.
@@ -272,7 +273,8 @@ Tutte le route (eccetto login) richiedono header `Authorization: Bearer <token>`
 - `POST /:id/repay { amount }` (→ REPAID al saldo), `DELETE /:id` (409 se rate già rientrate), `POST /check {force?}` (test del controllo giornaliero)
 - `PUT /api/treasury/fiscal-profile` accetta anche `maxSelfFinancePercent`
 
-### Import CSV (`/api/import`) — protette, scoped famiglia
+### Import estratto conto (`/api/import`) — protette, scoped famiglia
+- **Formati** (`lib/statementParsers.js`, rilevati dal contenuto): CSV; Excel xls/xlsx e Excel-XML (SheetJS, foglio più lungo, preambolo tagliato da `trimToTable`); XML ISO 20022 camt.052/053 (→ colonne fisse Data/Descrizione/Importo, `autoMapping`); XML CBI/tabellare generico (chiavi → intestazioni, colonna "Importo con segno" da Segno D/C); PDF (pdf.js con coordinate: righe per Y, segno da segno esplicito → saldo progressivo → colonna Dare/Avere dell'intestazione più vicina in X, continuazioni descrizione; `autoMapping`; PDF scansionati → 400). La response ha `format` e `autoMapped` (true → il client salta la mappa colonne e il mapping CSV salvato non viene toccato). Limite file 15 MB.
 - `POST /bank-csv/preview` multipart `file` (+ `mapping` JSON `{dateCol, descCol, amountCol | debitCol+creditCol, hasHeader?, invertSign?}` indici colonna, `saveMapping=true`) → `{ delimiter, headers, sample, totalRows, savedMapping, mapping, parsed: null | [{line, date, amount, type, description, hash, duplicate, category, categorySource, error?}], stats }`
 - `POST /bank-csv/commit { rows[{date, amount, type, description, category, hash?, method?, learn?}], method? }` → `{ created, skipped, errors }` (max 2000 righe)
 - `GET /category-rules`, `POST /category-rules {pattern, category, type?}`, `DELETE /category-rules/:id`

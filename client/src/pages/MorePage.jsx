@@ -10,7 +10,7 @@ const ITEMS = [
   { to: "/analytics", label: "Analisi", hint: "Spese per categoria, negozi, prodotti" },
   { to: "/shopping-list", label: "Lista spesa", hint: "Cosa ricomprare, prevista dagli scontrini" },
   { to: "/budgets", label: "Budget", hint: "Tetto mensile per categoria" },
-  { to: "/import", label: "Importa CSV", hint: "Estratto conto della banca" },
+  { to: "/import", label: "Importa estratto conto", hint: "CSV, Excel, XML o PDF della banca" },
   { to: "/settings", label: "Impostazioni", hint: "Famiglia, saldo iniziale, invito" },
 ];
 

@@ -30,7 +30,7 @@ const TITLES = [
   ["/treasury", "Tesoreria"],
   ["/invoices", "Fatture"],
   ["/ocr", "Nuova spesa"],
-  ["/import", "Importa CSV"],
+  ["/import", "Importa estratto conto"],
   ["/analytics", "Analisi"],
   ["/shopping-list", "Lista spesa"],
   ["/budgets", "Budget"],
