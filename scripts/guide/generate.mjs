@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Guida utente CasaWallet — pipeline ripetibile: seed demo → screenshot → PDF.
+// Guida utente Awareness — pipeline ripetibile: seed demo → screenshot → PDF.
 //
 //   npm run docs:guide                       # locale: DB guide.db, server :3011, client :5183
 //   npm run docs:guide -- --skip-seed        # riusa guide.db
@@ -9,7 +9,7 @@
 //        --api-url=https://casa-wallet-production.up.railway.app \
 //        --email=... --password=...          # prod: salta seed/server e le schermate sensibili
 //
-// Output: docs/guide/img/*.png, docs/Guida_CasaWallet.pdf, client/public/Guida_CasaWallet.pdf
+// Output: docs/guide/img/*.png, docs/Guida_Awareness.pdf, client/public/Guida_Awareness.pdf
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -21,7 +21,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const DOCS = path.join(ROOT, "docs", "guide");
 const IMG = path.join(DOCS, "img");
 const FIX = path.join(DOCS, "fixtures");
-const PDF = path.join(ROOT, "docs", "Guida_CasaWallet.pdf");
+const PDF = path.join(ROOT, "docs", "Guida_Awareness.pdf");
 fs.mkdirSync(IMG, { recursive: true });
 
 const args = Object.fromEntries(process.argv.slice(2).map((a) => { const m = a.match(/^--([^=]+)(?:=(.*))?$/); return m ? [m[1], m[2] ?? true] : [a, true]; }));
@@ -218,10 +218,10 @@ async function buildPdf(browser) {
   fs.writeFileSync(tmp, out);
   const page = await browser.newPage();
   await page.goto(pathToFileURL(tmp).href, { waitUntil: "networkidle" });
-  await page.pdf({ path: PDF, format: "A4", printBackground: true, margin: { top: "14mm", bottom: "14mm", left: "14mm", right: "14mm" }, displayHeaderFooter: true, headerTemplate: "<span></span>", footerTemplate: '<div style="width:100%;font-size:9px;color:#8B9691;text-align:center;font-family:system-ui">CasaWallet · Guida utente · pagina <span class="pageNumber"></span> di <span class="totalPages"></span></div>' });
+  await page.pdf({ path: PDF, format: "A4", printBackground: true, margin: { top: "14mm", bottom: "14mm", left: "14mm", right: "14mm" }, displayHeaderFooter: true, headerTemplate: "<span></span>", footerTemplate: '<div style="width:100%;font-size:9px;color:#8B9691;text-align:center;font-family:system-ui">Awareness · Guida utente · pagina <span class="pageNumber"></span> di <span class="totalPages"></span></div>' });
   await page.close();
   if (!args["keep-html"]) fs.rmSync(tmp);
-  const pub = path.join(ROOT, "client", "public", "Guida_CasaWallet.pdf");
+  const pub = path.join(ROOT, "client", "public", "Guida_Awareness.pdf");
   fs.copyFileSync(PDF, pub);
   log(`PDF: ${PDF} (copiato in client/public per la voce "Guida" nelle Impostazioni)`);
 }

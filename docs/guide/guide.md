@@ -1,4 +1,4 @@
-# CasaWallet
+# Awareness
 
 ### Guida utente
 

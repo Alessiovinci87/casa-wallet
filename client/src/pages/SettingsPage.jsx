@@ -230,9 +230,9 @@ export default function SettingsPage() {
       {/* Guida utente (PDF generato da npm run docs:guide, servito da /public) */}
       <section className="card p-5">
         <h2 className="text-sm font-semibold text-ink-600 uppercase tracking-wide mb-1">Guida</h2>
-        <p className="text-sm text-ink-600 mb-3">Come funziona CasaWallet in tre regole, una pagina per funzione, la routine di 2 minuti al giorno.</p>
+        <p className="text-sm text-ink-600 mb-3">Come funziona Awareness in tre regole, una pagina per funzione, la routine di 2 minuti al giorno.</p>
         <a
-          href="/Guida_CasaWallet.pdf"
+          href="/Guida_Awareness.pdf"
           target="_blank"
           rel="noopener"
           className="inline-flex items-center min-h-[44px] px-4 bg-brand-600 text-white rounded-lg hover:bg-brand-700"
