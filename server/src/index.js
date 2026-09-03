@@ -24,6 +24,7 @@ import deadlinesRouter from "./routes/deadlines.js";
 import treasuryRouter from "./routes/treasury.js";
 import invoicesRouter from "./routes/invoices.js";
 import recurringRulesRouter from "./routes/recurringRules.js";
+import goalsRouter from "./routes/goals.js";
 
 dotenv.config();
 
@@ -103,6 +104,7 @@ app.use("/api/deadlines", deadlinesRouter);
 app.use("/api/treasury", treasuryRouter);
 app.use("/api/invoices", invoicesRouter);
 app.use("/api/recurring-rules", recurringRulesRouter);
+app.use("/api/goals", goalsRouter);
 
 // --- Error handler globale: mai HTML, sempre JSON coerente con il resto dell'API ---
 // (Express 5 inoltra qui anche i reject delle route async.)

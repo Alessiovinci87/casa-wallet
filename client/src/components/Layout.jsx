@@ -7,6 +7,7 @@ const links = [
   { to: "/", label: "Dashboard", end: true },
   { to: "/expenses", label: "Uscite" },
   { to: "/income", label: "Entrate" },
+  { to: "/goals", label: "Obiettivi" },
   { to: "/recurring", label: "Ricorrenze" },
   { to: "/tax-savings", label: "Salvadanaio" },
   { to: "/treasury", label: "Tesoreria" },

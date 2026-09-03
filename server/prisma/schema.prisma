@@ -25,6 +25,7 @@ model Household {
   dismissals        ShoppingListDismissal[]
   categoryBudgets   CategoryBudget[]
   recurringRules    RecurringRule[]
+  savingsGoals      SavingsGoal[]
 }
 
 model User {
@@ -46,6 +47,7 @@ model User {
   invoices        Invoice[]
   arubaConnection ArubaConnection?
   recurringRules  RecurringRule[]
+  savingsGoals    SavingsGoal[]
 }
 
 model Transaction {
@@ -71,6 +73,7 @@ model Transaction {
   // Nullable: transazione nata da una regola ricorrente (chip "Ricorrente").
   recurringRuleId String?
   recurringRule   RecurringRule? @relation(fields: [recurringRuleId], references: [id])
+  goalContribution GoalContribution? // prelievo da un obiettivo registrato come uscita
 
   @@index([householdId, date])
   @@index([recurringRuleId, date])
@@ -285,9 +288,55 @@ model RecurringRule {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   transactions Transaction[]
+  linkedGoals  SavingsGoal[]
 
   @@index([householdId, active])
   @@index([nextRunAt])
+}
+
+// Obiettivo di risparmio (salvadanaio a obiettivo). Condiviso in famiglia per
+// default; personal=true → visibile solo a userId.
+//   kind: GOAL (traguardo con data) | SINKING (spesa periodica da spalmare,
+//         opz. collegata a una RecurringRule: quota = amount/mesi, si svuota
+//         a ogni scadenza) | BUFFER (cuscinetto senza data)
+model SavingsGoal {
+  id                    String    @id @default(cuid())
+  householdId           String
+  household             Household @relation(fields: [householdId], references: [id])
+  userId                String?   // creatore; per personal=true è il proprietario
+  user                  User?     @relation(fields: [userId], references: [id])
+  name                  String
+  icon                  String?
+  kind                  String    @default("GOAL")
+  targetAmount          Float
+  targetDate            DateTime?
+  startDate             DateTime  @default(now()) // inizio traiettoria lineare
+  priority              Int       @default(2) // 1 = alta, 2 = media, 3 = bassa
+  active                Boolean   @default(true)
+  personal              Boolean   @default(false)
+  linkedRecurringRuleId String?
+  linkedRecurringRule   RecurringRule? @relation(fields: [linkedRecurringRuleId], references: [id])
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  contributions         GoalContribution[]
+
+  @@index([householdId, active])
+}
+
+// Movimento su un obiettivo: amount > 0 versamento, < 0 prelievo.
+model GoalContribution {
+  id            String       @id @default(cuid())
+  goalId        String
+  goal          SavingsGoal  @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  userId        String?      // chi ha registrato il movimento
+  amount        Float
+  date          DateTime
+  note          String?
+  transactionId String?      @unique // prelievo collegato a un'uscita reale
+  transaction   Transaction? @relation(fields: [transactionId], references: [id])
+  createdAt     DateTime     @default(now())
+
+  @@index([goalId, date])
 }
 
 enum TxType {

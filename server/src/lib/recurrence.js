@@ -153,6 +153,29 @@ export async function postOccurrence(rule, occurrence) {
     event: "transaction_update",
     payload: { action: "created", transaction },
   });
+
+  // SINKING collegati: la scadenza svuota il fondo (prelievo = min(saved, amount))
+  // e collega il prelievo all'uscita reale. Così il traguardo riparte da zero.
+  const linked = await prisma.savingsGoal.findMany({
+    where: { linkedRecurringRuleId: rule.id, kind: "SINKING", active: true },
+    include: { contributions: { select: { amount: true } } },
+  });
+  for (const goal of linked) {
+    const saved = goal.contributions.reduce((s, c) => s + c.amount, 0);
+    const take = Math.min(saved, rule.amount);
+    if (take <= 0) continue;
+    await prisma.goalContribution.create({
+      data: {
+        goalId: goal.id,
+        userId: rule.userId,
+        amount: -Number(take.toFixed(2)),
+        date: when,
+        note: `Scadenza ${rule.description || rule.category}`,
+        transactionId: transaction.id,
+      },
+    });
+    broadcast(rule.householdId, { event: "goal_update", payload: { action: "drained", goal: { id: goal.id } } });
+  }
   return { transaction, created: true };
 }
 

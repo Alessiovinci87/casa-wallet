@@ -4,6 +4,7 @@ import { useShoppingListStore } from "../store/shoppingListStore.js";
 import { useAnalyticsStore } from "../store/analyticsStore.js";
 import { useInvoiceStore } from "../store/invoiceStore.js";
 import { useRecurringStore } from "../store/recurringStore.js";
+import { useGoalStore } from "../store/goalStore.js";
 
 const WS_URL = import.meta.env.VITE_WS_URL || "ws://localhost:3001/ws";
 
@@ -45,6 +46,9 @@ export function useWebSocket() {
             // Regole della famiglia: ricarica solo se la pagina le ha già caricate.
             const r = useRecurringStore.getState();
             if (r.loaded) r.fetchRules();
+          } else if (msg.event === "goal_update") {
+            const g = useGoalStore.getState();
+            if (g.loaded) g.fetchGoals();
           } else if (msg.event === "invoice_update") {
             // Refresh della pagina Fatture solo se già caricata (fatture personali:
             // il GET è comunque scoped per utente lato server).

@@ -6,6 +6,8 @@ import { CATEGORIES, PAY_METHODS, PAY_METHOD_LABELS } from "../lib/constants.js"
 import Segmented from "./Segmented.jsx";
 import RecurrenceFields, { emptyRecurrence, recurrenceToPayload } from "./RecurrenceFields.jsx";
 import { useRecurringStore } from "../store/recurringStore.js";
+import { useGoalStore } from "../store/goalStore.js";
+import AllocateModal from "./AllocateModal.jsx";
 
 const empty = {
   amount: "",
@@ -37,6 +39,15 @@ export default function TransactionForm({ initial, onClose }) {
   const [repeat, setRepeat] = useState(false);
   const [recurrence, setRecurrence] = useState(emptyRecurrence);
   const createRule = useRecurringStore((s) => s.createRule);
+  // Dopo un'entrata: proponi il riparto del netto post-tasse sugli obiettivi.
+  const goals = useGoalStore((s) => s.goals);
+  const goalsLoaded = useGoalStore((s) => s.loaded);
+  const fetchGoals = useGoalStore((s) => s.fetchGoals);
+  const [allocateFor, setAllocateFor] = useState(null); // transactionId
+  useEffect(() => {
+    if (!isEdit && form.type === "INCOME" && !goalsLoaded) fetchGoals().catch(() => {});
+  }, [form.type, isEdit, goalsLoaded, fetchGoals]);
+  const hasGoals = goals.some((g) => g.active && g.status !== "DONE");
   const [error, setError] = useState("");
   // Riconciliazione: fatture EMESSE per riconoscere un'entrata come incasso.
   const [pendingInvoices, setPendingInvoices] = useState(null); // null = non ancora caricate
@@ -67,13 +78,14 @@ export default function TransactionForm({ initial, onClose }) {
     setCollecting(true);
     setError("");
     try {
-      await api.put(`/api/invoices/${matchedInvoice.id}/collect`, {
+      const { data } = await api.put(`/api/invoices/${matchedInvoice.id}/collect`, {
         method: form.method,
         date: new Date(form.date).toISOString(),
         ...(form.taxPercent !== "" && { taxPercent: Number(form.taxPercent) }),
       });
       await fetchTransactions();
-      onClose();
+      if (hasGoals && data?.transaction?.id) setAllocateFor(data.transaction.id);
+      else onClose();
     } catch (err) {
       setError(err.response?.data?.error || "Registrazione incasso fallita");
       setCollecting(false);
@@ -148,12 +160,22 @@ export default function TransactionForm({ initial, onClose }) {
           ...recurrenceToPayload(recurrence),
         });
         await fetchTransactions();
-      } else await addTransaction(payload);
+      } else {
+        const created = await addTransaction(payload);
+        if (payload.type === "INCOME" && hasGoals && created?.id) {
+          setAllocateFor(created.id);
+          return;
+        }
+      }
       onClose();
     } catch (err) {
       setError(err.response?.data?.error || "Errore salvataggio");
     }
   };
+
+  if (allocateFor) {
+    return <AllocateModal incomeTransactionId={allocateFor} onClose={onClose} />;
+  }
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-10">

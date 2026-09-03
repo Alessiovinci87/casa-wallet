@@ -8,6 +8,7 @@ import api from "../lib/api.js";
 import { eur } from "../lib/format.js";
 import { PAY_METHOD_LABELS } from "../lib/constants.js";
 import NotificationsToggle from "../components/NotificationsToggle.jsx";
+import { useGoalStore } from "../store/goalStore.js";
 
 // Lazy: recharts (~150KB) esce dal bundle iniziale; il grafico appare al mount.
 const BalanceTrendChart = lazy(() => import("../components/BalanceTrendChart.jsx"));
@@ -43,6 +44,9 @@ export default function Dashboard() {
   const { transactions, fetchTransactions } = useTransactionStore();
   const { summary, fetchSummary } = useTaxStore();
   const user = useAuthStore((s) => s.user);
+  const goalSummary = useGoalStore((s) => s.summary);
+  const fetchGoals = useGoalStore((s) => s.fetchGoals);
+  useEffect(() => { fetchGoals().catch(() => {}); }, [fetchGoals]);
   // Previous month totals, fetched separately so the store keeps the current month.
   const [prev, setPrev] = useState(null);
   // Prossima scadenza fiscale entro 60 giorni (incluse quelle scadute).
@@ -190,6 +194,26 @@ export default function Dashboard() {
           </span>
         )}
       </button>
+
+      {/* Obiettivi: soldi parcheggiati e quota del mese */}
+      {goalSummary && goalSummary.count > 0 && (
+        <button
+          type="button"
+          onClick={() => navigate("/goals")}
+          className="card w-full p-4 flex items-center justify-between hover:border-brand-200 transition text-left"
+        >
+          <div>
+            <div className="text-sm text-ink-600">Obiettivi · {eur(goalSummary.parked)} parcheggiati</div>
+            <div className="text-xs text-ink-400 mt-0.5 nums">
+              Quota del mese {eur(goalSummary.monthQuota)} · versati {eur(goalSummary.monthContributed)}
+              {goalSummary.behind > 0 && <span className="text-rose-600 font-semibold"> · {goalSummary.behind} in ritardo</span>}
+            </div>
+          </div>
+          <span className={`text-lg font-bold nums ${goalSummary.monthContributed >= goalSummary.monthQuota ? "text-brand-600" : "text-tax-600"}`}>
+            {eur(Math.max(0, goalSummary.monthQuota - goalSummary.monthContributed))}
+          </span>
+        </button>
+      )}
 
       {/* Incassi attesi: fatture emesse non ancora incassate */}
       {incoming && incoming.count > 0 && (
