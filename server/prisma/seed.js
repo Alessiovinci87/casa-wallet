@@ -6,7 +6,6 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { createHouseholdWithUniqueCode } from "../src/lib/inviteCode.js";
-import { firstOccurrenceOnOrAfter, todayRomeUTC } from "../src/lib/recurrence.js";
 
 const prisma = new PrismaClient();
 
@@ -49,26 +48,6 @@ async function main() {
       },
     });
     console.log(`seeded user: ${u.email} (${u.role})`);
-  }
-
-  // Ricorrenze della famiglia reale (dati di test, sez. 4 del brief). Idempotenti
-  // per (household, description): il cron le posta quando arrivano a scadenza.
-  // Solo in dev (SEED_DEMO_RULES=1) per non sporcare la prod al deploy.
-  if (process.env.SEED_DEMO_RULES === "1") {
-    const owner = await prisma.user.findUnique({ where: { email: users[0].email } });
-    const rules = [
-      { type: "EXPENSE", amount: 326.29, category: "Trasporti", method: "TRANSFER", description: "Rata auto", frequency: "MONTHLY", dayOfMonth: 5, startDate: new Date(Date.UTC(2026, 8, 1)), endDate: new Date(Date.UTC(2027, 3, 5)) },
-      { type: "EXPENSE", amount: 66.67, category: "Bollette", method: "CARD", description: "Internet", frequency: "MONTHLY", dayOfMonth: 14, startDate: new Date(Date.UTC(2026, 8, 1)) },
-      { type: "EXPENSE", amount: 65, category: "Bollette", method: "CARD", description: "Aquamea", frequency: "MONTHLY", dayOfMonth: 31, startDate: new Date(Date.UTC(2026, 8, 1)) },
-      { type: "EXPENSE", amount: 2100, category: "Casa", method: "TRANSFER", description: "Mutuo", frequency: "SEMIANNUAL", dayOfMonth: 21, startDate: new Date(Date.UTC(2026, 5, 21)) },
-    ];
-    for (const r of rules) {
-      const exists = await prisma.recurringRule.findFirst({ where: { householdId: household.id, description: r.description } });
-      if (exists) continue;
-      const nextRunAt = firstOccurrenceOnOrAfter(r, todayRomeUTC());
-      await prisma.recurringRule.create({ data: { ...r, nextRunAt, userId: owner.id, householdId: household.id } });
-      console.log(`seeded recurring rule: ${r.description}`);
-    }
   }
 }
 
