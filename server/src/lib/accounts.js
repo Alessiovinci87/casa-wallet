@@ -56,7 +56,10 @@ async function accountBalance(householdId, account, isDefault, today) {
   // Il predefinito raccoglie anche le transazioni senza conto.
   if (isDefault) where.OR = [{ accountId: account.id }, { accountId: null }];
   else where.accountId = account.id;
-  if (account.openingBalanceDate) where.date.gte = account.openingBalanceDate;
+  // Il saldo iniziale è il saldo "di adesso" del giorno scelto: i movimenti di
+  // quel giorno sono già dentro (versamenti, addebiti, ricorrenze scattate) e non
+  // si sommano; contano dal giorno dopo. Restano visibili nelle statistiche.
+  if (account.openingBalanceDate) where.date.gte = new Date(account.openingBalanceDate.getTime() + MS_PER_DAY);
   const [inc, exp] = await Promise.all([
     prisma.transaction.aggregate({ where: { ...where, type: "INCOME" }, _sum: { amount: true } }),
     prisma.transaction.aggregate({ where: { ...where, type: "EXPENSE" }, _sum: { amount: true } }),

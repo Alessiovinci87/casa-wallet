@@ -34,7 +34,7 @@ function AccountForm({ initial, onSave, onCancel, saving }) {
         <input type="text" value={f.number} onChange={(e) => set("number", e.target.value)} placeholder="IT60X0542811101000000123456" className="w-full px-2 py-2 border border-card-line rounded nums" />
       </div>
       <p className="col-span-2 text-[13px] text-ink-400">
-        Il saldo iniziale è quello di inizio giornata: i movimenti del giorno scelto e dei giorni dopo si registrano a parte e si sommano. Metti il saldo di ieri sera con la data di oggi, poi registra entrate e uscite di oggi (versamenti compresi).
+        Metti il saldo che vedi in banca adesso, con la data di oggi. I movimenti di oggi sono già compresi: se li registri compaiono nelle statistiche del mese ma non si sommano al saldo. Da domani ogni movimento conta.
       </p>
       <div>
         <label className="block text-xs text-ink-600 mb-1">Saldo iniziale €</label>

@@ -114,7 +114,7 @@ export default function OnboardingPage() {
       {step === 0 && (
         <div className="card p-5 space-y-3">
           <h2 className="font-semibold">Quanto c'è sul conto oggi? <span className="text-[13px] font-normal text-ink-400">(obbligatorio)</span></h2>
-          <p className="text-sm text-ink-600">Da qui parte il saldo effettivo: a questo numero l'app aggiunge le entrate e toglie le uscite che registri da oggi.</p>
+          <p className="text-sm text-ink-600">Il saldo che vedi in banca adesso. I movimenti di oggi sono già compresi; da domani l'app aggiunge le entrate e toglie le uscite che registri.</p>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-ink-600 mb-1">Saldo €</label>

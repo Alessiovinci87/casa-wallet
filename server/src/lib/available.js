@@ -24,7 +24,7 @@ export async function computeHouseholdBalance(household, today = todayRomeUTC())
   // non è ancora uscita dal conto e vive nella previsione, non nel saldo.
   const endOfToday = new Date(today.getTime() + MS_PER_DAY - 1);
   const where = { householdId: household.id, date: { lte: endOfToday } };
-  if (household.openingBalanceDate) where.date.gte = household.openingBalanceDate;
+  if (household.openingBalanceDate) where.date.gte = new Date(household.openingBalanceDate.getTime() + MS_PER_DAY);
   const [inc, exp] = await Promise.all([
     prisma.transaction.aggregate({ where: { ...where, type: "INCOME" }, _sum: { amount: true } }),
     prisma.transaction.aggregate({ where: { ...where, type: "EXPENSE" }, _sum: { amount: true } }),
