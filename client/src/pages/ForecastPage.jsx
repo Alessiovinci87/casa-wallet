@@ -69,7 +69,7 @@ export default function ForecastPage() {
                   : <>Minimo {eur(data.minBalance)} il {dayjs(data.minDate).format("D MMMM")}</>}
             </div>
             <div className="mt-2 text-sm text-white/85 nums">
-              Oggi libero {eur(data.startBalance)} → tra {days} giorni {eur(data.endBalance)}
+              Base: Disponibile reale di oggi prima delle fisse del mese ({eur(data.startBalance)}, le fisse rientrano come eventi) → tra {days} giorni {eur(data.endBalance)}
               {data.daysNegative > 0 && <> · minimo {eur(data.minBalance)} il {dayjs(data.minDate).format("D/M")}</>}
             </div>
           </div>

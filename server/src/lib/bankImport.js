@@ -206,7 +206,7 @@ export function detectRecurrences(transactions, { minMonths = 3 } = {}) {
       dayOfMonth: medDay,
       months: months.size,
       lastDate: last.date,
-      sampleIds: sorted.slice(0, 6).map((t) => t.id).filter(Boolean),
+      transactionIds: sorted.map((t) => t.id).filter(Boolean),
     });
   }
   proposals.sort((a, b) => b.months - a.months || b.amount - a.amount);

@@ -33,6 +33,7 @@ export default function ImportPage() {
   const [result, setResult] = useState(null);
   const [candidates, setCandidates] = useState(null);
   const [created, setCreated] = useState({});
+  const [onlyUncategorized, setOnlyUncategorized] = useState(false);
 
   const upload = async (f, map, save) => {
     setBusy(true);
@@ -55,7 +56,8 @@ export default function ImportPage() {
         });
       }
       if (data.parsed) {
-        setRows(data.parsed.map((r) => ({ ...r, include: !r.error && !r.duplicate, learn: false })));
+        // Senza categoria → "Altro", con flag per il filtro "da categorizzare".
+        setRows(data.parsed.map((r) => ({ ...r, include: !r.error && !r.duplicate, learn: false, needsCategory: !r.error && !r.category, category: r.category || (r.error ? null : "Altro") })));
       }
     } catch (err) {
       setError(err.response?.data?.error || "Lettura del file non riuscita");
@@ -126,9 +128,11 @@ export default function ImportPage() {
         description: p.description.replace(/\s*n\.?\s*\d+.*$/i, "").trim().slice(0, 60),
         frequency: "MONTHLY",
         dayOfMonth: p.dayOfMonth,
-        startDate: new Date().toISOString(),
+        startDate: p.lastDate || new Date().toISOString(),
         autoPost: true,
+        linkTransactionIds: p.transactionIds, // le righe già importate finiscono in Fisse
       });
+      fetchTransactions();
       setCreated((c) => ({ ...c, [i]: true }));
     } catch (err) {
       window.alert(err.response?.data?.error || "Creazione ricorrenza non riuscita");
@@ -194,13 +198,14 @@ export default function ImportPage() {
               <span className="font-semibold">{preview.stats.total} righe</span>
               <span className="text-ink-400"> · {preview.stats.duplicates} già presenti · {preview.stats.errors} non lette · {preview.stats.uncategorized} senza categoria</span>
             </div>
+            <Segmented size="sm" value={onlyUncategorized} onChange={setOnlyUncategorized} options={[{ value: false, label: "Tutte" }, { value: true, label: `Da categorizzare (${rows.filter((r) => r.needsCategory).length})` }]} />
             <div className="flex items-center gap-2">
               <span className="text-xs text-ink-600">Metodo</span>
               <Segmented size="sm" value={method} onChange={setMethod} options={PAY_METHODS.map((m) => ({ value: m, label: PAY_METHOD_LABELS[m] }))} />
             </div>
           </div>
           <div className="divide-y divide-card-line max-h-[60vh] overflow-y-auto">
-            {rows.map((r, i) => (
+            {rows.map((r, i) => (onlyUncategorized && !r.needsCategory) ? null : (
               <div key={i} className={`p-3 flex items-center gap-3 text-sm ${r.error || r.duplicate ? "opacity-50" : ""}`}>
                 <input type="checkbox" checked={Boolean(r.include)} disabled={Boolean(r.error)} onChange={(e) => setRow(i, { include: e.target.checked })} />
                 <div className="min-w-0 flex-1">
@@ -210,12 +215,13 @@ export default function ImportPage() {
                       {dayjs(r.date).format("DD/MM/YYYY")} · {r.type === "INCOME" ? "entrata" : "uscita"}
                       {r.duplicate && <span className="text-tax-600"> · già importata</span>}
                       {r.categorySource === "rule" && <span> · categoria da regola</span>}
+                      {r.needsCategory && <span className="text-tax-600"> · da categorizzare</span>}
                     </div>
                   )}
                   {!r.error && r.include && (
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       {/* Categoria: tendina qui per compattezza (molte righe × molte categorie). */}
-                      <select value={r.category || ""} onChange={(e) => setRow(i, { category: e.target.value })} className={`px-2 py-1 border rounded-lg text-xs ${r.category ? "border-card-line" : "border-rose-400"}`}>
+                      <select value={r.category || ""} onChange={(e) => setRow(i, { category: e.target.value, needsCategory: false })} className={`px-2 py-1 border rounded-lg text-xs min-h-[44px] ${r.needsCategory ? "border-tax-600" : "border-card-line"}`}>
                         <option value="">— categoria —</option>
                         {CATEGORIES[r.type].map((c) => <option key={c} value={c}>{c}</option>)}
                       </select>

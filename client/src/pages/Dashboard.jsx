@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import { useTransactionStore } from "../store/transactionStore.js";
 import { useAuthStore } from "../store/authStore.js";
 import { useGoalStore } from "../store/goalStore.js";
+import { useRecurringStore } from "../store/recurringStore.js";
 import api from "../lib/api.js";
 import { eur } from "../lib/format.js";
 import NotificationsToggle from "../components/NotificationsToggle.jsx";
@@ -94,6 +95,10 @@ export default function Dashboard() {
   const user = useAuthStore((s) => s.user);
   const goalSummary = useGoalStore((s) => s.summary);
   const fetchGoals = useGoalStore((s) => s.fetchGoals);
+  // Ricorrenze con conferma manuale in attesa: banner in-app (la push non arriva nella webview).
+  const rules = useRecurringStore((s) => s.rules);
+  const fetchRules = useRecurringStore((s) => s.fetchRules);
+  const pendingRules = rules.filter((r) => r.pendingAt);
   const [prev, setPrev] = useState(null);
   const [nextDeadline, setNextDeadline] = useState(null);
   const [incoming, setIncoming] = useState(null);
@@ -105,7 +110,8 @@ export default function Dashboard() {
   useEffect(() => {
     fetchTransactions({ month: MONTH, year: YEAR });
     fetchGoals().catch(() => {});
-  }, [fetchTransactions, fetchGoals]);
+    fetchRules().catch(() => {});
+  }, [fetchTransactions, fetchGoals, fetchRules]);
 
   useEffect(() => {
     api.get("/api/transactions", { params: { month: prevDate.getMonth() + 1, year: prevDate.getFullYear() } })
@@ -179,10 +185,26 @@ export default function Dashboard() {
 
       <NotificationsToggle />
 
+      {pendingRules.length > 0 && (
+        <button
+          type="button"
+          onClick={() => navigate("/movements?tab=recurring")}
+          className="w-full text-left bg-tax-50 text-tax-600 rounded-xl p-3 text-[13px] flex items-center justify-between gap-3 min-h-[52px]"
+        >
+          <span>
+            <span className="font-semibold">Da confermare:</span>{" "}
+            {pendingRules.map((r) => `${r.description || r.category} ${eur(r.amount)} del ${dayjs(r.pendingAt).format("D/M")}`).join(" · ")}
+          </span>
+          <span className="shrink-0 font-semibold">Apri ›</span>
+        </button>
+      )}
+
       {/* 1. Disponibile reale */}
       <button type="button" onClick={() => avail && setSheet(true)} className={`w-full text-left rounded-2xl p-5 ${tone}`}>
         <div className={`text-[13px] uppercase tracking-widest ${muted}`}>Disponibile reale</div>
-        <div className="text-4xl sm:text-5xl font-bold tracking-tight mt-1 nums">{avail ? eur(avail.available) : "…"}</div>
+        <div className="text-4xl sm:text-5xl font-bold tracking-tight mt-1 nums">
+          {!avail ? "…" : !avail.hasOpeningBalance && avail.balance === 0 ? "—" : eur(avail.available)}
+        </div>
         {avail && (
           <div className={`text-[13px] mt-1.5 ${muted}`}>
             {avail.hasOpeningBalance ? (

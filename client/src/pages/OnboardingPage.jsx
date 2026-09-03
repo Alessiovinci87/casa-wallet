@@ -62,7 +62,8 @@ export default function OnboardingPage() {
   };
 
   const saveOpening = () => wrap(async () => {
-    if (opening.amount !== "") await setOpeningBalance(Number(opening.amount), opening.date);
+    if (opening.amount === "" || !Number.isFinite(Number(opening.amount))) throw new Error("Il saldo iniziale è obbligatorio: è il punto zero di tutto il resto");
+    await setOpeningBalance(Number(opening.amount), opening.date);
     setStep(1);
   });
   const addRule = () => wrap(async () => {
@@ -98,7 +99,7 @@ export default function OnboardingPage() {
     <div className="max-w-xl mx-auto space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="sr-only">Punto zero</h1>
-        <button onClick={finish} className="text-sm text-ink-600 hover:text-ink-900">Salta</button>
+        {step > 0 && <button onClick={finish} className="text-sm text-ink-600 hover:text-ink-900">Salta</button>}
       </div>
       <div className="flex gap-1">
         {STEPS.map((s, i) => (
@@ -110,7 +111,7 @@ export default function OnboardingPage() {
 
       {step === 0 && (
         <div className="card p-5 space-y-3">
-          <h2 className="font-semibold">Quanto c'è sul conto oggi?</h2>
+          <h2 className="font-semibold">Quanto c'è sul conto oggi? <span className="text-[13px] font-normal text-ink-400">(obbligatorio)</span></h2>
           <p className="text-sm text-ink-600">Da qui parte il saldo effettivo: a questo numero l'app aggiunge le entrate e toglie le uscite che registri da oggi.</p>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -123,7 +124,7 @@ export default function OnboardingPage() {
             </div>
           </div>
           <div className="flex justify-end">
-            <button onClick={saveOpening} disabled={busy} className="px-4 py-2 bg-brand-600 text-white rounded hover:bg-brand-700 disabled:opacity-50">Avanti</button>
+            <button onClick={saveOpening} disabled={busy || opening.amount === ""} className="px-4 py-2 bg-brand-600 text-white rounded hover:bg-brand-700 disabled:opacity-50">Avanti</button>
           </div>
         </div>
       )}

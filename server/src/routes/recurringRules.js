@@ -186,9 +186,34 @@ router.post("/", async (req, res) => {
   const nextRunAt = firstOccurrenceOnOrAfter(draft, from);
   if (!nextRunAt) return res.status(400).json({ error: "Nessuna occorrenza: endDate precede la prima ricorrenza" });
 
+  // linkTransactionIds (import CSV): le righe storiche diventano occorrenze della regola
+  // (finiscono in Fisse) e la prima occorrenza da postare è quella dopo l'ultima collegata.
+  const linkIds = Array.isArray(req.body?.linkTransactionIds) ? req.body.linkTransactionIds.filter((x) => typeof x === "string") : [];
+  let lastLinked = null;
+  if (linkIds.length) {
+    const linked = await prisma.transaction.findMany({
+      where: { id: { in: linkIds }, householdId: req.user.householdId, type: data.type },
+      select: { id: true, date: true },
+    });
+    for (const t of linked) if (!lastLinked || t.date > lastLinked) lastLinked = t.date;
+  }
+  const startFrom = lastLinked && lastLinked >= today ? new Date(lastLinked.getTime() + MS_PER_DAY) : nextRunAt;
   const rule = await prisma.recurringRule.create({
-    data: { ...data, nextRunAt, userId: req.user.id, householdId: req.user.householdId },
+    data: {
+      ...data,
+      nextRunAt: lastLinked ? firstOccurrenceOnOrAfter(draft, startFrom > today ? startFrom : today) : nextRunAt,
+      lastPostedAt: lastLinked,
+      userId: req.user.id,
+      householdId: req.user.householdId,
+    },
   });
+  if (linkIds.length) {
+    await prisma.transaction.updateMany({
+      where: { id: { in: linkIds }, householdId: req.user.householdId, type: data.type },
+      data: { recurringRuleId: rule.id },
+    });
+    broadcast(req.user.householdId, { event: "transaction_update", payload: { action: "linked", count: linkIds.length } });
+  }
   const run = await processRule(rule, { today });
   const fresh = await prisma.recurringRule.findUnique({ where: { id: rule.id }, include });
   const out = enrichRule(fresh);

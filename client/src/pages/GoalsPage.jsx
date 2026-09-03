@@ -170,7 +170,7 @@ function GoalWizard({ initial, onClose }) {
           <div className="bg-brand-50 rounded-xl p-3 text-sm">
             <div className="text-brand-700 font-semibold">Servono circa {eur(quota)} al mese</div>
             <div className="text-xs text-ink-600 mt-0.5">
-              {linkedRule ? `${eur(linkedRule.amount)} ogni ${linkedRule.monthsPerOccurrence} mesi` : `${eur(form.targetAmount)} in ${monthsLabel(months)}`}
+              {linkedRule ? `${eur(linkedRule.amount)} ogni ${linkedRule.monthsPerOccurrence} mesi` : `${eur(form.targetAmount)} per ${monthsLabel(months)}, mese corrente incluso (mesi contati per eccesso da oggi alla data)`}
             </div>
           </div>
         )}
