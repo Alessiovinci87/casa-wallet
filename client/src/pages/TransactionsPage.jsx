@@ -111,6 +111,11 @@ export default function TransactionsPage() {
                 <div className="text-ink-400">
                   {PAY_METHOD_LABELS[t.method]} · {dayjs(t.date).format("DD/MM/YYYY")}
                   {t.description ? ` · ${t.description}` : ""}
+                  {t.recurringRuleId && (
+                    <span className="ml-1 inline-block px-1.5 py-0.5 text-xs rounded-full bg-brand-50 text-brand-700 align-middle">
+                      ↻ Ricorrente
+                    </span>
+                  )}
                   {t.user?.name ? (
                     <span className="ml-1 inline-block px-1.5 py-0.5 text-xs rounded-full bg-paper text-ink-600 align-middle">
                       {t.user.name}

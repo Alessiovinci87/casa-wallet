@@ -30,3 +30,15 @@ export const PAY_METHOD_LABELS = {
   CARD: "Carta",
   TRANSFER: "Bonifico",
 };
+
+// Frequenze delle ricorrenze (regole entrate/uscite ricorrenti).
+export const FREQUENCIES = ["WEEKLY", "MONTHLY", "BIMONTHLY", "QUARTERLY", "SEMIANNUAL", "YEARLY"];
+export const FREQUENCY_LABELS = {
+  WEEKLY: "Settimanale",
+  MONTHLY: "Mensile",
+  BIMONTHLY: "Bimestrale",
+  QUARTERLY: "Trimestrale",
+  SEMIANNUAL: "Semestrale",
+  YEARLY: "Annuale",
+};
+export const WEEKDAY_LABELS = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];

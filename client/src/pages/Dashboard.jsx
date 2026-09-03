@@ -296,6 +296,7 @@ export default function Dashboard() {
                 <div>
                   <span className="font-medium">{t.category}</span>
                   <span className="text-ink-400 ml-2">{PAY_METHOD_LABELS[t.method]}</span>
+                  {t.recurringRuleId && <span className="text-brand-600 ml-2 text-xs" title="Ricorrente">↻</span>}
                   {t.user?.name && <span className="text-ink-400 ml-2 text-xs">· {t.user.name}</span>}
                 </div>
                 <span className={`font-semibold nums ${t.type === "INCOME" ? "text-brand-600" : "text-ink-900"}`}>

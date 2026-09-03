@@ -2,6 +2,7 @@
 import cron from "node-cron";
 import { sendTaxAlerts } from "../lib/taxAlert.js";
 import { sendDeadlineReminders } from "../lib/deadlineReminder.js";
+import { runDueRules } from "../lib/recurrence.js";
 
 export function startCronJobs() {
   // Tax reminder: 1st day of every month at 09:00 Europe/Rome.
@@ -32,6 +33,22 @@ export function startCronJobs() {
     { timezone: "Europe/Rome" }
   );
 
+  // Ricorrenze: ogni giorno alle 06:00 Europe/Rome posta (o mette in attesa di
+  // conferma) le occorrenze dovute. Idempotente per (regola, data).
+  cron.schedule(
+    "0 6 * * *",
+    async () => {
+      try {
+        const result = await runDueRules();
+        console.log("[cron] ricorrenze:", JSON.stringify({ processed: result.processed }));
+      } catch (err) {
+        console.error("[cron] ricorrenze fallite:", err);
+      }
+    },
+    { timezone: "Europe/Rome" }
+  );
+
   console.log("[cron] job mensile alert tasse schedulato (1° del mese, 09:00)");
+  console.log("[cron] job giornaliero ricorrenze schedulato (06:00)");
   console.log("[cron] job giornaliero scadenze fiscali schedulato (08:00)");
 }

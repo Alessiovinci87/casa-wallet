@@ -4,6 +4,8 @@ import { useTransactionStore } from "../store/transactionStore.js";
 import { useTreasuryStore } from "../store/treasuryStore.js";
 import { CATEGORIES, PAY_METHODS, PAY_METHOD_LABELS } from "../lib/constants.js";
 import Segmented from "./Segmented.jsx";
+import RecurrenceFields, { emptyRecurrence, recurrenceToPayload } from "./RecurrenceFields.jsx";
+import { useRecurringStore } from "../store/recurringStore.js";
 
 const empty = {
   amount: "",
@@ -30,6 +32,11 @@ export default function TransactionForm({ initial, onClose }) {
     description: initial?.description ?? "",
   }));
   const [ocrBusy, setOcrBusy] = useState(false);
+  // "Ripeti": in creazione la transazione diventa una regola ricorrente
+  // (la prima occorrenza nasce subito con postFirst, le altre dal cron).
+  const [repeat, setRepeat] = useState(false);
+  const [recurrence, setRecurrence] = useState(emptyRecurrence);
+  const createRule = useRecurringStore((s) => s.createRule);
   const [error, setError] = useState("");
   // Riconciliazione: fatture EMESSE per riconoscere un'entrata come incasso.
   const [pendingInvoices, setPendingInvoices] = useState(null); // null = non ancora caricate
@@ -129,7 +136,19 @@ export default function TransactionForm({ initial, onClose }) {
     };
     try {
       if (isEdit) await updateTransaction(initial.id, payload);
-      else await addTransaction(payload);
+      else if (repeat) {
+        await createRule({
+          type: payload.type,
+          amount: payload.amount,
+          category: payload.category,
+          method: payload.method,
+          description: payload.description,
+          startDate: payload.date,
+          postFirst: true,
+          ...recurrenceToPayload(recurrence),
+        });
+        await fetchTransactions();
+      } else await addTransaction(payload);
       onClose();
     } catch (err) {
       setError(err.response?.data?.error || "Errore salvataggio");
@@ -251,6 +270,33 @@ export default function TransactionForm({ initial, onClose }) {
             className="w-full px-2 py-2 border border-card-line rounded"
           />
         </div>
+
+        {!isEdit && (
+          <div className="mt-4 border-t border-card-line pt-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Ripeti</span>
+              <Segmented
+                size="sm"
+                value={repeat}
+                onChange={setRepeat}
+                options={[
+                  { value: false, label: "No" },
+                  { value: true, label: "Sì" },
+                ]}
+              />
+            </div>
+            {repeat && (
+              <div className="mt-3">
+                <RecurrenceFields value={recurrence} onChange={setRecurrence} />
+                {form.type === "INCOME" && form.taxPercent !== "" && (
+                  <p className="text-[11px] text-tax-600 mt-2">
+                    Le entrate ricorrenti non accantonano tasse in automatico: la % va applicata a mano.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex justify-end gap-2 mt-6">
           <button type="button" onClick={onClose} className="px-4 py-2 text-ink-600 hover:text-ink-900">

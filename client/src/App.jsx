@@ -19,6 +19,7 @@ const AnalyticsPage = lazy(() => import("./pages/AnalyticsPage.jsx"));
 const ShoppingListPage = lazy(() => import("./pages/ShoppingListPage.jsx"));
 const BudgetsPage = lazy(() => import("./pages/BudgetsPage.jsx"));
 const SummaryPage = lazy(() => import("./pages/SummaryPage.jsx"));
+const RecurringPage = lazy(() => import("./pages/RecurringPage.jsx"));
 
 const Spinner = () => (
   <div className="min-h-[40vh] flex items-center justify-center">
@@ -68,6 +69,7 @@ function App() {
             <Route path="/shopping-list" element={<ShoppingListPage />} />
             <Route path="/budgets" element={<BudgetsPage />} />
             <Route path="/summary" element={<SummaryPage />} />
+            <Route path="/recurring" element={<RecurringPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>
         </Routes>

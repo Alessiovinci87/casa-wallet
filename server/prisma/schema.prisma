@@ -24,6 +24,7 @@ model Household {
   recurringProducts RecurringProduct[]
   dismissals        ShoppingListDismissal[]
   categoryBudgets   CategoryBudget[]
+  recurringRules    RecurringRule[]
 }
 
 model User {
@@ -44,6 +45,7 @@ model User {
   fiscalProfile FiscalProfile?
   invoices        Invoice[]
   arubaConnection ArubaConnection?
+  recurringRules  RecurringRule[]
 }
 
 model Transaction {
@@ -66,8 +68,12 @@ model Transaction {
   taxSaving   TaxSaving?
   receipt     Receipt?
   invoice     Invoice?
+  // Nullable: transazione nata da una regola ricorrente (chip "Ricorrente").
+  recurringRuleId String?
+  recurringRule   RecurringRule? @relation(fields: [recurringRuleId], references: [id])
 
   @@index([householdId, date])
+  @@index([recurringRuleId, date])
 }
 
 model TaxSaving {
@@ -81,17 +87,9 @@ model TaxSaving {
   transferredAt DateTime?
 }
 
-enum TxType {
-  INCOME
-  EXPENSE
-}
-
-enum PayMethod {
-  CASH
-  POS
-  CARD
-  TRANSFER
-}
+// Allowed values (validated in the API, since SQLite has no native enums):
+//   type:   INCOME | EXPENSE
+//   method: CASH | POS | CARD | TRANSFER
 
 model Receipt {
   id            String        @id @default(cuid())
@@ -255,4 +253,51 @@ model ArubaConnection {
   lastSyncAt        DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
+}
+
+// Regola ricorrente (entrata o uscita): motore separato da RecurringProduct
+// (prodotti della spesa). Scoped famiglia; userId = chi l'ha creata.
+//   frequency: WEEKLY | MONTHLY | BIMONTHLY | QUARTERLY | SEMIANNUAL | YEARLY
+//   autoPost:  true = il cron crea la Transaction; false = push "Conferma" e
+//              la transazione nasce alla conferma (pendingAt = occorrenza in attesa)
+model RecurringRule {
+  id           String    @id @default(cuid())
+  householdId  String
+  household    Household @relation(fields: [householdId], references: [id])
+  userId       String
+  user         User      @relation(fields: [userId], references: [id])
+  type         String    // INCOME | EXPENSE
+  amount       Float
+  category     String
+  method       String    // CASH | POS | CARD | TRANSFER
+  description  String?
+  frequency    String
+  interval     Int       @default(1)
+  dayOfMonth   Int?      // 1..31 (31 = ultimo giorno del mese)
+  weekday      Int?      // 0..6 (0 = domenica) per WEEKLY
+  startDate    DateTime
+  endDate      DateTime?
+  nextRunAt    DateTime?
+  lastPostedAt DateTime?
+  pendingAt    DateTime? // occorrenza in attesa di conferma (solo autoPost=false)
+  autoPost     Boolean   @default(true)
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  transactions Transaction[]
+
+  @@index([householdId, active])
+  @@index([nextRunAt])
+}
+
+enum TxType {
+  INCOME
+  EXPENSE
+}
+
+enum PayMethod {
+  CASH
+  POS
+  CARD
+  TRANSFER
 }
