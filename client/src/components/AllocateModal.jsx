@@ -45,8 +45,8 @@ export default function AllocateModal({ amount, incomeTransactionId, onClose, on
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-20">
-      <div className="card p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+    <div className="modal-backdrop z-20">
+      <div className="card p-6 w-full max-w-md modal-panel">
         <h2 className="text-lg font-semibold">Distribuisci sugli obiettivi</h2>
         <p className="text-sm text-ink-600 mt-1">
           {proposal?.source

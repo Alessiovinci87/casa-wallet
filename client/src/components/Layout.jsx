@@ -95,9 +95,16 @@ export default function Layout() {
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
-    const onResize = () => setKeyboard(window.innerHeight - vv.height > 150);
+    const onResize = () => {
+      setKeyboard(window.innerHeight - vv.height > 150);
+      // Le finestre (nuova spesa, ricorrenza…) si dimensionano sul viewport visuale:
+      // con la tastiera aperta restano interamente scorrevoli fino al tasto Salva.
+      document.documentElement.style.setProperty("--vvh", `${Math.round(vv.height)}px`);
+    };
+    onResize();
     vv.addEventListener("resize", onResize);
-    return () => vv.removeEventListener("resize", onResize);
+    vv.addEventListener("scroll", onResize);
+    return () => { vv.removeEventListener("resize", onResize); vv.removeEventListener("scroll", onResize); };
   }, []);
 
   const pick = (key) => {
