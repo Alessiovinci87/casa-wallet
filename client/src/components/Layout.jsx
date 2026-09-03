@@ -9,6 +9,7 @@ const links = [
   { to: "/income", label: "Entrate" },
   { to: "/goals", label: "Obiettivi" },
   { to: "/recurring", label: "Ricorrenze" },
+  { to: "/forecast", label: "Previsione" },
   { to: "/tax-savings", label: "Salvadanaio" },
   { to: "/treasury", label: "Tesoreria" },
   { to: "/invoices", label: "Fatture" },
