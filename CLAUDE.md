@@ -154,6 +154,9 @@ App di gestione economia domestica **multi-tenant** (famiglie/household). Nata p
 - Flag: `--skip-seed` (riusa guide.db), `--shots-only`, `--pdf-only`, `--keep-html`. **Prod**: `--base-url=https://casa-wallet.vercel.app --api-url=https://casa-wallet-production.up.railway.app --email=… --password=…` salta seed/server e le schermate `sensitive` (punto-zero, tesoreria, fatture, impostazioni), che restano quelle già in `img/`.
 - `seed-demo.js` NON è eseguito dal Dockerfile; ricrea da zero la famiglia "Demo" se esiste (idempotente).
 
+## Icona app — `npm run icons`
+- Sorgente `client/public/favicon.svg` (portafoglio bianco su verde brand-600 `#0a6847`, angoli arrotondati). `scripts/icons/generate.mjs` (Playwright) produce `icon-192.png`, `icon-512.png`, `icon-512-maskable.png`, `apple-touch-icon.png` in `client/public` e i mipmap Android (`ic_launcher`, `ic_launcher_round`, `ic_launcher_foreground` per densità) + `values/ic_launcher_background.xml` verde. `index.html`: link icon/apple-touch-icon/manifest, `theme-color`, meta iOS web-app. `public/manifest.webmanifest` (standalone, verde) → "Aggiungi a schermata Home" mostra l'icona. Per l'APK: `npx cap sync android` e rebuild.
+
 ## Stack
 - /client: React + Vite + Tailwind → Vercel
 - /server: Node + Express + Prisma + PostgreSQL → Railway
