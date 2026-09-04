@@ -6,6 +6,9 @@
 // personali − quota equa delle spese di famiglia (spese household / n. membri).
 // Con scope "household" si considerano le entrate e le spese di tutta la famiglia.
 import { prisma } from "./prisma.js";
+import { pendingTaxFund } from "./taxFund.js";
+import { monthlyEquivalent } from "./recurrence.js";
+import { computeInstallmentPlan } from "./repaymentPlan.js";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -260,17 +263,20 @@ function monthsToRepayWithCollections(amount, monthlyCapacity, collections, toda
  * della prossima scadenza?" Tre scenari dai percentili della capacità mensile.
  */
 export async function simulateSelfFinancing({ userId, householdId, amount, scope = "user", buffer = 0.1 }) {
-  const profile = await buildFinancialProfile({ userId, householdId, scope, buffer });
-  if (!profile.ok) return profile;
+  let profile = await buildFinancialProfile({ userId, householdId, scope, buffer });
+  // Fallback dichiarativo: senza 3 mesi di storico la capacità viene dai dati
+  // inseriti (ricorrenze, obiettivi, budget). Mai un NO muto.
+  let declared = null;
+  if (!profile.ok) {
+    declared = await buildDeclaredCapacity({ householdId, userId, buffer });
+    profile = declared.profile;
+  }
 
   const today = new Date();
   const todayUTC = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
 
-  const [pendingSavings, nextDeadline, overdueCount] = await Promise.all([
-    prisma.taxSaving.findMany({
-      where: { transferred: false, transaction: { userId } },
-      select: { amount: true },
-    }),
+  const [fundAvailable, nextDeadline, overdueCount] = await Promise.all([
+    pendingTaxFund(userId),
     prisma.taxDeadline.findFirst({
       where: { userId, paid: false, dueDate: { gte: todayUTC } },
       orderBy: { dueDate: "asc" },
@@ -280,8 +286,6 @@ export async function simulateSelfFinancing({ userId, householdId, amount, scope
       where: { userId, paid: false, dueDate: { lt: todayUTC } },
     }),
   ]);
-
-  const fundAvailable = pendingSavings.reduce((s, t) => s + t.amount, 0);
 
   // Incassi attesi (fatture EMESSE): accelerano il rientro negli scenari
   // realistico e ottimista; lo scenario pessimista li ignora per prudenza.
@@ -329,14 +333,24 @@ export async function simulateSelfFinancing({ userId, householdId, amount, scope
   else if (byName.ottimista === "OK" || byName.ottimista === "RISCHIO") overallVerdict = "RISCHIO";
   else overallVerdict = "NO";
 
+  // Piano di rientro proposto: rate nei mesi pieni fino alla prossima scadenza.
+  const repaymentPlan = nextDeadline
+    ? { ...computeInstallmentPlan({ amount, takenAt: todayUTC, dueDate: nextDeadline.dueDate }), fundAfter: Number((fundAvailable - amount).toFixed(2)) }
+    : null;
+
   return {
     ok: true,
     amount,
     scope,
+    basis: declared ? "dichiarato" : "storico",
+    basisLabel: declared ? "stima da dati dichiarati" : `stima dallo storico (${profile.monthsAnalyzed} mesi)`,
+    declared: declared ? declared.summary : null,
+    missing: declared ? declared.missing : [],
     fundAvailable,
     exceedsFund: amount > fundAvailable,
     overdueCount,
     nextDeadline,
+    repaymentPlan,
     // Metadati per la UI (senza la lista items, interna alla simulazione).
     expectedCollections: expectedCollections
       ? {
@@ -358,6 +372,53 @@ export async function simulateSelfFinancing({ userId, householdId, amount, scope
       effectiveTaxPercent: profile.effectiveTaxPercent,
       buffer: profile.buffer,
     },
-    disclaimer: DISCLAIMER,
+    disclaimer: declared ? DECLARED_DISCLAIMER : DISCLAIMER,
+  };
+}
+
+export const DECLARED_DISCLAIMER = "Stima da dati dichiarati (ricorrenze, obiettivi, budget): con 3 mesi di storico passa alla stima dallo storico. Non è consulenza fiscale.";
+
+/**
+ * Capacità mensile "dichiarata" (fallback sotto i 3 mesi di storico):
+ *   entrate ricorrenti (mensilizzate) − uscite ricorrenti (mensilizzate)
+ *   − quote obiettivi del mese − budget variabili per categoria.
+ * Gli incassi attesi dalle fatture EMESSE entrano nella simulazione come
+ * somme una tantum (come nello scenario storico). Scenari: pessimista = 75%
+ * senza incassi, realistico = capacità − buffer, ottimista = capacità piena.
+ */
+export async function buildDeclaredCapacity({ householdId, userId, buffer = 0.1 }) {
+  const { listGoals } = await import("./goals.js");
+  const [rules, goals, budgets] = await Promise.all([
+    prisma.recurringRule.findMany({ where: { householdId, active: true } }),
+    listGoals({ householdId, userId }),
+    prisma.categoryBudget.findMany({ where: { householdId } }),
+  ]);
+  const r2 = (n) => Number((Math.round(n * 100) / 100).toFixed(2));
+  const income = r2(rules.filter((r) => r.type === "INCOME").reduce((s, r) => s + monthlyEquivalent(r), 0));
+  const fixed = r2(rules.filter((r) => r.type === "EXPENSE").reduce((s, r) => s + monthlyEquivalent(r), 0));
+  const goalsQuota = r2(goals.filter((g) => g.active && g.status !== "DONE").reduce((s, g) => s + (g.catchUpQuota ?? g.monthlyQuota ?? 0), 0));
+  const budgetsTotal = r2(budgets.reduce((s, b) => s + (b.amount || 0), 0));
+  const capacity = r2(income - fixed - goalsQuota - budgetsTotal);
+  const pendingInvoices = await prisma.invoice.count({ where: { userId, status: "EMESSA" } });
+  const missing = [];
+  if (income === 0 && pendingInvoices === 0) missing.push("entrate: aggiungi una ricorrenza in entrata o importa una fattura emessa");
+  if (budgets.length === 0) missing.push("budget delle spese variabili (Altro → Budget): senza, le variabili contano zero");
+  const cap = capacity > 0 ? capacity : null;
+  return {
+    missing,
+    summary: { income, fixed, goalsQuota, budgets: budgetsTotal, capacity, pendingInvoices },
+    profile: {
+      ok: true,
+      basis: "dichiarato",
+      monthsAnalyzed: 0,
+      buffer,
+      medianMonthlyIncome: income,
+      avgMonthlyExpense: r2(fixed + budgetsTotal),
+      effectiveTaxPercent: null,
+      capacity: {
+        p25: cap ? r2(cap * 0.75) : cap, p50: cap, p75: cap,
+        buffered: { p25: cap ? r2(cap * 0.75) : cap, p50: cap ? r2(cap * (1 - buffer)) : cap, p75: cap },
+      },
+    },
   };
 }

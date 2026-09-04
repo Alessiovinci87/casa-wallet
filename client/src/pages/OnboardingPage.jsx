@@ -35,6 +35,7 @@ export default function OnboardingPage() {
   const [rule, setRule] = useState({ type: "EXPENSE", description: "", amount: "", dayOfMonth: "", category: "" });
   const [hasVat, setHasVat] = useState(null);
   const [taxPct, setTaxPct] = useState("");
+  const [taxOpening, setTaxOpening] = useState("");
   const [goal, setGoal] = useState({ name: "", amount: "", date: "" });
   const [copied, setCopied] = useState(false);
 
@@ -81,6 +82,10 @@ export default function OnboardingPage() {
   const saveTax = () => wrap(async () => {
     if (hasVat && taxPct !== "") {
       await saveFiscalProfile({ ...(fiscalProfile || {}), regime: fiscalProfile?.regime || "FORFETTARIO", defaultTaxPercent: Number(taxPct) });
+    }
+    // "Già accantonato per le tasse": fondo iniziale personale (reversibile da Tesoreria).
+    if (hasVat && taxOpening !== "" && Number(taxOpening) > 0) {
+      await api.put("/api/tax-savings/opening", { amount: Number(taxOpening) });
     }
     setStep(4);
   });
@@ -189,6 +194,9 @@ export default function OnboardingPage() {
               <label className="block text-xs text-ink-600 mb-1">% da accantonare su ogni entrata</label>
               <input type="number" min="0" max="100" value={taxPct} onChange={(e) => setTaxPct(e.target.value)} placeholder="es. 30" className="w-40 px-2 py-2 border border-card-line rounded nums" />
               <p className="text-[11px] text-ink-400 mt-1">In Tesoreria puoi affinare regime, coefficiente e aliquote: l'app ti dirà la % minima consigliata.</p>
+              <label className="block text-xs text-ink-600 mb-1 mt-3">Già accantonato per le tasse (facoltativo)</label>
+              <input type="number" min="0" step="0.01" value={taxOpening} onChange={(e) => setTaxOpening(e.target.value)} placeholder="es. 3000" className="w-40 px-2 py-2 border border-card-line rounded nums" />
+              <p className="text-[11px] text-ink-400 mt-1">Soldi già messi da parte per le tasse e compresi nel saldo iniziale: partono nel fondo tasse fin da subito.</p>
             </div>
           )}
           <div className="flex justify-end">

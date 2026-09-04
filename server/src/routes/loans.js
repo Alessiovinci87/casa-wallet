@@ -3,6 +3,7 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { DEFAULT_MAX_PERCENT, checkInternalLoans, createInternalLoan, enrichLoan, loansSummary } from "../lib/loans.js";
+import { pendingTaxFund } from "../lib/taxFund.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -11,28 +12,29 @@ router.use(authMiddleware);
 router.get("/", async (req, res) => {
   const where = { userId: req.user.id };
   if (req.query.includeClosed !== "true") where.status = { in: ["OPEN", "LATE"] };
-  const [loans, pending, profile, summary] = await Promise.all([
+  const [loans, fundAvailable, profile, summary] = await Promise.all([
     prisma.internalLoan.findMany({ where, orderBy: { takenAt: "desc" } }),
-    prisma.taxSaving.aggregate({ where: { transferred: false, transaction: { userId: req.user.id } }, _sum: { amount: true } }),
+    pendingTaxFund(req.user.id),
     prisma.fiscalProfile.findUnique({ where: { userId: req.user.id }, select: { maxSelfFinancePercent: true } }),
     loansSummary(req.user.id),
   ]);
-  const fundAvailable = Number((pending._sum.amount || 0).toFixed(2));
   const maxPercent = profile?.maxSelfFinancePercent ?? DEFAULT_MAX_PERCENT;
   res.json({
     loans: loans.map((l) => enrichLoan(l)),
     outstanding: summary.outstanding,
     openCount: summary.openCount,
     fundAvailable,
+    fundFree: Math.max(0, Number((fundAvailable - summary.outstanding).toFixed(2))),
     maxPercent,
     cap: Math.max(0, Number(((fundAvailable * maxPercent) / 100 - summary.outstanding).toFixed(2))),
   });
 });
 
-// POST /api/loans { amount, note?, scope? } → 201 | 400 con motivo del rifiuto
+// POST /api/loans { amount, note?, scope?, force? } → 201 | 400 con motivo del rifiuto
+// force=true accetta un verdetto RISCHIO (mai un NO); resta loggato in loan.forced.
 router.post("/", async (req, res) => {
-  const { amount, note, scope } = req.body || {};
-  const r = await createInternalLoan({ userId: req.user.id, householdId: req.user.householdId, amount, note, scope });
+  const { amount, note, scope, force } = req.body || {};
+  const r = await createInternalLoan({ userId: req.user.id, householdId: req.user.householdId, amount, note, scope, force: force === true });
   if (r.error) return res.status(400).json({ error: r.error, code: r.code, cap: r.cap, maxPercent: r.maxPercent });
   res.status(201).json(r);
 });

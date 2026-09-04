@@ -6,12 +6,14 @@
 //     coperta dal fondo tasse (consumato in ordine di scadenza)
 //   + incassi attesi (fatture EMESSE, netto post-accantonamento)     [treasury]
 //   − quote obiettivi del mese (il 1° di ogni mese; oggi per il residuo corrente) [F3]
+//   − rate di rientro dei prestiti dal fondo tasse (rialimentano il fondo)   [F6]
 // Ritorna i giorni con saldo proiettato e flag NEGATIVE / LOW (< 20% delle fisse).
 import { prisma } from "./prisma.js";
 import { occurrencesBetween, todayRomeUTC } from "./recurrence.js";
 import { computeExpectedCollections } from "./treasury.js";
 import { computeAvailable } from "./available.js";
 import { listGoals } from "./goals.js";
+import { enrichLoan } from "./loans.js";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const round2 = (n) => Number((Math.round(n * 100) / 100).toFixed(2));
@@ -45,16 +47,34 @@ export async function buildForecast({ householdId, userId, days = 90 }) {
     }
   }
 
-  // 2) Scadenze fiscali non pagate (tutti i membri), coperte dal fondo tasse in ordine.
+  // 2) Rate di rientro dei prestiti interni (future, non ancora coperte da quanto già rientrato).
   const memberIds = members.map((m) => m.id);
   const nameOf = Object.fromEntries(members.map((m) => [m.id, m.name]));
+  const loans = await prisma.internalLoan.findMany({ where: { userId: { in: memberIds }, status: { in: ["OPEN", "LATE"] } } });
+  const loanEvents = [];
+  for (const l of loans) {
+    for (const it of enrichLoan(l, today).remainingInstallments) {
+      const date = it.date < today ? today : it.date;
+      if (date > horizon) continue;
+      loanEvents.push({ date, kind: "loan", label: `Rata rientro fondo tasse · ${nameOf[l.userId] || ""}`.trim(), amount: -it.amount, loanId: l.id });
+    }
+  }
+  loanEvents.sort((a, b) => a.date - b.date);
+  events.push(...loanEvents);
+
+  // 3) Scadenze fiscali non pagate (tutti i membri), coperte dal fondo tasse in
+  //    ordine. Il fondo parte al netto dei prestiti aperti e si rialimenta con
+  //    le rate che precedono ogni scadenza.
   const deadlines = await prisma.taxDeadline.findMany({
     where: { userId: { in: memberIds }, paid: false, dueDate: { lte: horizon } },
     orderBy: { dueDate: "asc" },
   });
-  let fund = avail.taxPending;
+  let fund = round2(avail.taxPending - (avail.loansOutstanding || 0));
+  let li = 0;
   for (const d of deadlines) {
-    const covered = Math.min(fund, d.expectedAmount);
+    const due = d.dueDate < today ? today : d.dueDate;
+    while (li < loanEvents.length && loanEvents[li].date <= due) { fund = round2(fund - loanEvents[li].amount); li += 1; }
+    const covered = Math.max(0, Math.min(fund, d.expectedAmount));
     fund = round2(fund - covered);
     const uncovered = round2(d.expectedAmount - covered);
     events.push({
@@ -69,7 +89,7 @@ export async function buildForecast({ householdId, userId, days = 90 }) {
     });
   }
 
-  // 3) Incassi attesi (netto post-accantonamento), per ogni membro con fatture.
+  // 4) Incassi attesi (netto post-accantonamento), per ogni membro con fatture.
   for (const m of members) {
     const coll = await computeExpectedCollections({ userId: m.id, todayUTC: today });
     if (!coll) continue;
@@ -79,7 +99,7 @@ export async function buildForecast({ householdId, userId, days = 90 }) {
     }
   }
 
-  // 4) Quote obiettivi: residuo del mese corrente oggi, quota piena il 1° dei mesi successivi.
+  // 5) Quote obiettivi: residuo del mese corrente oggi, quota piena il 1° dei mesi successivi.
   const active = goals.filter((g) => g.active && g.status !== "DONE");
   const monthRemaining = round2(active.reduce((s, g) => s + (g.monthRemaining || 0), 0));
   const monthQuota = round2(active.reduce((s, g) => s + (g.monthlyQuota || 0), 0));
@@ -137,9 +157,10 @@ export async function buildForecast({ householdId, userId, days = 90 }) {
       deadlines: round2(events.filter((e) => e.kind === "deadline").reduce((s, e) => s + e.amount, 0)),
       collections: round2(events.filter((e) => e.kind === "collection").reduce((s, e) => s + e.amount, 0)),
       goals: round2(events.filter((e) => e.kind === "goal").reduce((s, e) => s + e.amount, 0)),
+      loans: round2(events.filter((e) => e.kind === "loan").reduce((s, e) => s + e.amount, 0)),
     },
     events,
     daily,
-    disclaimer: "Proiezione deterministica: ricorrenze, scadenze, incassi attesi e quote obiettivi. Le spese variabili non sono incluse.",
+    disclaimer: "Proiezione deterministica: ricorrenze, scadenze, incassi attesi, quote obiettivi e rate dei prestiti dal fondo tasse. Le spese variabili non sono incluse.",
   };
 }

@@ -32,6 +32,20 @@ export const useTreasuryStore = create((set, get) => ({
     await get().fetchLoans();
   },
 
+  // Fondo tasse iniziale ("già accantonato"): { amount|null, totalPending }
+  openingTax: null,
+  fetchOpeningTax: async () => {
+    const { data } = await api.get("/api/tax-savings/opening");
+    set({ openingTax: data });
+    return data;
+  },
+  saveOpeningTax: async (amount) => {
+    const { data } = await api.put("/api/tax-savings/opening", { amount });
+    set({ openingTax: data });
+    await get().fetchLoans().catch(() => {});
+    return data;
+  },
+
   fetchDeadlines: async () => {
     const { data } = await api.get("/api/deadlines");
     set({ deadlines: data });

@@ -119,7 +119,7 @@ router.post("/reset", async (req, res) => {
     prisma.arubaConnection.deleteMany({ where: { userId: { in: ids } } }),
     prisma.receiptItem.deleteMany({ where: { receipt: { householdId: hh } } }),
     prisma.receipt.deleteMany({ where: { householdId: hh } }),
-    prisma.taxSaving.deleteMany({ where: { transaction: { householdId: hh } } }),
+    prisma.taxSaving.deleteMany({ where: { OR: [{ transaction: { householdId: hh } }, { userId: { in: ids } }] } }),
     prisma.transaction.deleteMany({ where: { householdId: hh } }),
     prisma.recurringRule.deleteMany({ where: { householdId: hh } }),
     prisma.categoryBudget.deleteMany({ where: { householdId: hh } }),

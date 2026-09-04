@@ -14,6 +14,7 @@ const KIND = {
   deadline: { label: "Scadenza fiscale", cls: "bg-tax-50 text-tax-600" },
   collection: { label: "Incasso atteso", cls: "bg-emerald-50 text-emerald-700" },
   goal: { label: "Obiettivi", cls: "bg-paper text-ink-600" },
+  loan: { label: "Rata fondo tasse", cls: "bg-tax-50 text-tax-600" },
 };
 
 export default function ForecastPage() {

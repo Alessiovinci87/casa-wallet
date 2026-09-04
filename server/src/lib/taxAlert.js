@@ -1,6 +1,7 @@
 // Monthly "salvadanaio tasse" reminder. Il salvadanaio è PERSONALE: ogni
 // utente riceve email + push con il SOLO proprio totale non trasferito.
 import { prisma } from "./prisma.js";
+import { ownTaxSavingWhere } from "./taxFund.js";
 import { sendEmail } from "./email.js";
 import { sendPushToUser } from "./push.js";
 
@@ -21,7 +22,7 @@ export async function sendTaxAlertForUser(userId, { force = false } = {}) {
   if (!user) throw new Error("Utente non trovato");
 
   const pending = await prisma.taxSaving.findMany({
-    where: { transferred: false, transaction: { userId } },
+    where: { transferred: false, ...ownTaxSavingWhere(userId) },
   });
   const totalPending = pending.reduce((sum, t) => sum + t.amount, 0);
 

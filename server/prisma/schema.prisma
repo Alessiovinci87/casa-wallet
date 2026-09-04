@@ -76,6 +76,7 @@ model User {
   recurringRules  RecurringRule[]
   savingsGoals    SavingsGoal[]
   internalLoans   InternalLoan[]
+  taxSavings      TaxSaving[]   // accantonamenti iniziali senza transazione
 }
 
 model Transaction {
@@ -117,8 +118,14 @@ model Transaction {
 
 model TaxSaving {
   id            String       @id @default(cuid())
-  transactionId String       @unique
-  transaction   Transaction  @relation(fields: [transactionId], references: [id])
+  transactionId String?      @unique
+  transaction   Transaction? @relation(fields: [transactionId], references: [id])
+  // Accantonamento iniziale ("già accantonato per le tasse"): nessuna transazione,
+  // userId diretto e note = "saldo iniziale". Il proprietario del salvadanaio è
+  // sempre transaction.userId oppure userId.
+  userId        String?
+  user          User?        @relation(fields: [userId], references: [id])
+  note          String?
   amount        Float
   month         Int
   year          Int
@@ -395,6 +402,7 @@ model InternalLoan {
   status            String    @default("OPEN")
   note              String?
   simulationVerdict String?   // verdetto al momento del prelievo
+  forced            Boolean   @default(false) // verdetto RISCHIO accettato esplicitamente dall'utente
   lastAlertAt       DateTime? // anti-duplicato alert 30 giorni
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt

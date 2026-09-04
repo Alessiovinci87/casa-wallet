@@ -74,7 +74,9 @@ router.post("/generate", async (req, res) => {
   if (!estimate.ok) return res.status(400).json({ error: estimate.detail || estimate.reason });
   if (estimate.noHistory) {
     return res.status(400).json({
-      error: `Nessuna fattura incassata nel ${year - 1}: non c'è una base per stimare saldo e acconti.`,
+      error: `Nessuna fattura incassata nel ${year - 1}: non c'è una base per stimare saldo e acconti. Inserisci le scadenze a mano con "Nuova scadenza" (importo dal commercialista o dall'F24 dell'anno scorso).`,
+      code: "NO_HISTORY",
+      noHistory: true,
     });
   }
 

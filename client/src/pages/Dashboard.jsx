@@ -69,7 +69,7 @@ function BreakdownSheet({ avail, onClose }) {
             <li key={b.key} className="py-2.5">
               <div className="flex justify-between gap-3">
                 <span className="text-ink-600">{b.label}</span>
-                <span className="font-semibold nums">{b.sign < 0 ? "− " : ""}{eur(b.amount)}</span>
+                <span className="font-semibold nums">{b.sign < 0 ? "− " : b.key !== "balance" ? "+ " : ""}{eur(b.amount)}</span>
               </div>
               {b.key === "balance" && avail.accounts?.length > 1 && (
                 <ul className="mt-1 text-[13px] text-ink-400">

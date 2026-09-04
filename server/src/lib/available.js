@@ -3,12 +3,14 @@
 //   − tasse accantonate non trasferite (TaxSaving pending di tutti i membri)
 //   − somme parcheggiate negli Obiettivi
 //   − uscite ricorrenti già dovute da qui a fine mese (non ancora registrate)
-//   − prestiti interni aperti dal fondo tasse (quella parte del saldo è già impegnata)
+//   + prestiti interni aperti dal fondo tasse (quella parte del fondo è stata
+//     liberata: i soldi sono spendibili, il rientro compare come rate in Previsione)
 // Il saldo effettivo parte dal punto zero (Household.openingBalance alla data)
 // oppure, senza punto zero, dalla somma di tutte le transazioni.
 import { prisma } from "./prisma.js";
 import { accrualInfo, accruedForPeriodic, monthlyEquivalent, monthsPerOccurrence, occurrencesBetween, todayRomeUTC } from "./recurrence.js";
 import { computeAccountBalances } from "./accounts.js";
+import { householdTaxSavingWhere } from "./taxFund.js";
 
 const round2 = (n) => Number((Math.round(n * 100) / 100).toFixed(2));
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -66,7 +68,7 @@ export async function computeAvailable({ householdId, userId }) {
   const [bal, taxAgg, goals, committed, fixedRules, loansAgg] = await Promise.all([
     computeBalance(household, today),
     prisma.taxSaving.aggregate({
-      where: { transferred: false, transaction: { householdId } },
+      where: { transferred: false, ...householdTaxSavingWhere(householdId) },
       _sum: { amount: true },
     }),
     // Tutti gli obiettivi della famiglia (anche personali di altri membri): i
@@ -97,7 +99,7 @@ export async function computeAvailable({ householdId, userId }) {
     .filter((i) => i.accrued > 0);
   const periodicAccrued = round2(periodicItems.reduce((s, i) => s + i.accrued, 0));
 
-  const available = round2(bal.balance - taxPending - goalsParked - committed.total - periodicAccrued - loansOutstanding);
+  const available = round2(bal.balance - (taxPending - loansOutstanding) - goalsParked - committed.total - periodicAccrued);
   const status = available < 0 ? "NEGATIVE" : fixedMonthly > 0 && available < fixedMonthly * 0.2 ? "LOW" : "OK";
 
   const breakdown = [
@@ -110,7 +112,7 @@ export async function computeAvailable({ householdId, userId }) {
     breakdown.push({ key: "periodic", label: "Accantonato per spese periodiche", amount: periodicAccrued, sign: -1 });
   }
   if (loansOutstanding > 0) {
-    breakdown.push({ key: "loans", label: "Prestiti interni da rientrare", amount: loansOutstanding, sign: -1 });
+    breakdown.push({ key: "loans", label: "Prelevati dal fondo tasse (da rientrare)", amount: loansOutstanding, sign: 1 });
   }
 
   return {

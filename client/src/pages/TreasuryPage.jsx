@@ -30,9 +30,12 @@ export default function TreasuryPage() {
     simulation, simulating, simulate,
     fiscalProfile, suggestedMinPercent, belowSuggested, fetchFiscalProfile, saveFiscalProfile,
     loans, fetchLoans, createLoan, repayLoan, cancelLoan,
+    openingTax, fetchOpeningTax, saveOpeningTax,
   } = useTreasuryStore();
   const [loanBusy, setLoanBusy] = useState(false);
   const [loanMsg, setLoanMsg] = useState("");
+  const [openingTaxInput, setOpeningTaxInput] = useState("");
+  const [openingTaxMsg, setOpeningTaxMsg] = useState("");
 
   const [scope, setScope] = useState("user");
   const [showForm, setShowForm] = useState(false);
@@ -60,19 +63,45 @@ export default function TreasuryPage() {
     fetchFiscalProfile();
     fetchTaxEstimate();
     fetchLoans().catch(() => {});
-  }, [fetchDeadlines, fetchFiscalProfile, fetchLoans]);
+    fetchOpeningTax().catch(() => {});
+  }, [fetchDeadlines, fetchFiscalProfile, fetchLoans, fetchOpeningTax]);
 
-  // Prestito interno: creato SOLO se il simulatore dà OK e l'importo è entro il cap (guardrail server).
+  useEffect(() => {
+    if (openingTax) setOpeningTaxInput(openingTax.amount ?? "");
+  }, [openingTax]);
+
+  const submitOpeningTax = async (e) => {
+    e.preventDefault();
+    setOpeningTaxMsg("");
+    try {
+      const d = await saveOpeningTax(openingTaxInput === "" ? null : Number(openingTaxInput));
+      setOpeningTaxMsg(d.amount != null ? `Fondo iniziale salvato: ${eur(d.amount)}.` : "Fondo iniziale rimosso.");
+      fetchLoans().catch(() => {});
+    } catch (err) {
+      setOpeningTaxMsg(err.response?.data?.error || "Salvataggio non riuscito");
+    }
+  };
+
+  // Prestito interno: OK → si crea; RISCHIO → solo dopo conferma esplicita
+  // (force, loggato nel prestito); NO → mai (guardrail server).
   const takeLoan = async () => {
-    if (!simulation?.ok || simulation.overallVerdict !== "OK") return;
+    if (!simulation?.ok || simulation.overallVerdict === "NO") return;
+    const plan = simulation.repaymentPlan;
     const due = simulation.nextDeadline ? dayjs(simulation.nextDeadline.dueDate).format("DD/MM/YYYY") : "la prossima scadenza";
-    const note = window.prompt(`Preleva ${eur(simulation.amount)} dal fondo tasse con piano di rientro entro ${due}. A cosa serve? (facoltativo)`, "");
+    const planText = plan ? ` Rientro: ${plan.count} ${plan.count === 1 ? "rata" : "rate"} da ${eur(plan.installment)} (${plan.installments.map((i) => dayjs(i.date).format("D MMM")).join(", ")}).` : "";
+    let force = false;
+    if (simulation.overallVerdict === "RISCHIO") {
+      force = window.confirm(`Verdetto RISCHIOSO (${simulation.basisLabel}): il rientro potrebbe sforare la scadenza del ${due}.${planText}\n\nVuoi procedere lo stesso? La scelta resta registrata nel prestito.`);
+      if (!force) return;
+    }
+    const note = window.prompt(`Preleva ${eur(simulation.amount)} dal fondo tasse con piano di rientro entro ${due}.${planText} A cosa serve? (facoltativo)`, "");
     if (note == null) return;
     setLoanBusy(true);
     setLoanMsg("");
     try {
-      const r = await createLoan({ amount: simulation.amount, note, scope });
-      setLoanMsg(`Prestito registrato: rata ${eur(r.loan.monthlyRepayment)}/mese, rientro entro ${dayjs(r.loan.dueDate).format("DD/MM/YYYY")}.`);
+      const r = await createLoan({ amount: simulation.amount, note, scope, force });
+      setLoanMsg(`Prestito registrato: ${r.loan.installmentsCount} ${r.loan.installmentsCount === 1 ? "rata" : "rate"} da ${eur(r.loan.monthlyRepayment)} (${r.loan.installments.map((i) => dayjs(i.date).format("D MMM")).join(", ")}), rientro entro ${dayjs(r.loan.dueDate).format("DD/MM/YYYY")}. Nel fondo restano ${eur(r.fundAfter)}.`);
+      fetchOpeningTax().catch(() => {});
     } catch (err) {
       setLoanMsg(err.response?.data?.error || "Prestito rifiutato");
     } finally {
@@ -190,6 +219,7 @@ export default function TreasuryPage() {
   };
 
   const insufficientData = profile && profile.ok === false;
+  const fundTotal = loans?.fundAvailable ?? openingTax?.totalPending ?? 0;
 
   return (
     <div className="space-y-6">
@@ -362,8 +392,8 @@ export default function TreasuryPage() {
         ) : insufficientData ? (
           <div className="card p-4 text-sm text-ink-600">
             <strong>Dati insufficienti.</strong> Servono almeno 3 mesi di transazioni per costruire il profilo
-            (hai {profile.monthsAnalyzed} {profile.monthsAnalyzed === 1 ? "mese" : "mesi"}). Continua a registrare
-            entrate e uscite: il simulatore si attiverà da solo.
+            (hai {profile.monthsAnalyzed} {profile.monthsAnalyzed === 1 ? "mese" : "mesi"}). Anche i movimenti importati
+            dall'estratto conto contano. Intanto il simulatore usa i dati dichiarati (ricorrenze, obiettivi, budget).
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -404,6 +434,30 @@ export default function TreasuryPage() {
           Simula un prelievo dal salvadanaio tasse: il sistema calcola in quanto tempo riesci a
           reintegrarlo con le tue entrate e lo confronta con la prossima scadenza.
         </p>
+        {/* Fondo tasse: totale, prestati, "già accantonato" (fondo iniziale) */}
+        <div className="card p-4 space-y-2" data-testid="tax-fund">
+          <div className="flex items-baseline justify-between gap-3">
+            <div className="text-sm text-ink-600">Fondo tasse (accantonato, non trasferito)</div>
+            <div className="text-lg font-bold text-tax-600 nums">{eur(fundTotal)}</div>
+          </div>
+          {loans?.outstanding > 0 && (
+            <div className="text-xs text-tax-600">di cui prestati <strong className="nums">{eur(loans.outstanding)}</strong> · nel fondo restano <strong className="nums">{eur(loans.fundFree)}</strong></div>
+          )}
+          <form onSubmit={submitOpeningTax} className="flex flex-wrap items-end gap-2 pt-1">
+            <div>
+              <label className="block text-xs text-ink-600 mb-1">Già accantonato per le tasse €</label>
+              <input type="number" step="0.01" min="0" value={openingTaxInput} onChange={(e) => setOpeningTaxInput(e.target.value)}
+                placeholder="es. 3000" className="w-40 px-2 py-2 border border-card-line rounded-lg nums" />
+            </div>
+            <button type="submit" className="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700">Salva</button>
+            {openingTaxInput !== "" && openingTax?.amount != null && (
+              <button type="button" onClick={() => { setOpeningTaxInput(""); saveOpeningTax(null).then(() => setOpeningTaxMsg("Fondo iniziale rimosso.")).catch(() => {}); }} className="px-3 py-2 border border-card-line rounded-lg text-ink-600">Rimuovi</button>
+            )}
+          </form>
+          <p className="text-xs text-ink-400">Soldi già messi da parte prima di usare l'app: entrano nel fondo, nel Disponibile reale e nel simulatore. Modificabile in ogni momento.</p>
+          {openingTaxMsg && <div className="text-xs text-ink-900">{openingTaxMsg}</div>}
+        </div>
+
         <form onSubmit={runSimulation} className="card p-4 flex flex-wrap items-end gap-3">
           <div>
             <label className="block text-xs text-ink-600 mb-1">Importo che ti serve €</label>
@@ -411,18 +465,17 @@ export default function TreasuryPage() {
               type="number" step="1" min="1" required
               value={simAmount}
               onChange={(e) => setSimAmount(e.target.value)}
-              disabled={insufficientData}
-              className="w-40 px-2 py-2 border border-card-line rounded-lg nums disabled:opacity-50"
+              className="w-40 px-2 py-2 border border-card-line rounded-lg nums"
             />
           </div>
           <button
             type="submit"
-            disabled={simulating || insufficientData}
+            disabled={simulating}
             className="px-5 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:opacity-50"
           >
             {simulating ? "Calcolo…" : "Simula"}
           </button>
-          {insufficientData && <span className="text-xs text-ink-400">Disponibile con almeno 3 mesi di dati</span>}
+          {insufficientData && <span className="text-xs text-ink-400">Meno di 3 mesi di storico: stima da dati dichiarati</span>}
         </form>
 
         {simulation?.ok && (
@@ -432,6 +485,7 @@ export default function TreasuryPage() {
               <div>
                 <div className="text-xs opacity-80">Verdetto per {eur(simulation.amount)}</div>
                 <div className="text-xl font-bold">{VERDICT_STYLES[simulation.overallVerdict].label}</div>
+                <div className="text-xs opacity-80 mt-0.5">{simulation.basisLabel}</div>
               </div>
               <div className="text-right text-xs">
                 <div>Fondo tasse disponibile: <strong className="nums">{eur(simulation.fundAvailable)}</strong></div>
@@ -446,6 +500,37 @@ export default function TreasuryPage() {
                 )}
               </div>
             </div>
+
+            {simulation.declared && (
+              <div className="card p-4 text-xs text-ink-600 space-y-1">
+                <div className="font-semibold text-ink-900 text-sm">Base di calcolo: dati dichiarati</div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+                  <span>Entrate ricorrenti</span><span className="text-right nums">{eur(simulation.declared.income)}</span>
+                  <span>Uscite fisse</span><span className="text-right nums">− {eur(simulation.declared.fixed)}</span>
+                  <span>Quote obiettivi</span><span className="text-right nums">− {eur(simulation.declared.goalsQuota)}</span>
+                  <span>Budget variabili</span><span className="text-right nums">− {eur(simulation.declared.budgets)}</span>
+                  <span className="font-semibold text-ink-900">Capacità mensile</span><span className={`text-right nums font-semibold ${simulation.declared.capacity > 0 ? "text-brand-700" : "text-rose-600"}`}>{eur(simulation.declared.capacity)}</span>
+                </div>
+                {simulation.missing?.length > 0 && (
+                  <ul className="list-disc pl-4 text-rose-600">
+                    {simulation.missing.map((m) => <li key={m}>Manca: {m}</li>)}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {simulation.repaymentPlan && (
+              <div className="card p-4 text-sm" data-testid="repayment-plan">
+                <div className="font-semibold mb-1">Piano di rientro proposto</div>
+                <div className="text-xs text-ink-600">
+                  <strong className="nums">{simulation.repaymentPlan.count}</strong> {simulation.repaymentPlan.count === 1 ? "rata" : "rate"} da{" "}
+                  <strong className="nums">{eur(simulation.repaymentPlan.installment)}</strong>:{" "}
+                  {simulation.repaymentPlan.installments.map((i) => dayjs(i.date).format("D MMM YYYY")).join(" · ")}.
+                  Dopo il prelievo nel fondo restano <strong className="nums">{eur(simulation.repaymentPlan.fundAfter)}</strong>
+                  {simulation.nextDeadline && <> a fronte di <strong className="nums">{eur(simulation.nextDeadline.expectedAmount)}</strong> dovuti il {dayjs(simulation.nextDeadline.dueDate).format("D MMM YYYY")}</>}.
+                </div>
+              </div>
+            )}
 
             {/* Incassi attesi (fatture emesse non ancora incassate) */}
             {simulation.expectedCollections && (
@@ -509,15 +594,19 @@ export default function TreasuryPage() {
               <div className="text-sm">
                 <div className="font-semibold">Preleva con piano di rientro</div>
                 <div className="text-xs text-ink-600">
-                  {simulation.overallVerdict === "OK"
-                    ? <>Massimo prelevabile: <strong className="nums">{eur(loans?.cap ?? 0)}</strong> ({loans?.maxPercent ?? 50}% del fondo{loans?.outstanding > 0 ? ", al netto dei prestiti aperti" : ""}).</>
-                    : "Disponibile solo con verdetto OK."}
+                  {simulation.overallVerdict === "NO"
+                    ? "Con verdetto NO il prelievo non è consentito."
+                    : <>Massimo prelevabile: <strong className="nums">{eur(loans?.cap ?? 0)}</strong> ({loans?.maxPercent ?? 50}% del fondo{loans?.outstanding > 0 ? ", al netto dei prestiti aperti" : ""}).
+                        {simulation.overallVerdict === "RISCHIO" && <span className="text-tax-600"> Verdetto rischioso: ti chiederemo una conferma.</span>}</>}
+                  {loans && simulation.overallVerdict !== "NO" && simulation.amount > loans.cap + 0.005 && (
+                    <div className="text-rose-600 font-semibold">Importo oltre il massimo consentito ({eur(loans.cap)}).</div>
+                  )}
                 </div>
                 {loanMsg && <div className="text-xs mt-1 text-ink-900">{loanMsg}</div>}
               </div>
               <button
                 type="button"
-                disabled={loanBusy || simulation.overallVerdict !== "OK" || (loans && simulation.amount > loans.cap + 0.005)}
+                disabled={loanBusy || simulation.overallVerdict === "NO" || (loans && simulation.amount > loans.cap + 0.005)}
                 onClick={takeLoan}
                 className="px-4 py-2 bg-tax-600 text-white rounded-lg hover:opacity-90 disabled:opacity-40"
               >
@@ -542,12 +631,17 @@ export default function TreasuryPage() {
                     {l.note && <span className="text-ink-400"> · {l.note}</span>}
                   </div>
                   <span className={`shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full ${l.status === "LATE" ? "bg-rose-50 text-rose-700" : "bg-brand-50 text-brand-700"}`}>
-                    {l.status === "LATE" ? "In ritardo" : "In corso"}
+                    {l.status === "LATE" ? "In ritardo" : "In corso"}{l.forced ? " · forzato" : ""}
                   </span>
                 </div>
                 <div className="bg-paper rounded-full h-2">
                   <div className={`${l.status === "LATE" ? "bg-rose-500" : "bg-brand-500"} h-2 rounded-full`} style={{ width: `${Math.round(l.progress * 100)}%` }} />
                 </div>
+                {l.remainingInstallments?.length > 0 && (
+                  <div className="text-xs text-ink-400 nums">
+                    Prossime rate: {l.remainingInstallments.map((i) => `${dayjs(i.date).format("D MMM")} ${eur(i.amount)}`).join(" · ")}
+                  </div>
+                )}
                 <div className="flex items-center justify-between gap-2 text-xs text-ink-600">
                   <span className="nums">Rientrati {eur(l.repaid)} · mancano {eur(l.outstanding)} · rata {eur(l.monthlyRepayment)}/mese{l.behindBy > 0 && <span className="text-rose-600"> · indietro di {eur(l.behindBy)}</span>}</span>
                   <div className="flex gap-2">

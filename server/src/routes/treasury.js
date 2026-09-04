@@ -10,6 +10,7 @@ import {
   computeExpectedCollections,
 } from "../lib/treasury.js";
 import { estimateTaxPayments } from "../lib/taxEstimate.js";
+import { ownTaxSavingWhere } from "../lib/taxFund.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -95,7 +96,7 @@ router.get("/fiscal-report", async (req, res) => {
       },
     }),
     prisma.taxSaving.findMany({
-      where: { year, transaction: { userId: req.user.id } },
+      where: { year, ...ownTaxSavingWhere(req.user.id) },
       select: { amount: true, transferred: true },
     }),
     estimateTaxPayments({ userId: req.user.id, year: year + 1 }), // dovuto per l'anno `year` si paga in year+1

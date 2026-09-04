@@ -9,20 +9,17 @@ import { simulateSelfFinancing } from "./treasury.js";
 import { sendEmail } from "./email.js";
 import { sendPushToUser } from "./push.js";
 import { todayRomeUTC } from "./recurrence.js";
+import { computeInstallmentPlan, remainingInstallments } from "./repaymentPlan.js";
 
 export const DEFAULT_MAX_PERCENT = 50;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
-const MS_PER_MONTH = 30.4375 * MS_PER_DAY;
 const round2 = (n) => Number((Math.round(n * 100) / 100).toFixed(2));
 const eur = (n) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(n || 0);
 
-/** Traiettoria lineare: quanto dovrebbe essere già rientrato oggi. */
+/** Traiettoria del piano: somma delle rate con data ≤ oggi (LATE se sotto). */
 export function expectedRepaidByNow(loan, today = new Date()) {
-  const start = new Date(loan.takenAt).getTime();
-  const end = new Date(loan.dueDate).getTime();
-  const span = Math.max(1, end - start);
-  const elapsed = Math.min(Math.max(0, today.getTime() - start), span);
-  return round2(loan.amount * (elapsed / span));
+  const plan = computeInstallmentPlan({ amount: loan.amount, takenAt: loan.takenAt, dueDate: loan.dueDate });
+  return round2(plan.installments.filter((i) => i.date <= today).reduce((s, i) => s + i.amount, 0));
 }
 
 export function enrichLoan(loan, today = new Date()) {
@@ -30,9 +27,15 @@ export function enrichLoan(loan, today = new Date()) {
   const expected = expectedRepaidByNow(loan, today);
   const daysToDue = Math.round((new Date(loan.dueDate).getTime() - today.getTime()) / MS_PER_DAY);
   const monthsLeft = Math.max(0, Math.ceil(daysToDue / 30.4375));
+  const plan = computeInstallmentPlan({ amount: loan.amount, takenAt: loan.takenAt, dueDate: loan.dueDate });
+  const remaining = remainingInstallments(plan, loan.repaid);
   return {
     ...loan,
     outstanding,
+    installments: plan.installments,
+    installmentsCount: plan.count,
+    remainingInstallments: remaining,
+    nextInstallment: remaining[0] || null,
     expectedRepaidByNow: expected,
     behindBy: round2(Math.max(0, expected - loan.repaid)),
     progress: loan.amount > 0 ? Math.min(1, loan.repaid / loan.amount) : 1,
@@ -53,14 +56,20 @@ export async function loansSummary(userId) {
  * Crea un prestito interno applicando i guardrail. Ritorna { loan } oppure
  * { error, code, simulation } (400 lato route).
  */
-export async function createInternalLoan({ userId, householdId, amount, note, scope = "user" }) {
+export async function createInternalLoan({ userId, householdId, amount, note, scope = "user", force = false }) {
   const n = Number(amount);
   if (!Number.isFinite(n) || n <= 0) return { error: "amount deve essere > 0", code: "AMOUNT" };
 
   const simulation = await simulateSelfFinancing({ userId, householdId, amount: n, scope });
   if (!simulation.ok) return { error: "Dati insufficienti per simulare il rientro", code: simulation.reason, simulation };
-  if (simulation.overallVerdict !== "OK") {
-    return { error: `Il simulatore non dà OK (verdetto ${simulation.overallVerdict}): prestito rifiutato`, code: "VERDICT", simulation };
+  // Verdetto: OK → si crea; RISCHIO → solo con conferma esplicita (force, loggata);
+  // NO → mai.
+  if (simulation.overallVerdict === "NO") {
+    const why = simulation.missing?.length ? ` Manca: ${simulation.missing.join("; ")}.` : "";
+    return { error: `Verdetto NO (${simulation.basisLabel}): il rientro non ci sta entro la scadenza, prestito rifiutato.${why}`, code: "VERDICT", simulation };
+  }
+  if (simulation.overallVerdict === "RISCHIO" && !force) {
+    return { error: `Verdetto RISCHIO (${simulation.basisLabel}): il rientro potrebbe sforare la scadenza. Puoi procedere solo confermando l'avviso.`, code: "VERDICT_RISK", simulation };
   }
   if (!simulation.nextDeadline) {
     return { error: "Nessuna scadenza fiscale futura: aggiungila prima di prelevare dal fondo", code: "NO_DEADLINE", simulation };
@@ -84,9 +93,9 @@ export async function createInternalLoan({ userId, householdId, amount, note, sc
 
   const today = todayRomeUTC();
   const dueDate = new Date(simulation.nextDeadline.dueDate);
-  const months = Math.max(1, Math.ceil((dueDate.getTime() - today.getTime()) / MS_PER_MONTH));
-  // Rata minima per rientrare entro la scadenza (il simulatore realistico può fare prima).
-  const monthlyRepayment = round2(n / months);
+  // Rata = importo ÷ mesi pieni fino alla scadenza (vedi repaymentPlan.js).
+  const plan = computeInstallmentPlan({ amount: n, takenAt: today, dueDate });
+  const monthlyRepayment = plan.installment;
 
   const loan = await prisma.internalLoan.create({
     data: {
@@ -98,9 +107,10 @@ export async function createInternalLoan({ userId, householdId, amount, note, sc
       monthlyRepayment,
       note: note ? String(note).trim() : null,
       simulationVerdict: simulation.overallVerdict,
+      forced: simulation.overallVerdict === "RISCHIO" && Boolean(force),
     },
   });
-  return { loan: enrichLoan(loan), simulation, cap, maxPercent };
+  return { loan: enrichLoan(loan), simulation, cap, maxPercent, fundAfter: round2(simulation.fundAvailable - open.outstanding - n) };
 }
 
 /**

@@ -5,6 +5,7 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { sendTaxAlertForUser } from "../lib/taxAlert.js";
+import { ownTaxSavingWhere, findOpeningTaxSaving, setOpeningTaxSaving, pendingTaxFund } from "../lib/taxFund.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -12,7 +13,7 @@ router.use(authMiddleware);
 // GET /api/tax-savings → total pending (not transferred) + full list by month/year.
 router.get("/", async (req, res) => {
   const items = await prisma.taxSaving.findMany({
-    where: { transaction: { userId: req.user.id } },
+    where: ownTaxSavingWhere(req.user.id),
     orderBy: [{ year: "desc" }, { month: "desc" }],
     include: { transaction: true },
   });
@@ -27,7 +28,7 @@ router.get("/", async (req, res) => {
 // GET /api/tax-savings/summary → { totalPending, byMonth: [{month, year, amount, transferred}] }
 router.get("/summary", async (req, res) => {
   const items = await prisma.taxSaving.findMany({
-    where: { transaction: { userId: req.user.id } },
+    where: ownTaxSavingWhere(req.user.id),
     orderBy: [{ year: "desc" }, { month: "desc" }],
   });
 
@@ -54,7 +55,7 @@ router.put("/:id/transfer", async (req, res) => {
   const { id } = req.params;
   // Solo i propri accantonamenti: 404 se di un altro utente.
   const existing = await prisma.taxSaving.findFirst({
-    where: { id, transaction: { userId: req.user.id } },
+    where: { id, ...ownTaxSavingWhere(req.user.id) },
   });
   if (!existing) {
     return res.status(404).json({ error: "Salvadanaio non trovato" });
@@ -65,6 +66,23 @@ router.put("/:id/transfer", async (req, res) => {
     data: { transferred: true, transferredAt: new Date() },
   });
   res.json(updated);
+});
+
+// GET /api/tax-savings/opening → { amount|null, id?, totalPending }
+// "Già accantonato per le tasse": fondo iniziale personale, senza transazione.
+router.get("/opening", async (req, res) => {
+  const [rec, totalPending] = await Promise.all([findOpeningTaxSaving(req.user.id), pendingTaxFund(req.user.id)]);
+  res.json({ amount: rec?.amount ?? null, id: rec?.id ?? null, transferred: rec?.transferred ?? false, totalPending });
+});
+
+// PUT /api/tax-savings/opening { amount|null } → imposta/azzera il fondo iniziale (reversibile)
+router.put("/opening", async (req, res) => {
+  const { amount } = req.body || {};
+  const n = amount == null || amount === "" ? null : Number(amount);
+  if (n != null && (!Number.isFinite(n) || n < 0)) return res.status(400).json({ error: "amount deve essere ≥ 0" });
+  const rec = await setOpeningTaxSaving(req.user.id, n);
+  const totalPending = await pendingTaxFund(req.user.id);
+  res.json({ amount: rec?.amount ?? null, id: rec?.id ?? null, transferred: rec?.transferred ?? false, totalPending });
 });
 
 // POST /api/tax-savings/send-alert → invia subito l'email+push di promemoria
