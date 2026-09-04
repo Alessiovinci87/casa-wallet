@@ -44,11 +44,11 @@ header { background-color: var(--ground) !important; color: #fff; }
 header h1, header button { color: #fff; }
 header .bg-brand-600 { background: #fff !important; color: var(--ground) !important; }
 .section-title, main h2:not(.card *):not(.list *):not([role="dialog"] *):not(.modal-panel *) { color: rgb(255 255 255 / 0.75) !important; }
-main .text-ink-900:not(.card):not(.list):not(.bg-tax-50):not(.bg-rose-50):not(.bg-brand-50):not(.bg-amber-50):not(.card *):not(.list *):not(.seg *):not(.chip):not(.modal-panel *):not([role="dialog"] *):not(.sheet-panel *) { color: #fff; }
-main .text-ink-600:not(.card):not(.list):not(.bg-tax-50):not(.bg-rose-50):not(.bg-brand-50):not(.bg-amber-50):not(.card *):not(.list *):not(.seg *):not(.chip):not(.modal-panel *):not([role="dialog"] *):not(.sheet-panel *) { color: rgb(255 255 255 / 0.82); }
-main .text-ink-400:not(.card):not(.list):not(.bg-tax-50):not(.bg-rose-50):not(.bg-brand-50):not(.bg-amber-50):not(.card *):not(.list *):not(.seg *):not(.chip):not(.modal-panel *):not([role="dialog"] *):not(.sheet-panel *) { color: rgb(255 255 255 / 0.65); }
-main .text-brand-600:not(.card):not(.list):not(.bg-tax-50):not(.bg-rose-50):not(.bg-brand-50):not(.bg-amber-50):not(.card *):not(.list *):not(.modal-panel *):not([role="dialog"] *):not(.sheet-panel *),
-main .text-brand-700:not(.card):not(.list):not(.bg-tax-50):not(.bg-rose-50):not(.bg-brand-50):not(.bg-amber-50):not(.card *):not(.list *):not(.modal-panel *):not([role="dialog"] *):not(.sheet-panel *) { color: #fff; }
+main .text-ink-900:not(.card):not(.action-bar *):not(.list):not(.bg-tax-50):not(.bg-rose-50):not(.bg-brand-50):not(.bg-amber-50):not(.card *):not(.list *):not(.seg *):not(.chip):not(.modal-panel *):not([role="dialog"] *):not(.sheet-panel *) { color: #fff; }
+main .text-ink-600:not(.card):not(.action-bar *):not(.list):not(.bg-tax-50):not(.bg-rose-50):not(.bg-brand-50):not(.bg-amber-50):not(.card *):not(.list *):not(.seg *):not(.chip):not(.modal-panel *):not([role="dialog"] *):not(.sheet-panel *) { color: rgb(255 255 255 / 0.82); }
+main .text-ink-400:not(.card):not(.action-bar *):not(.list):not(.bg-tax-50):not(.bg-rose-50):not(.bg-brand-50):not(.bg-amber-50):not(.card *):not(.list *):not(.seg *):not(.chip):not(.modal-panel *):not([role="dialog"] *):not(.sheet-panel *) { color: rgb(255 255 255 / 0.65); }
+main .text-brand-600:not(.card):not(.action-bar *):not(.list):not(.bg-tax-50):not(.bg-rose-50):not(.bg-brand-50):not(.bg-amber-50):not(.card *):not(.list *):not(.modal-panel *):not([role="dialog"] *):not(.sheet-panel *),
+main .text-brand-700:not(.card):not(.action-bar *):not(.list):not(.bg-tax-50):not(.bg-rose-50):not(.bg-brand-50):not(.bg-amber-50):not(.card *):not(.list *):not(.modal-panel *):not([role="dialog"] *):not(.sheet-panel *) { color: #fff; }
 main > div > p, main > div > div > p:not(.card *) { color: rgb(255 255 255 / 0.85); }
 /* Controlli fuori dalle card: su verde diventano bianchi/traslucidi */
 main .seg:not(.card *):not(.modal-panel *):not([role="dialog"] *) { background: rgb(255 255 255 / 0.18); }
@@ -60,8 +60,8 @@ main .btn-primary:not(.card *):not(.list *):not(.modal-panel *):not([role="dialo
 main button.bg-brand-600:not(.card *):not(.list *):not(.modal-panel *):not([role="dialog"] *):not(.action-bar *) { background: #fff !important; color: var(--ground) !important; }
 main .btn-ghost:not(.card *):not(.list *):not(.modal-panel *):not([role="dialog"] *) { color: #fff; }
 main button[class*="border-card-line"]:not(.card *):not(.list *):not(.modal-panel *):not([role="dialog"] *):not(.action-bar *) { background: rgb(255 255 255 / 0.14); color: #fff; }
-main .text-rose-600:not(.card):not(.list):not(.bg-tax-50):not(.bg-rose-50):not(.bg-brand-50):not(.bg-amber-50):not(.card *):not(.list *):not(.modal-panel *):not([role="dialog"] *):not(.sheet-panel *):not(.bg-rose-50 *) { color: #ffd6de; }
-main .text-tax-600:not(.card):not(.list):not(.bg-tax-50):not(.bg-rose-50):not(.bg-brand-50):not(.bg-amber-50):not(.card *):not(.list *):not(.modal-panel *):not([role="dialog"] *):not(.sheet-panel *):not(.bg-tax-50 *) { color: #ffd9a3; }
+main .text-rose-600:not(.card):not(.action-bar *):not(.list):not(.bg-tax-50):not(.bg-rose-50):not(.bg-brand-50):not(.bg-amber-50):not(.card *):not(.list *):not(.modal-panel *):not([role="dialog"] *):not(.sheet-panel *):not(.bg-rose-50 *) { color: #ffd6de; }
+main .text-tax-600:not(.card):not(.action-bar *):not(.list):not(.bg-tax-50):not(.bg-rose-50):not(.bg-brand-50):not(.bg-amber-50):not(.card *):not(.list *):not(.modal-panel *):not([role="dialog"] *):not(.sheet-panel *):not(.bg-tax-50 *) { color: #ffd9a3; }
 main .bg-brand-50:not(.card):not(.card *):not(.list *):not(.modal-panel *):not([role="dialog"] *) { background: rgb(255 255 255 / 0.14) !important; color: #fff; }
 main .divide-card-line:not(.card *) > * + *, main .border-card-line:not(.card *):not(button):not(input) { border-color: rgb(255 255 255 / 0.2); }
 /* FAB e tab bar restano bianchi sopra il verde */
@@ -121,7 +121,7 @@ main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([t
 main select, main textarea,
 .sheet-panel input:not([type="checkbox"]), .sheet-panel select, .sheet-panel textarea,
 .page-scroll input:not([type="checkbox"]), .modal-panel input:not([type="checkbox"]), .modal-panel select {
-  background-color: var(--color-paper);
+  background-color: #e6ebe8; /* più scuro del fondo card: il campo si vede */
   border: 1px solid transparent !important;
   border-radius: 0.75rem !important;
   min-height: 48px;
@@ -144,7 +144,7 @@ main input[type="date"] { -webkit-appearance: none; appearance: none; }
 .btn:disabled { opacity: 0.4; }
 .btn-primary { background: var(--color-brand-600); color: #fff; }
 .btn-primary:hover { background: var(--color-brand-700); }
-.btn-secondary { background: var(--color-paper); color: var(--color-ink-900); }
+.btn-secondary { background: #e6ebe8; color: var(--color-ink-900); }
 .btn-danger { background: #e11d48; color: #fff; }
 .btn-ghost { color: var(--color-brand-600); background: transparent; }
 /* Le utility Tailwind usate in giro per i bottoni pieni prendono lo stesso raggio */

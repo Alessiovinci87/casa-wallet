@@ -248,10 +248,10 @@ export default function Dashboard() {
             const expected = exp + thisMonth.reduce((s, e) => s + e.amount, 0);
             const open = openAccount === a.id;
             return (
-              <div key={a.id} className={`rounded-2xl p-5 ${a.balance < 0 ? "bg-rose-50 text-rose-700" : "bg-white border border-card-line text-ink-900"}`}>
+              <div key={a.id} className="card p-5 text-ink-900">
                 <button type="button" onClick={() => navigate(`/movements?tab=expenses&account=${a.id}`)} className="w-full text-left">
                   <div className="text-[13px] uppercase tracking-widest text-ink-600">{a.name}</div>
-                  <div className="text-4xl sm:text-5xl font-bold tracking-tight mt-1 nums">{eur(a.balance)}</div>
+                  <div className={`amount-hero mt-2 nums ${a.balance < 0 ? "text-rose-600" : "text-brand-600"}`}>{eur(a.balance)}</div>
                   {next && (
                     <div className="text-[13px] mt-1.5 nums">
                       <span className="text-rose-600">Prossima uscita {dayjs(next.date).format("D MMM")} · {next.description || next.category} −{eur(next.amount)}</span>
@@ -291,9 +291,9 @@ export default function Dashboard() {
               </div>
             );
           })}
-          <button type="button" onClick={() => setSheet(true)} className="w-full text-left px-1 py-2 min-h-[44px] flex items-center justify-between gap-3 text-[13px] text-ink-600">
-            <span>Disponibile reale <span className="text-ink-400">(totale meno impegni)</span></span>
-            <span className="shrink-0"><span className={`font-semibold nums ${avail.available < 0 ? "text-rose-600" : "text-ink-900"}`}>{eur(avail.available)}</span> <span className="text-ink-400">›</span></span>
+          <button type="button" onClick={() => setSheet(true)} className="card card-tap w-full text-left px-4 py-3 min-h-[44px] flex items-center justify-between gap-3 text-[15px] text-ink-900">
+            <span>Disponibile reale <span className="text-ink-400 text-[13px]">(totale meno impegni)</span></span>
+            <span className="shrink-0"><span className={`font-semibold nums ${avail.available < 0 ? "text-rose-600" : "text-brand-600"}`}>{eur(avail.available)}</span> <span className="text-ink-400">›</span></span>
           </button>
         </>
       ) : (
