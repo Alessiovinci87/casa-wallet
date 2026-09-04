@@ -26,6 +26,19 @@
   --color-tax-50: #fdf3e3;
 }
 
+/* Guscio app: la pagina non scorre, scorre solo <main>. Altezza = viewport
+   visuale (--vvh da Layout; fallback 100dvh, che segue la toolbar di Safari). */
+html, body, #root { height: 100%; }
+body { overflow: hidden; overscroll-behavior: none; }
+.app-shell { height: 100dvh; height: var(--vvh, 100dvh); overflow: hidden; }
+.app-main {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  scroll-padding-bottom: 6rem;
+}
+/* Pagine pubbliche (login, registrazione): scorrono da sole dentro il viewport */
+.page-scroll { height: 100dvh; height: var(--vvh, 100dvh); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
 /* Base */
 body {
   background-color: var(--color-paper);

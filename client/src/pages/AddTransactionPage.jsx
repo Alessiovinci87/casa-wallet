@@ -198,7 +198,7 @@ export default function AddTransactionPage() {
   const dateChip = date === today() ? "today" : date === dayjs().subtract(1, "day").format("YYYY-MM-DD") ? "yesterday" : "other";
 
   return (
-    <div className="space-y-5 pb-28">
+    <div className="space-y-5 -mb-4">
       <h1 className="sr-only">Nuovo movimento</h1>
       {toast && <div className="text-sm text-brand-700 bg-brand-50 rounded-lg p-2">{toast}</div>}
       {error && <div className="text-sm text-rose-600 bg-rose-50 rounded-lg p-2">{error}</div>}
@@ -329,8 +329,8 @@ export default function AddTransactionPage() {
         )}
       </div>
 
-      {/* Barra fissa: riepilogo + Salva */}
-      <div className="fixed inset-x-0 bottom-0 z-30 bg-white/95 backdrop-blur border-t border-card-line px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      {/* Barra Salva: sticky in fondo all'area scorrevole (resta visibile anche con la tastiera aperta) */}
+      <div className="sticky bottom-0 z-30 -mx-4 bg-white/95 backdrop-blur border-t border-card-line px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="max-w-3xl mx-auto flex items-center gap-3">
           <div className="min-w-0 flex-1 text-[13px] text-ink-600 truncate">
             <span className={`font-semibold nums ${isExpense ? "text-ink-900" : "text-brand-600"}`}>{isExpense ? "−" : "+"}{eur(Number.isFinite(amountNum) ? amountNum : 0)}</span>

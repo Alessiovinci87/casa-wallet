@@ -25,7 +25,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-paper">
+    <div className="page-scroll flex items-center justify-center bg-paper">
       <form onSubmit={handleSubmit} className="card p-8 w-full max-w-sm">
         <h1 className="text-2xl font-bold text-brand-600 mb-6">Awareness</h1>
         {error && <div className="mb-4 text-sm text-rose-600 bg-rose-50 rounded p-2">{error}</div>}

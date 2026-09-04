@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore.js";
 import { useWebSocket } from "../hooks/useWebSocket.js";
@@ -8,6 +8,11 @@ import TransactionForm from "./TransactionForm.jsx";
 // Navigazione mobile-first: bottom tab bar (5 voci) + FAB "+" su mobile,
 // sidebar sinistra fissa con bottone "Nuovo" su desktop (≥ 768px).
 // Header di pagina: solo titolo e avatar (tap → Impostazioni).
+//
+// Guscio app (senza position:fixed): header · main scorrevole · tab bar sono
+// tre righe di una colonna alta quanto il viewport VISUALE (--vvh). Su iPhone
+// le barre fisse saltavano con la toolbar di Safari e con la tastiera; qui
+// scorre solo <main>, la tab bar è sempre al suo posto e non copre nulla.
 
 const TABS = [
   { to: "/", label: "Home", Icon: HomeIcon, end: true },
@@ -92,7 +97,11 @@ export default function Layout() {
   const [sheet, setSheet] = useState(false);
   const [form, setForm] = useState(null); // { type } → TransactionForm
   const [keyboard, setKeyboard] = useState(false);
+  const mainRef = useRef(null);
   useWebSocket(); // live sync while logged in
+
+  // Scorre solo <main>: a ogni cambio pagina si riparte dall'alto.
+  useEffect(() => { mainRef.current?.scrollTo?.(0, 0); }, [location.pathname, location.search]);
 
   // Tab bar nascosta quando la tastiera è aperta (mobile: il viewport visuale si restringe).
   useEffect(() => {
@@ -100,9 +109,11 @@ export default function Layout() {
     if (!vv) return;
     const onResize = () => {
       setKeyboard(window.innerHeight - vv.height > 150);
-      // Le finestre (nuova spesa, ricorrenza…) si dimensionano sul viewport visuale:
-      // con la tastiera aperta restano interamente scorrevoli fino al tasto Salva.
+      // Il guscio (e le finestre) si dimensionano sul viewport visuale: con la
+      // tastiera aperta tutto resta scorrevole fino al tasto Salva, e la pagina
+      // non "scappa" verso l'alto (iOS sposta il layout viewport: lo riportiamo a 0).
       document.documentElement.style.setProperty("--vvh", `${Math.round(vv.height)}px`);
+      if (window.scrollY !== 0 || vv.offsetTop !== 0) window.scrollTo(0, 0);
     };
     onResize();
     vv.addEventListener("resize", onResize);
@@ -115,6 +126,8 @@ export default function Layout() {
     if (key === "ocr") navigate("/ocr");
     else navigate(`/add?type=${key === "income" ? "income" : "expense"}`);
   };
+  // FAB: un tocco e sei sull'importo (Uscita; in pagina si passa a Entrata o allo scontrino).
+  const quickAdd = () => navigate("/add?type=expense");
 
   const showFab = !NO_FAB.some((p) => location.pathname.startsWith(p));
   const title = pageTitle(location.pathname);
@@ -125,9 +138,9 @@ export default function Layout() {
     `flex items-center gap-3 px-3 py-2.5 rounded-xl min-h-[44px] ${isActive ? "bg-brand-50 text-brand-700 font-semibold" : "text-ink-600 hover:bg-paper"}`;
 
   return (
-    <div className="min-h-screen bg-paper text-ink-900 md:flex">
+    <div className="app-shell bg-paper text-ink-900 md:flex">
       {/* Sidebar desktop */}
-      <aside className="hidden md:flex md:flex-col w-56 shrink-0 border-r border-card-line bg-white sticky top-0 h-screen p-3 gap-1">
+      <aside className="hidden md:flex md:flex-col w-56 shrink-0 border-r border-card-line bg-white h-full p-3 gap-1">
         <button
           onClick={() => setSheet(true)}
           className="flex items-center justify-center gap-2 bg-brand-600 text-white rounded-xl py-2.5 mb-2 font-semibold hover:bg-brand-700"
@@ -141,8 +154,8 @@ export default function Layout() {
         ))}
       </aside>
 
-      <div className="flex-1 min-w-0">
-        <header className="sticky top-0 z-20 bg-paper/90 backdrop-blur border-b border-card-line">
+      <div className="flex-1 min-w-0 h-full flex flex-col">
+        <header className="shrink-0 z-20 bg-paper border-b border-card-line pt-[env(safe-area-inset-top)]">
           <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
             <div className="flex items-center min-w-0">
               {!ROOTS.has(location.pathname) && (
@@ -170,34 +183,38 @@ export default function Layout() {
           </div>
         </header>
 
-        <main className="max-w-3xl mx-auto px-4 py-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-8">
-          <Outlet />
-        </main>
+        <div className="relative flex-1 min-h-0">
+          <main ref={mainRef} className="app-main h-full overflow-y-auto">
+            <div className="max-w-3xl mx-auto px-4 py-4 pb-24 md:pb-8">
+              <Outlet />
+            </div>
+          </main>
+
+          {/* FAB mobile: dentro l'area scorrevole (absolute, non fixed) */}
+          {showFab && !keyboard && (
+            <button
+              onClick={quickAdd}
+              className="md:hidden absolute right-4 bottom-4 z-30 w-14 h-14 rounded-full bg-brand-600 text-white shadow-lg flex items-center justify-center hover:bg-brand-700"
+              aria-label="Nuovo movimento"
+            >
+              <PlusIcon size={26} />
+            </button>
+          )}
+        </div>
+
+        {/* Bottom tab bar mobile: in flusso, sotto <main>, mai sopra al contenuto */}
+        {!keyboard && !location.pathname.startsWith("/add") && (
+          <nav className="md:hidden shrink-0 z-30 bg-white border-t border-card-line pb-[env(safe-area-inset-bottom)]">
+            <div className="flex h-14">
+              {TABS.map(({ to, label, Icon, end }) => (
+                <NavLink key={to} to={to} end={end} className={tabClass}>
+                  <Icon size={22} /> {label}
+                </NavLink>
+              ))}
+            </div>
+          </nav>
+        )}
       </div>
-
-      {/* FAB mobile */}
-      {showFab && !keyboard && (
-        <button
-          onClick={() => setSheet(true)}
-          className="md:hidden fixed right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 w-14 h-14 rounded-full bg-brand-600 text-white shadow-lg flex items-center justify-center hover:bg-brand-700"
-          aria-label="Nuovo movimento"
-        >
-          <PlusIcon size={26} />
-        </button>
-      )}
-
-      {/* Bottom tab bar mobile */}
-      {!keyboard && !location.pathname.startsWith("/add") && (
-        <nav className="md:hidden fixed inset-x-0 bottom-0 z-30 bg-white border-t border-card-line pb-[env(safe-area-inset-bottom)]">
-          <div className="flex h-14">
-            {TABS.map(({ to, label, Icon, end }) => (
-              <NavLink key={to} to={to} end={end} className={tabClass}>
-                <Icon size={22} /> {label}
-              </NavLink>
-            ))}
-          </div>
-        </nav>
-      )}
 
       {sheet && <ActionSheet onClose={() => setSheet(false)} onPick={pick} />}
       {form && <TransactionForm initial={form} onClose={() => setForm(null)} />}
