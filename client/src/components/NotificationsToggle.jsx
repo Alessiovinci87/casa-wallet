@@ -29,20 +29,14 @@ export default function NotificationsToggle() {
   };
 
   return (
-    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 text-sm">
-      <span className="text-amber-800">
-        Attiva le notifiche push per ricevere i promemoria delle tasse.
+    <div className="card px-4 py-2 flex items-center justify-between gap-3 text-[13px]">
+      <span className="text-ink-600 min-w-0">
+        <span className="block font-medium text-ink-900">Notifiche</span>
+        {error ? <span className="text-rose-600">{error}</span> : "Promemoria tasse e scadenze sul telefono"}
       </span>
-      <div className="flex items-center gap-3">
-        {error && <span className="text-rose-600">{error}</span>}
-        <button
-          onClick={enable}
-          disabled={busy}
-          className="px-3 py-1.5 bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-50 whitespace-nowrap"
-        >
-          {busy ? "Attivazione…" : "Attiva notifiche"}
-        </button>
-      </div>
+      <button onClick={enable} disabled={busy} className="btn btn-ghost px-2 shrink-0 whitespace-nowrap">
+        {busy ? "…" : "Attiva"}
+      </button>
     </div>
   );
 }

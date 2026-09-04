@@ -4,6 +4,7 @@ import { eur } from "../lib/format.js";
 import { useAccountStore } from "../store/accountStore.js";
 import { useHouseholdStore } from "../store/householdStore.js";
 
+import { dialog } from "../lib/dialog.js";
 // Gestione dei conti della famiglia: nome, numero (o IBAN, per riconoscere gli
 // estratti importati), saldo iniziale alla data, predefinito. Usato in
 // Impostazioni e nel Punto zero. `compact` nasconde l'intestazione.
@@ -59,7 +60,7 @@ export default function AccountsManager({ compact = false }) {
     const j = i + dir;
     if (j < 0 || j >= ids.length) return;
     [ids[i], ids[j]] = [ids[j], ids[i]];
-    try { await reorder(ids); } catch { window.alert("Riordino non riuscito"); }
+    try { await reorder(ids); } catch { dialog.alert({ message: "Riordino non riuscito" }); }
   };
   const fetchHousehold = useHouseholdStore((s) => s.fetchHousehold);
   const [editing, setEditing] = useState(null); // null | "new" | account
@@ -83,11 +84,11 @@ export default function AccountsManager({ compact = false }) {
     }
   };
   const remove = async (a) => {
-    if (!window.confirm(`Eliminare il conto "${a.name}"? I suoi movimenti passano al conto predefinito.`)) return;
-    try { await removeAccount(a.id); await fetchHousehold(); } catch (err) { window.alert(err.response?.data?.error || "Eliminazione non riuscita"); }
+    if (!(await dialog.confirm({ message: `Eliminare il conto "${a.name}"? I suoi movimenti passano al conto predefinito.`, danger: true }))) return;
+    try { await removeAccount(a.id); await fetchHousehold(); } catch (err) { dialog.alert({ message: err.response?.data?.error || "Eliminazione non riuscita" }); }
   };
   const makeDefault = async (a) => {
-    try { await updateAccount(a.id, { isDefault: true }); } catch { window.alert("Operazione non riuscita"); }
+    try { await updateAccount(a.id, { isDefault: true }); } catch { dialog.alert({ message: "Operazione non riuscita" }); }
   };
 
   return (

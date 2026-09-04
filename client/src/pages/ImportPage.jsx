@@ -8,6 +8,7 @@ import Segmented from "../components/Segmented.jsx";
 import { useRecurringStore } from "../store/recurringStore.js";
 import { useTransactionStore } from "../store/transactionStore.js";
 
+import { dialog } from "../lib/dialog.js";
 // Import estratto conto (CSV, Excel, XML, PDF): 1) file → 2) mappa colonne (salvata sulla famiglia; saltata per PDF/camt)
 // → 3) anteprima con categorie proposte e duplicati → 4) esito + ricorrenze rilevate.
 
@@ -142,7 +143,7 @@ export default function ImportPage() {
       fetchTransactions();
       setCreated((c) => ({ ...c, [i]: true }));
     } catch (err) {
-      window.alert(err.response?.data?.error || "Creazione ricorrenza non riuscita");
+      dialog.alert({ message: err.response?.data?.error || "Creazione ricorrenza non riuscita" });
     }
   };
 

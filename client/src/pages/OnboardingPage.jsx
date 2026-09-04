@@ -110,7 +110,7 @@ export default function OnboardingPage() {
       </div>
       <div className="flex gap-1">
         {STEPS.map((s, i) => (
-          <button key={s} onClick={() => setStep(i)} style={{ minHeight: 0, minWidth: 0 }} className={`flex-1 h-1.5 rounded-full ${i <= step ? "bg-brand-600" : "bg-card-line"}`} title={s} aria-label={s} />
+          <div key={s} className={`flex-1 h-1.5 rounded-full ${i <= step ? "bg-brand-600" : "bg-card-line"}`} title={s} />
         ))}
       </div>
       <div className="text-xs text-ink-400">Passo {step + 1} di {STEPS.length} · {STEPS[step]}</div>

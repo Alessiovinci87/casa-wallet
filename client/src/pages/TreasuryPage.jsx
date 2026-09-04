@@ -5,7 +5,10 @@ import { eur } from "../lib/format.js";
 import api from "../lib/api.js";
 import { fiscalReportToCsv, downloadCsv } from "../lib/exportCsv.js";
 import Segmented from "../components/Segmented.jsx";
+import Sheet from "../components/Sheet.jsx";
+import { ChevronRightIcon } from "../components/Icons.jsx";
 
+import { dialog } from "../lib/dialog.js";
 const DEADLINE_TYPES = [
   { value: "IRPEF_SALDO", label: "IRPEF saldo" },
   { value: "IRPEF_ACCONTO", label: "IRPEF acconto" },
@@ -38,6 +41,8 @@ export default function TreasuryPage() {
   const [openingTaxMsg, setOpeningTaxMsg] = useState("");
 
   const [scope, setScope] = useState("user");
+  const [tab, setTab] = useState("deadlines"); // deadlines | fund | profile
+  const [detail, setDetail] = useState(null); // scadenza aperta nel foglio
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState(emptyDeadline);
@@ -91,10 +96,10 @@ export default function TreasuryPage() {
     const planText = plan ? ` Rientro: ${plan.count} ${plan.count === 1 ? "rata" : "rate"} da ${eur(plan.installment)} (${plan.installments.map((i) => dayjs(i.date).format("D MMM")).join(", ")}).` : "";
     let force = false;
     if (simulation.overallVerdict === "RISCHIO") {
-      force = window.confirm(`Verdetto RISCHIOSO (${simulation.basisLabel}): il rientro potrebbe sforare la scadenza del ${due}.${planText}\n\nVuoi procedere lo stesso? La scelta resta registrata nel prestito.`);
+      force = (await dialog.confirm({ message: `Verdetto RISCHIOSO (${simulation.basisLabel}): il rientro potrebbe sforare la scadenza del ${due}.${planText}\n\nVuoi procedere lo stesso? La scelta resta registrata nel prestito.`, danger: false }));
       if (!force) return;
     }
-    const note = window.prompt(`Preleva ${eur(simulation.amount)} dal fondo tasse con piano di rientro entro ${due}.${planText} A cosa serve? (facoltativo)`, "");
+    const note = (await dialog.prompt({ message: `Preleva ${eur(simulation.amount)} dal fondo tasse con piano di rientro entro ${due}.${planText} A cosa serve? (facoltativo)`, defaultValue: "" }));
     if (note == null) return;
     setLoanBusy(true);
     setLoanMsg("");
@@ -109,11 +114,11 @@ export default function TreasuryPage() {
     }
   };
   const repay = async (l) => {
-    const raw = window.prompt(`Rata di rientro per il prestito di ${eur(l.amount)} (mancano ${eur(l.outstanding)}):`, String(l.suggestedRepayment));
+    const raw = (await dialog.prompt({ message: `Rata di rientro per il prestito di ${eur(l.amount)} (mancano ${eur(l.outstanding)}):`, defaultValue: String(l.suggestedRepayment), inputMode: "decimal" }));
     if (raw == null) return;
     const amount = Number(String(raw).replace(",", "."));
-    if (!Number.isFinite(amount) || amount <= 0) return window.alert("Importo non valido");
-    try { await repayLoan(l.id, amount); } catch (err) { window.alert(err.response?.data?.error || "Operazione non riuscita"); }
+    if (!Number.isFinite(amount) || amount <= 0) return dialog.alert({ message: "Importo non valido" });
+    try { await repayLoan(l.id, amount); } catch (err) { dialog.alert({ message: err.response?.data?.error || "Operazione non riuscita" }); }
   };
 
   const generateDeadlines = async () => {
@@ -222,29 +227,27 @@ export default function TreasuryPage() {
   const fundTotal = loans?.fundAvailable ?? openingTax?.totalPending ?? 0;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="sr-only">Tesoreria</h1>
-        <Segmented
-          size="sm"
-          value={scope}
-          onChange={setScope}
-          options={[
-            { value: "user", label: "Solo io" },
-            { value: "household", label: "Famiglia" },
-          ]}
-        />
-      </div>
+    <div className="space-y-5">
+      <h1 className="sr-only">Tesoreria</h1>
+      <Segmented
+        value={tab}
+        onChange={setTab}
+        options={[
+          { value: "deadlines", label: "Scadenze" },
+          { value: "fund", label: "Fondo" },
+          { value: "profile", label: "Profilo" },
+        ]}
+      />
 
-      {error && <div className="text-sm text-rose-600 bg-rose-50 rounded p-2">{error}</div>}
+      {error && <div className="text-sm text-rose-600 bg-rose-50 rounded-xl p-3">{error}</div>}
+
+      {tab === "deadlines" && (<>
 
       {/* ============ (a) Scadenze fiscali ============ */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold">Scadenze fiscali</h2>
-          <button onClick={openNew} className="px-3 py-1.5 text-sm bg-brand-600 text-white rounded-lg hover:bg-brand-700">
-            + Nuova scadenza
-          </button>
+          <button onClick={openNew} className="btn btn-ghost px-2">+ Nuova</button>
         </div>
 
         {showForm && (
@@ -302,38 +305,28 @@ export default function TreasuryPage() {
           </form>
         )}
 
-        <div className="card divide-y divide-card-line">
+        <div className="list">
           {deadlines.length === 0 ? (
             <p className="p-4 text-sm text-ink-400">
               Nessuna scadenza. Aggiungi le tue scadenze fiscali (saldo, acconti, IVA, INPS) per attivare i promemoria e il simulatore.
             </p>
           ) : (
             deadlines.map((d) => (
-              <div key={d.id} className="p-3 flex flex-wrap items-center gap-2 text-sm">
+              <button key={d.id} type="button" onClick={() => setDetail(d)} className="row w-full">
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium flex items-center gap-2 flex-wrap">
-                    {d.name}
-                    <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-paper text-ink-600">{TYPE_LABELS[d.type] || d.type}</span>
-                    {d.overdue && <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-600 font-semibold">Scaduta</span>}
-                    {d.paid && <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-brand-50 text-brand-700">Pagata</span>}
-                  </div>
-                  <div className="text-ink-400">
-                    {dayjs(d.dueDate).format("D MMMM YYYY")}
-                    {!d.paid && d.daysUntil >= 0 && <span> · tra {d.daysUntil} giorni</span>}
+                  <div className="font-medium truncate">{d.name}</div>
+                  <div className="text-[13px] text-ink-400">
+                    {dayjs(d.dueDate).format("D MMM YYYY")} · {TYPE_LABELS[d.type] || d.type}
                   </div>
                 </div>
-                <span className={`font-semibold nums ${d.paid ? "text-ink-400 line-through" : "text-tax-600"}`}>
-                  {eur(d.expectedAmount)}
-                </span>
-                <button
-                  onClick={() => togglePaid(d.id, !d.paid)}
-                  className={`px-2.5 py-1 text-xs rounded-lg border ${d.paid ? "border-card-line text-ink-600 hover:bg-paper" : "border-brand-600 text-brand-600 hover:bg-brand-50"}`}
-                >
-                  {d.paid ? "Segna da pagare" : "Segna pagata"}
-                </button>
-                <button onClick={() => openEdit(d)} className="text-ink-400 hover:text-brand-600 px-1" title="Modifica">✎</button>
-                <button onClick={() => deleteDeadline(d.id)} className="text-ink-400 hover:text-rose-600 px-1" title="Elimina">✕</button>
-              </div>
+                <div className="text-right shrink-0">
+                  <div className={`font-semibold nums ${d.paid ? "text-ink-400 line-through" : "text-tax-600"}`}>{eur(d.expectedAmount)}</div>
+                  <div className={`text-[13px] ${d.paid ? "text-brand-700" : d.overdue ? "text-rose-600 font-semibold" : "text-ink-400"}`}>
+                    {d.paid ? "Pagata" : d.overdue ? `scaduta da ${Math.abs(d.daysUntil)} gg` : `tra ${d.daysUntil} gg`}
+                  </div>
+                </div>
+                <ChevronRightIcon size={18} className="row-chevron" />
+              </button>
             ))
           )}
         </div>
@@ -384,6 +377,13 @@ export default function TreasuryPage() {
         </section>
       )}
 
+      </>)}
+
+      {tab === "fund" && (<>
+      <div className="flex items-center justify-between gap-3">
+        <span className="section-title">Capacità di rientro</span>
+        <Segmented size="sm" value={scope} onChange={setScope} options={[{ value: "user", label: "Solo io" }, { value: "household", label: "Famiglia" }]} className="w-52" />
+      </div>
       {/* ============ (b) Profilo finanziario ============ */}
       <section className="space-y-3">
         <h2 className="font-semibold">Il tuo profilo finanziario</h2>
@@ -647,7 +647,7 @@ export default function TreasuryPage() {
                   <div className="flex gap-2">
                     <button onClick={() => repay(l)} className="px-2.5 py-1 bg-brand-600 text-white rounded-lg font-semibold">Registra rata</button>
                     {l.repaid === 0 && (
-                      <button onClick={() => { if (window.confirm("Annullare il prestito?")) cancelLoan(l.id).catch(() => {}); }} className="px-2.5 py-1 border border-card-line rounded-lg text-ink-600">Annulla</button>
+                      <button onClick={async () => { if ((await dialog.confirm({ message: "Annullare il prestito?", danger: true }))) cancelLoan(l.id).catch(() => {}); }} className="px-2.5 py-1 border border-card-line rounded-lg text-ink-600">Annulla</button>
                     )}
                   </div>
                 </div>
@@ -657,6 +657,9 @@ export default function TreasuryPage() {
         )}
       </section>
 
+      </>)}
+
+      {tab === "profile" && (<>
       {/* ============ (d) Profilo fiscale ============ */}
       <section className="space-y-3">
         <h2 className="font-semibold">Profilo fiscale</h2>
@@ -765,6 +768,23 @@ export default function TreasuryPage() {
           </div>
         </div>
       </section>
+      </>)}
+
+      {detail && (
+        <Sheet title={detail.name} onClose={() => setDetail(null)}>
+          <div className="text-[15px] space-y-1">
+            <div className="flex justify-between"><span className="text-ink-600">Importo previsto</span><span className={`font-semibold nums ${detail.paid ? "text-ink-400 line-through" : "text-tax-600"}`}>{eur(detail.expectedAmount)}</span></div>
+            <div className="flex justify-between"><span className="text-ink-600">Scadenza</span><span className="nums">{dayjs(detail.dueDate).format("D MMMM YYYY")}</span></div>
+            <div className="flex justify-between"><span className="text-ink-600">Tipo</span><span>{TYPE_LABELS[detail.type] || detail.type}</span></div>
+            <div className="flex justify-between"><span className="text-ink-600">Stato</span><span className={detail.paid ? "text-brand-700" : detail.overdue ? "text-rose-600 font-semibold" : ""}>{detail.paid ? "Pagata" : detail.overdue ? `Scaduta da ${Math.abs(detail.daysUntil)} giorni` : `Tra ${detail.daysUntil} giorni`}</span></div>
+          </div>
+          <div className="grid grid-cols-1 gap-2 mt-4">
+            <button type="button" onClick={async () => { await togglePaid(detail.id, !detail.paid); setDetail(null); }} className="btn btn-primary w-full">{detail.paid ? "Segna da pagare" : "Segna pagata"}</button>
+            <button type="button" onClick={() => { openEdit(detail); setDetail(null); }} className="btn btn-secondary w-full">Modifica</button>
+            <button type="button" onClick={async () => { if (await dialog.confirm({ message: `Eliminare "${detail.name}"?`, danger: true })) { await deleteDeadline(detail.id); setDetail(null); } }} className="btn w-full text-rose-600">Elimina</button>
+          </div>
+        </Sheet>
+      )}
     </div>
   );
 }

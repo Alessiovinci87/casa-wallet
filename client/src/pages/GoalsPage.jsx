@@ -9,6 +9,7 @@ import AllocateModal from "../components/AllocateModal.jsx";
 import { useTaxStore } from "../store/taxStore.js";
 import { useNavigate } from "react-router-dom";
 
+import { dialog } from "../lib/dialog.js";
 // Obiettivi: card con barra progresso, quota mensile, stato colorato,
 // versa/preleva, "Distribuisci". Wizard nuovo obiettivo: nome → importo → data
 // → "servono N €/mese".
@@ -268,32 +269,32 @@ export default function GoalsPage() {
   useEffect(() => { fetchGoals(); fetchTaxSummary().catch(() => {}); }, [fetchGoals, fetchTaxSummary]);
 
   const deposit = async (g) => {
-    const raw = window.prompt(`Quanto versi su "${g.name}"?`, g.monthRemaining > 0 ? String(g.monthRemaining) : "");
+    const raw = (await dialog.prompt({ message: `Quanto versi su "${g.name}"?`, defaultValue: g.monthRemaining > 0 ? String(g.monthRemaining) : "", inputMode: "decimal" }));
     if (raw == null) return;
     const amount = Number(String(raw).replace(",", "."));
-    if (!Number.isFinite(amount) || amount <= 0) return window.alert("Importo non valido");
-    try { await contribute(g.id, { amount }); } catch (err) { window.alert(err.response?.data?.error || "Versamento non riuscito"); }
+    if (!Number.isFinite(amount) || amount <= 0) return dialog.alert({ message: "Importo non valido" });
+    try { await contribute(g.id, { amount }); } catch (err) { dialog.alert({ message: err.response?.data?.error || "Versamento non riuscito" }); }
   };
   const withdraw = async (g) => {
-    const raw = window.prompt(`Quanto prelevi da "${g.name}"? (disponibili ${eur(g.saved)})`, String(g.saved));
+    const raw = (await dialog.prompt({ message: `Quanto prelevi da "${g.name}"? (disponibili ${eur(g.saved)})`, defaultValue: String(g.saved), inputMode: "decimal" }));
     if (raw == null) return;
     const amount = Number(String(raw).replace(",", "."));
-    if (!Number.isFinite(amount) || amount <= 0) return window.alert("Importo non valido");
-    const createTransaction = window.confirm("Registrare anche l'uscita reale nel bilancio? (OK = sì, Annulla = solo prelievo dal salvadanaio)");
+    if (!Number.isFinite(amount) || amount <= 0) return dialog.alert({ message: "Importo non valido" });
+    const createTransaction = (await dialog.confirm({ message: "Registrare anche l'uscita reale nel bilancio? (OK = sì, Annulla = solo prelievo dal salvadanaio)", danger: true }));
     try {
       await contribute(g.id, { amount: -amount, createTransaction, category: "Altro", method: "TRANSFER" });
       if (createTransaction) fetchTransactions();
-    } catch (err) { window.alert(err.response?.data?.error || "Prelievo non riuscito"); }
+    } catch (err) { dialog.alert({ message: err.response?.data?.error || "Prelievo non riuscito" }); }
   };
   const remove = async (g) => {
-    if (!window.confirm(`Eliminare "${g.name}"? I ${eur(g.saved)} parcheggiati tornano disponibili.`)) return;
-    try { await deleteGoal(g.id); } catch { window.alert("Eliminazione non riuscita"); }
+    if (!(await dialog.confirm({ message: `Eliminare "${g.name}"? I ${eur(g.saved)} parcheggiati tornano disponibili.`, danger: true }))) return;
+    try { await deleteGoal(g.id); } catch { dialog.alert({ message: "Eliminazione non riuscita" }); }
   };
-  const distribute = () => {
-    const raw = window.prompt("Importo da distribuire sugli obiettivi:");
+  const distribute = async () => {
+    const raw = (await dialog.prompt({ message: "Importo da distribuire sugli obiettivi:", inputMode: "decimal" }));
     if (raw == null) return;
     const amount = Number(String(raw).replace(",", "."));
-    if (!Number.isFinite(amount) || amount <= 0) return window.alert("Importo non valido");
+    if (!Number.isFinite(amount) || amount <= 0) return dialog.alert({ message: "Importo non valido" });
     setAllocateAmount(amount);
   };
 

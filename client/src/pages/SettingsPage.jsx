@@ -3,6 +3,7 @@ import { useAuthStore } from "../store/authStore.js";
 import { useHouseholdStore } from "../store/householdStore.js";
 import AccountsManager from "../components/AccountsManager.jsx";
 
+import { dialog } from "../lib/dialog.js";
 // Impostazioni famiglia: nome (editabile dall'OWNER), membri, codice invito
 // con copia + rigenerazione (OWNER), logout.
 export default function SettingsPage() {
@@ -75,7 +76,7 @@ export default function SettingsPage() {
   };
 
   const handleRegenerate = async () => {
-    if (!window.confirm("Rigenerare il codice invito? Il codice attuale smetterà di funzionare."))
+    if (!(await dialog.confirm({ message: "Rigenerare il codice invito? Il codice attuale smetterà di funzionare.", danger: true })))
       return;
     setError("");
     try {

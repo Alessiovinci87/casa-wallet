@@ -41,7 +41,7 @@ function MiniCard({ label, value, sub, tone = "text-ink-900", onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className="card p-3.5 text-left min-w-[11rem] snap-start shrink-0 sm:min-w-0 sm:flex-1 hover:border-brand-200 transition min-h-[88px]"
+      className="card card-tap p-3.5 text-left min-h-[88px]"
     >
       <div className="text-[13px] text-ink-600">{label}</div>
       <div className={`text-xl font-bold nums mt-0.5 ${tone}`}>{value}</div>
@@ -189,8 +189,8 @@ export default function Dashboard() {
   return (
     <div className="space-y-4">
       {user?.emailVerified === false && (
-        <div className="bg-tax-50 text-tax-600 rounded-xl p-3 text-[13px] flex items-center justify-between gap-3">
-          <span>✉ Conferma la tua email ({user.email}).</span>
+        <div className="bg-tax-50 text-tax-600 rounded-2xl px-4 py-2 text-[13px] flex items-center justify-between gap-3">
+          <span className="truncate">✉ Conferma la tua email</span>
           <button
             type="button"
             disabled={resendState !== "idle"}
@@ -297,9 +297,9 @@ export default function Dashboard() {
           </button>
         </>
       ) : (
-      <button type="button" onClick={() => avail && setSheet(true)} className={`w-full text-left rounded-2xl p-5 ${tone}`}>
+      <button type="button" onClick={() => avail && setSheet(true)} className={`w-full text-left p-5 ${avail?.status === "OK" || !avail ? "card card-tap" : `rounded-2xl ${tone}`}`}>
         <div className={`text-[13px] uppercase tracking-widest ${muted}`}>Disponibile reale</div>
-        <div className="text-4xl sm:text-5xl font-bold tracking-tight mt-1 nums">
+        <div className="amount-hero mt-2 nums">
           {!avail ? "…" : !avail.hasOpeningBalance && avail.balance === 0 ? "—" : eur(avail.available)}
         </div>
         {avail && (
@@ -320,8 +320,8 @@ export default function Dashboard() {
       </button>
       )}
 
-      {/* 2. Tre card compatte (scroll orizzontale su mobile) */}
-      <div className="flex gap-3 overflow-x-auto snap-x -mx-4 px-4 sm:mx-0 sm:px-0 pb-1">
+      {/* 2. Card compatte in griglia 2×2 (tutte visibili, niente scroll orizzontale) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <MiniCard
           label="Consulente"
           value={goalSummary?.behind ? `${goalSummary.behind} in ritardo` : "Resoconto"}
@@ -331,8 +331,8 @@ export default function Dashboard() {
         />
         <MiniCard
           label="Obiettivi"
-          value={goalSummary?.count ? `${eur(goalSummary.parked)} parcheggiati` : "Nessuno"}
-          sub={goalSummary?.count ? `quota di ${MONTH_NAME} ${eur(goalSummary.monthQuota)} · versati ${eur(goalSummary.monthContributed)}` : "Crea il primo obiettivo"}
+          value={goalSummary?.count ? eur(goalSummary.parked) : "Nessuno"}
+          sub={goalSummary?.count ? `parcheggiati · ${MONTH_NAME}: versati ${eur(goalSummary.monthContributed)} su ${eur(goalSummary.monthQuota)}` : "Crea il primo obiettivo"}
           tone={goalSummary?.behind ? "text-rose-600" : "text-ink-900"}
           onClick={() => navigate("/goals")}
         />

@@ -33,7 +33,7 @@ function Chips({ items, value, onPick, empty }) {
             key={it}
             type="button"
             onClick={() => onPick(it)}
-            className={`shrink-0 snap-start px-3 min-h-[44px] rounded-full text-[13px] font-medium border ${active ? "bg-brand-600 text-white border-brand-600" : "bg-white border-card-line text-ink-600"}`}
+            className={`chip shrink-0 snap-start px-3.5 text-[13px] ${active ? "chip-active" : ""}`}
           >
             {it}
           </button>
@@ -67,6 +67,7 @@ export default function AddTransactionPage() {
   const [note, setNote] = useState("");
   const [taxPercent, setTaxPercent] = useState("");
   const [more, setMore] = useState(false);
+  const [showCategory, setShowCategory] = useState(false);
   const [repeat, setRepeat] = useState(false);
   const [recurrence, setRecurrence] = useState(emptyRecurrence);
   const [suggest, setSuggest] = useState({ merchants: [], recentWhats: [] });
@@ -237,11 +238,13 @@ export default function AddTransactionPage() {
       {/* Dove */}
       <div className="card p-4 space-y-2">
         <label className="block text-xs text-ink-600">{isExpense ? "Dove (negozio, sito, chi hai pagato)" : "Da chi (cliente, datore, ente)"}</label>
+        {/* Prima le scorciatoie: un tocco su un negozio noto compila anche categoria e metodo */}
+        <Chips items={merchantMatches} value={merchant} onPick={pickMerchant} empty={suggest.merchants.length ? null : "I negozi che usi compariranno qui come scorciatoie."} />
         <input
           type="text"
           value={merchant}
           onChange={(e) => setMerchant(e.target.value)}
-          placeholder={isExpense ? "es. Amazon, Conad, AliExpress" : "es. PICS SRL, INPS"}
+          placeholder={isExpense ? "oppure scrivi: Amazon, Conad…" : "es. PICS SRL, INPS"}
           className="w-full px-3 py-2 border border-card-line rounded-lg min-h-[44px]"
           autoCapitalize="words"
         />
@@ -250,7 +253,6 @@ export default function AddTransactionPage() {
             Intendevi <span className="font-semibold">{merchantHint}</span>? Tocca per usare la stessa voce.
           </button>
         )}
-        <Chips items={merchantMatches} value={merchant} onPick={pickMerchant} empty={suggest.merchants.length ? null : "I negozi che usi compariranno qui come scorciatoie."} />
         {known && <p className="text-[13px] text-ink-400">{known.count} {known.count === 1 ? "volta" : "volte"} · in tutto {eur(known.total)}{known.category ? ` · di solito ${known.category}` : ""}</p>}
       </div>
 
@@ -272,11 +274,18 @@ export default function AddTransactionPage() {
         <Chips items={whatMatches} value={what} onPick={setWhat} />
       </div>
 
-      {/* Categoria */}
-      <div className="card p-4">
-        <label className="block text-xs text-ink-600 mb-2">Categoria {known?.category && category === known.category && <span className="text-ink-400">· suggerita da {known.merchant}</span>}</label>
-        <Segmented size="sm" value={category} onChange={setCategory} options={CATEGORIES[type].map((c) => ({ value: c, label: c }))} />
-      </div>
+      {/* Categoria: compatta quando è già suggerita dal negozio, tocca per cambiarla */}
+      {category && known?.category === category && !showCategory ? (
+        <button type="button" onClick={() => setShowCategory(true)} className="card card-tap w-full text-left p-4 flex items-center justify-between gap-3">
+          <span><span className="block text-xs text-ink-600">Categoria</span><span className="font-medium">{category}</span> <span className="text-[13px] text-ink-400">· come le altre volte da {known.merchant}</span></span>
+          <span className="text-brand-600 text-[13px] font-medium shrink-0">Cambia</span>
+        </button>
+      ) : (
+        <div className="card p-4">
+          <label className="block text-xs text-ink-600 mb-2">Categoria</label>
+          <Segmented size="sm" value={category} onChange={(c) => { setCategory(c); setShowCategory(false); }} options={CATEGORIES[type].map((c) => ({ value: c, label: c }))} />
+        </div>
+      )}
 
       {/* Quando */}
       <div className="card p-4">
@@ -330,14 +339,14 @@ export default function AddTransactionPage() {
       </div>
 
       {/* Barra Salva: sticky in fondo all'area scorrevole (resta visibile anche con la tastiera aperta) */}
-      <div className="sticky bottom-0 z-30 -mx-4 bg-white/95 backdrop-blur border-t border-card-line px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="sticky bottom-0 z-30 -mx-4 action-bar px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="max-w-3xl mx-auto flex items-center gap-3">
           <div className="min-w-0 flex-1 text-[13px] text-ink-600 truncate">
             <span className={`font-semibold nums ${isExpense ? "text-ink-900" : "text-brand-600"}`}>{isExpense ? "−" : "+"}{eur(Number.isFinite(amountNum) ? amountNum : 0)}</span>
             {merchant && <> · {merchant}</>}{what && <> · {what}</>}{category && <> · {category}</>}
           </div>
-          <button type="button" onClick={() => save(true)} disabled={saving || !valid} className="px-3 min-h-[44px] rounded-lg border border-card-line text-ink-600 text-[13px] font-medium disabled:opacity-40">+ un'altra</button>
-          <button type="button" onClick={() => save(false)} disabled={saving || !valid} className="px-5 min-h-[44px] rounded-lg bg-brand-600 text-white font-semibold disabled:opacity-40">{saving ? "…" : "Salva"}</button>
+          <button type="button" onClick={() => save(true)} disabled={saving || !valid} className="btn btn-secondary px-3 text-[13px]">+ un'altra</button>
+          <button type="button" onClick={() => save(false)} disabled={saving || !valid} className="btn btn-primary">{saving ? "…" : "Salva"}</button>
         </div>
       </div>
     </div>

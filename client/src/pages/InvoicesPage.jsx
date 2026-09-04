@@ -7,6 +7,7 @@ import { eur } from "../lib/format.js";
 import { PAY_METHODS, PAY_METHOD_LABELS } from "../lib/constants.js";
 import Segmented from "../components/Segmented.jsx";
 
+import { dialog } from "../lib/dialog.js";
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = [CURRENT_YEAR, CURRENT_YEAR - 1, CURRENT_YEAR - 2];
 
@@ -221,7 +222,7 @@ export default function InvoicesPage() {
                 </>
               ) : (
                 <button
-                  onClick={() => window.confirm("Annullare l'incasso? L'entrata e l'accantonamento tasse verranno rimossi.") && uncollect(inv.id)}
+                  onClick={async () => (await dialog.confirm({ message: "Annullare l'incasso? L'entrata e l'accantonamento tasse verranno rimossi.", danger: true })) && uncollect(inv.id)}
                   className="px-2.5 py-1 text-xs rounded-lg border border-card-line text-ink-600 hover:bg-paper"
                 >
                   Annulla incasso
@@ -282,7 +283,7 @@ export default function InvoicesPage() {
               {syncing ? "Sincronizzo…" : "Sincronizza ora"}
             </button>
             <button
-              onClick={() => window.confirm("Scollegare Aruba?") && disconnectAruba()}
+              onClick={async () => (await dialog.confirm({ message: "Scollegare Aruba?", danger: true })) && disconnectAruba()}
               className="text-rose-600 text-xs hover:underline"
             >
               Scollega

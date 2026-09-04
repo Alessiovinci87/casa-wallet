@@ -1,9 +1,32 @@
-// Gruppo di pulsanti al posto delle tendine — linea di design dell'app:
-// le scelte tra poche opzioni si fanno con button, non con <select>.
-export default function Segmented({ options, value, onChange, size = "md", className = "" }) {
-  const pad = size === "sm" ? "px-3 py-2 text-[13px] min-h-[44px]" : "px-4 py-2 text-sm min-h-[44px]";
+// Gruppo di pulsanti al posto delle tendine — linea di design dell'app.
+// Fino a 4 opzioni corte: controllo segmentato stile app (binario grigio,
+// segmento attivo bianco che "scivola"). Più opzioni o etichette lunghe:
+// chip a capo, così restano leggibili anche a 390 px.
+export default function Segmented({ options, value, onChange, size = "md", className = "", chips }) {
+  const useChips = chips ?? (options.length > 4 || options.some((o) => String(o.label).length > 14));
+  if (useChips) {
+    const pad = size === "sm" ? "px-3.5 text-[13px]" : "px-4 text-sm";
+    return (
+      <div className={`flex flex-wrap gap-2 ${className}`}>
+        {options.map((o) => {
+          const active = o.value === value;
+          return (
+            <button
+              key={String(o.value)}
+              type="button"
+              onClick={() => onChange(o.value)}
+              aria-pressed={active}
+              className={`chip ${pad} ${active ? "chip-active" : ""}`}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
   return (
-    <div className={`flex flex-wrap gap-1.5 ${className}`}>
+    <div className={`seg ${size === "sm" ? "seg-sm" : ""} ${className}`} role="group">
       {options.map((o) => {
         const active = o.value === value;
         return (
@@ -12,11 +35,7 @@ export default function Segmented({ options, value, onChange, size = "md", class
             type="button"
             onClick={() => onChange(o.value)}
             aria-pressed={active}
-            className={`${pad} rounded-lg font-medium transition-colors ${
-              active
-                ? "bg-brand-600 text-white"
-                : "bg-white border border-card-line text-ink-600 hover:bg-brand-50"
-            }`}
+            className={`seg-item ${active ? "seg-active" : ""}`}
           >
             {o.label}
           </button>

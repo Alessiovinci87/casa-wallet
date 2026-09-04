@@ -9,6 +9,7 @@ import TransactionForm from "../components/TransactionForm.jsx";
 import Segmented from "../components/Segmented.jsx";
 import { useAccountStore } from "../store/accountStore.js";
 
+import { dialog } from "../lib/dialog.js";
 // Uscite / Entrate (dentro Movimenti): totale del mese con confronto, selettore
 // mese, blocchi Fisse/Variabili (Uscite) con subtotali. Riga: categoria,
 // descrizione, importo, chip Ricorrente / Fattura n. / da obiettivo.
@@ -89,8 +90,8 @@ export default function TransactionsPage({ type = "EXPENSE", accountId = "", onA
   });
   const openEdit = (t) => { setFormInitial(t); setShowForm(true); };
   const remove = async (t) => {
-    if (!window.confirm(`Eliminare "${t.description || t.category}" (${eur(t.amount)})?`)) return;
-    try { await deleteTransaction(t.id); } catch { window.alert("Eliminazione non riuscita, riprova."); }
+    if (!(await dialog.confirm({ message: `Eliminare "${t.description || t.category}" (${eur(t.amount)})?`, danger: true }))) return;
+    try { await deleteTransaction(t.id); } catch { dialog.alert({ message: "Eliminazione non riuscita, riprova." }); }
   };
 
   // Filtro "senza Dove" (da Dove vanno i soldi): solo i movimenti da completare.

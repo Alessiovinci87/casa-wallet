@@ -1,10 +1,10 @@
 @import "tailwindcss";
 
-/* CasaWallet — design "Conto Chiaro" (stile home banking)
-   Verde bosco come primario, fondo grigio-verde chiarissimo, card bianche
-   con bordo tenue, ambra riservata alle tasse, numeri tabulari. */
+/* Awareness — linea "app, non sito": superfici morbide senza bordi, liste
+   raggruppate stile iOS, controlli grandi e pieni, feedback al tocco,
+   fogli dal basso al posto delle finestre. Verde bosco primario, fondo
+   grigio-verde, ambra solo per le tasse, numeri tabulari. */
 @theme {
-  /* Primario: verde bosco (sostituisce emerald) */
   --color-brand-50: #eef5f1;
   --color-brand-100: #e3efe9;
   --color-brand-200: #c2ded1;
@@ -14,14 +14,12 @@
   --color-brand-700: #085539;
   --color-brand-800: #06422d;
 
-  /* Inchiostro e superfici */
   --color-ink-900: #17211d;
   --color-ink-600: #5b6864;
   --color-ink-400: #8b9691;
-  --color-paper: #f4f6f5;
-  --color-card-line: #e4e9e6;
+  --color-paper: #f2f4f3;
+  --color-card-line: #e6ebe8;
 
-  /* Ambra: solo per il salvadanaio tasse */
   --color-tax-600: #b3701a;
   --color-tax-50: #fdf3e3;
 }
@@ -36,7 +34,6 @@ body { overflow: hidden; overscroll-behavior: none; }
   overscroll-behavior-y: contain;
   scroll-padding-bottom: 6rem;
 }
-/* Pagine pubbliche (login, registrazione): scorrono da sole dentro il viewport */
 .page-scroll { height: 100dvh; height: var(--vvh, 100dvh); overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
 /* Base */
@@ -44,53 +41,120 @@ body {
   background-color: var(--color-paper);
   color: var(--color-ink-900);
   -webkit-font-smoothing: antialiased;
-  /* Regole di stile A4: cifre tabulari ovunque, mai sotto 13px */
+  -webkit-tap-highlight-color: transparent;
   font-variant-numeric: tabular-nums;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable", "Segoe UI", Roboto, system-ui, sans-serif;
 }
 .text-xs, .text-\[11px\], .text-\[10px\] { font-size: 13px; line-height: 1.25rem; }
-button, [role="button"] { touch-action: manipulation; }
-/* Tap target ≥ 44px per ogni bottone dell'app (icone comprese) */
+button, [role="button"] { touch-action: manipulation; -webkit-user-select: none; user-select: none; }
 main button, header button, nav a { min-height: 44px; }
 main button:not(.w-full):not([class*="w-1"]):not([class*="flex-1"]) { min-width: 44px; }
+/* Feedback al tocco su tutto ciò che si preme */
+main button, nav a, .card-tap { transition: transform 120ms ease, background-color 120ms ease, opacity 120ms ease; }
+main button:active, .card-tap:active { transform: scale(0.97); }
 
-/* Importi e cifre: sempre tabulari (innesto dalla direzione "Registro") */
-.nums {
-  font-variant-numeric: tabular-nums;
-}
+.nums { font-variant-numeric: tabular-nums; }
 
-/* Card standard dell'app */
+/* Superfici: card senza bordo, ombra appena accennata, angoli 18px */
 .card {
   background-color: #fff;
-  border: 1px solid var(--color-card-line);
-  border-radius: 0.875rem; /* 14px */
+  border: 1px solid transparent;
+  border-radius: 1.125rem;
+  box-shadow: 0 1px 2px rgb(23 33 29 / 0.04), 0 0 0 1px rgb(23 33 29 / 0.03);
 }
+.card-tap { cursor: pointer; }
+.card-tap:hover { background-color: #fbfcfb; }
 
-/* Finestre modali: su mobile ancorate in alto e alte quanto il viewport visuale
-   (variabile --vvh aggiornata da Layout con visualViewport), così con la tastiera
-   aperta il contenuto scorre fino ai pulsanti. Su desktop centrate. */
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 10;
-  background: rgb(0 0 0 / 0.4);
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 0.75rem;
-  padding-top: max(0.75rem, env(safe-area-inset-top));
+/* Titolo di sezione stile app: piccolo, maiuscolo, grigio, fuori dalla card */
+.section-title, main h2:not(.card *):not([role="dialog"] *):not(.modal-panel *) {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-ink-400);
+  margin: 0 0.25rem;
 }
-.modal-panel {
-  max-height: calc(var(--vvh, 100dvh) - 1.5rem);
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
+main h2.h-plain, .sheet-panel h2 { font-size: 1.125rem; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--color-ink-900); margin: 0; }
+
+/* Liste raggruppate: righe separate da una linea sottile rientrata */
+.list { background: #fff; border-radius: 1.125rem; overflow: hidden; box-shadow: 0 1px 2px rgb(23 33 29 / 0.04), 0 0 0 1px rgb(23 33 29 / 0.03); }
+.row { display: flex; align-items: center; gap: 0.75rem; width: 100%; text-align: left; padding: 0.75rem 1rem; min-height: 56px; position: relative; }
+.row + .row::before { content: ""; position: absolute; left: 1rem; right: 0; top: 0; height: 1px; background: var(--color-card-line); }
+.row:active { background: var(--color-paper); }
+.row-chevron { margin-left: auto; color: var(--color-ink-400); flex-shrink: 0; }
+.row-icon { width: 2.25rem; height: 2.25rem; border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: var(--color-brand-50); color: var(--color-brand-600); }
+
+/* Campi: pieni, senza bordo, alti 48px, angoli 12px (valgono per tutti i form dell'app) */
+main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+main select, main textarea,
+.sheet-panel input:not([type="checkbox"]), .sheet-panel select, .sheet-panel textarea,
+.page-scroll input:not([type="checkbox"]), .modal-panel input:not([type="checkbox"]), .modal-panel select {
+  background-color: var(--color-paper);
+  border: 1px solid transparent !important;
+  border-radius: 0.75rem !important;
+  min-height: 48px;
+  padding-left: 0.875rem;
+  padding-right: 0.875rem;
+  font-size: 16px; /* niente zoom automatico su iOS */
+  outline: none;
+  transition: box-shadow 120ms ease, background-color 120ms ease;
 }
+main input:focus, main select:focus, main textarea:focus, .sheet-panel input:focus, .page-scroll input:focus, .modal-panel input:focus {
+  background-color: #fff;
+  box-shadow: 0 0 0 2px var(--color-brand-200);
+}
+/* L'importo grande di Nuovo movimento resta "nudo" */
+main input.bg-transparent { background-color: transparent !important; box-shadow: none !important; padding-left: 0; min-height: 0; font-size: 2.5rem !important; border-radius: 0 !important; }
+main input[type="date"] { -webkit-appearance: none; appearance: none; }
+
+/* Bottoni */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 48px; padding: 0 1.25rem; border-radius: 0.875rem; font-weight: 600; font-size: 15px; }
+.btn:disabled { opacity: 0.4; }
+.btn-primary { background: var(--color-brand-600); color: #fff; }
+.btn-primary:hover { background: var(--color-brand-700); }
+.btn-secondary { background: var(--color-paper); color: var(--color-ink-900); }
+.btn-danger { background: #e11d48; color: #fff; }
+.btn-ghost { color: var(--color-brand-600); background: transparent; }
+/* Le utility Tailwind usate in giro per i bottoni pieni prendono lo stesso raggio */
+main button.bg-brand-600, main button.bg-tax-600, main button.bg-rose-600 { border-radius: 0.875rem; font-weight: 600; }
+main button[class*="border-card-line"] { background: var(--color-paper); border-color: transparent !important; border-radius: 0.875rem; font-weight: 500; }
+
+/* Chip e controllo segmentato */
+.chip { min-height: 44px; border-radius: 999px; background: #fff; color: var(--color-ink-600); font-weight: 500; box-shadow: 0 0 0 1px var(--color-card-line) inset; }
+.chip-active { background: var(--color-brand-600); color: #fff; box-shadow: none; }
+.seg { display: flex; background: #e8ece9; border-radius: 0.875rem; padding: 3px; gap: 2px; }
+.seg-item { flex: 1; min-height: 44px; border-radius: 0.7rem; font-size: 15px; font-weight: 500; color: var(--color-ink-600); transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease; }
+.seg-sm .seg-item { min-height: 44px; font-size: 14px; }
+.seg-active { background: #fff; color: var(--color-ink-900); font-weight: 600; box-shadow: 0 1px 3px rgb(23 33 29 / 0.12); }
+main .seg-item:active { transform: none; }
+
+/* Foglio dal basso */
+.sheet-backdrop { position: fixed; inset: 0; z-index: 50; background: rgb(23 33 29 / 0.45); display: flex; align-items: flex-end; justify-content: center; animation: fade 160ms ease; }
+.sheet-panel { width: 100%; max-height: calc(var(--vvh, 100dvh) - 2rem); background: #fff; border-radius: 1.5rem 1.5rem 0 0; padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); display: flex; flex-direction: column; animation: slide-up 220ms cubic-bezier(0.2, 0.8, 0.2, 1); box-shadow: 0 -8px 30px rgb(23 33 29 / 0.12); }
+.sheet-handle { width: 2.5rem; height: 5px; border-radius: 999px; background: var(--color-card-line); margin: 0.5rem auto 0.25rem; }
+.sheet-body { overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; min-height: 0; }
+@media (min-width: 640px) {
+  .sheet-backdrop { align-items: center; padding: 1rem; }
+  .sheet-panel { border-radius: 1.5rem; max-height: calc(var(--vvh, 100dvh) - 4rem); padding-bottom: 0.75rem; }
+  .sheet-handle { display: none; }
+}
+@keyframes slide-up { from { transform: translateY(24px); opacity: 0.6; } to { transform: translateY(0); opacity: 1; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* Finestre modali esistenti (form movimento, ricorrenza…): stesso look del foglio */
+.modal-backdrop { position: fixed; inset: 0; z-index: 10; background: rgb(23 33 29 / 0.45); display: flex; align-items: flex-end; justify-content: center; animation: fade 160ms ease; }
+.modal-panel { max-height: calc(var(--vvh, 100dvh) - 1.5rem); overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; border-radius: 1.5rem 1.5rem 0 0 !important; width: 100%; animation: slide-up 220ms cubic-bezier(0.2, 0.8, 0.2, 1); padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
 @media (min-width: 640px) {
   .modal-backdrop { align-items: center; padding: 1rem; }
-  .modal-panel { max-height: calc(var(--vvh, 100dvh) - 2rem); }
+  .modal-panel { max-height: calc(var(--vvh, 100dvh) - 2rem); border-radius: 1.5rem !important; width: auto; }
 }
 
-/* Stampa / salva PDF (Consulente): niente barre, colori pieni, testo nero. */
+/* Numero grande della Home */
+.amount-hero { font-size: 2.75rem; line-height: 1; font-weight: 800; letter-spacing: -0.02em; }
+
+/* Barra pulsanti di pagina (Salva) */
+.action-bar { background: rgb(255 255 255 / 0.97); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-top: 1px solid var(--color-card-line); }
+
 @media print {
   nav, header, .fixed, button[aria-label="Nuovo movimento"] { display: none !important; }
   body { background: #fff; color: #000; }

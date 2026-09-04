@@ -9,6 +9,7 @@ import RecurrenceFields, { emptyRecurrence, recurrenceToPayload } from "../compo
 import AccountPicker from "../components/AccountPicker.jsx";
 import { useAccountStore } from "../store/accountStore.js";
 
+import { dialog } from "../lib/dialog.js";
 // Ricorrenze: entrate/uscite fisse della famiglia. Lista con prossimo addebito,
 // importo mensile equivalente, totali fisse/mese, attiva/disattiva, modifica,
 // conferma/salta per le regole con conferma manuale.
@@ -163,18 +164,18 @@ export default function RecurringPage({ accountId = "" } = {}) {
   const pending = rules.filter((r) => r.pendingAt);
 
   const toggleActive = async (r) => {
-    try { await updateRule(r.id, { active: !r.active }); } catch { window.alert("Operazione non riuscita"); }
+    try { await updateRule(r.id, { active: !r.active }); } catch { dialog.alert({ message: "Operazione non riuscita" }); }
   };
   const remove = async (r) => {
-    if (!window.confirm(`Eliminare la ricorrenza "${r.description || r.category}"? Le transazioni già registrate restano.`)) return;
-    try { await deleteRule(r.id); } catch { window.alert("Eliminazione non riuscita"); }
+    if (!(await dialog.confirm({ message: `Eliminare la ricorrenza "${r.description || r.category}"? Le transazioni già registrate restano.`, danger: true }))) return;
+    try { await deleteRule(r.id); } catch { dialog.alert({ message: "Eliminazione non riuscita" }); }
   };
   const confirm = async (r) => {
-    const raw = window.prompt(`Confermi ${r.description || r.category} del ${dayjs(r.pendingAt).format("DD/MM/YYYY")}? Importo:`, String(r.amount));
+    const raw = (await dialog.prompt({ message: `Confermi ${r.description || r.category} del ${dayjs(r.pendingAt).format("DD/MM/YYYY")}? Importo:`, defaultValue: String(r.amount), inputMode: "decimal" }));
     if (raw == null) return;
     const amount = Number(String(raw).replace(",", "."));
-    if (!Number.isFinite(amount) || amount <= 0) return window.alert("Importo non valido");
-    try { await confirmPending(r.id, { amount }); fetchTransactions(); } catch (err) { window.alert(err.response?.data?.error || "Conferma non riuscita"); }
+    if (!Number.isFinite(amount) || amount <= 0) return dialog.alert({ message: "Importo non valido" });
+    try { await confirmPending(r.id, { amount }); fetchTransactions(); } catch (err) { dialog.alert({ message: err.response?.data?.error || "Conferma non riuscita" }); }
   };
 
   if (showForm) return <RuleForm initial={editing} onClose={() => { setShowForm(false); setEditing(null); }} />;

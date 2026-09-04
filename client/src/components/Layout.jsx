@@ -4,6 +4,7 @@ import { useAuthStore } from "../store/authStore.js";
 import { useWebSocket } from "../hooks/useWebSocket.js";
 import { HomeIcon, ListIcon, TargetIcon, ChartIcon, MoreIcon, PlusIcon, CameraIcon, MinusCircleIcon, PlusCircleIcon, XIcon } from "./Icons.jsx";
 import TransactionForm from "./TransactionForm.jsx";
+import DialogHost from "./DialogHost.jsx";
 
 // Navigazione mobile-first: bottom tab bar (5 voci) + FAB "+" su mobile,
 // sidebar sinistra fissa con bottone "Nuovo" su desktop (≥ 768px).
@@ -48,6 +49,13 @@ const TITLES = [
 ];
 // Pagine principali (tab bar): niente tasto indietro.
 const ROOTS = new Set(["/", "/movements", "/goals", "/forecast", "/more"]);
+// "Indietro" va sempre alla pagina genitore (affidabile anche dopo un refresh o da una push).
+const PARENTS = [
+  ["/add", "/movements"], ["/ocr", "/movements"], ["/tax-savings", "/goals"], ["/onboarding", "/"],
+  ["/settings", "/more"], ["/treasury", "/more"], ["/invoices", "/more"], ["/spending", "/more"], ["/advisor", "/more"],
+  ["/import", "/more"], ["/analytics", "/more"], ["/shopping-list", "/more"], ["/budgets", "/more"], ["/summary", "/"],
+];
+const parentOf = (path) => PARENTS.find(([p]) => path.startsWith(p))?.[1] || "/more";
 const pageTitle = (path) => (path === "/" ? "Home" : TITLES.find(([p]) => path.startsWith(p))?.[1] || "");
 
 // Il FAB non compare sulle pagine che sono già un form.
@@ -133,7 +141,7 @@ export default function Layout() {
   const title = pageTitle(location.pathname);
 
   const tabClass = ({ isActive }) =>
-    `flex flex-col items-center justify-center gap-0.5 min-h-[44px] flex-1 text-[13px] ${isActive ? "text-brand-600 font-semibold" : "text-ink-600"}`;
+    `flex flex-col items-center justify-center gap-0.5 min-h-[44px] flex-1 text-[13px] ${isActive ? "text-brand-600 font-semibold [&_svg]:stroke-[2.4]" : "text-ink-400"}`;
   const sideClass = ({ isActive }) =>
     `flex items-center gap-3 px-3 py-2.5 rounded-xl min-h-[44px] ${isActive ? "bg-brand-50 text-brand-700 font-semibold" : "text-ink-600 hover:bg-paper"}`;
 
@@ -155,20 +163,20 @@ export default function Layout() {
       </aside>
 
       <div className="flex-1 min-w-0 h-full flex flex-col">
-        <header className="shrink-0 z-20 bg-paper border-b border-card-line pt-[env(safe-area-inset-top)]">
+        <header className="shrink-0 z-20 bg-paper pt-[env(safe-area-inset-top)]">
           <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
             <div className="flex items-center min-w-0">
               {!ROOTS.has(location.pathname) && (
                 <button
                   type="button"
-                  onClick={() => (window.history.length > 1 ? navigate(-1) : navigate("/more"))}
+                  onClick={() => navigate(parentOf(location.pathname))}
                   className="w-11 h-11 -ml-3 mr-1 flex items-center justify-center text-ink-600"
                   aria-label="Indietro"
                 >
                   <span aria-hidden="true" className="text-2xl leading-none">‹</span>
                 </button>
               )}
-              <h1 className="text-lg font-bold truncate">{title}</h1>
+              <h1 className="text-[22px] font-bold tracking-tight truncate">{title}</h1>
             </div>
             <button
               onClick={() => navigate("/settings")}
@@ -204,7 +212,7 @@ export default function Layout() {
 
         {/* Bottom tab bar mobile: in flusso, sotto <main>, mai sopra al contenuto */}
         {!keyboard && !location.pathname.startsWith("/add") && (
-          <nav className="md:hidden shrink-0 z-30 bg-white border-t border-card-line pb-[env(safe-area-inset-bottom)]">
+          <nav className="md:hidden shrink-0 z-30 bg-white/95 backdrop-blur border-t border-card-line pb-[env(safe-area-inset-bottom)]">
             <div className="flex h-14">
               {TABS.map(({ to, label, Icon, end }) => (
                 <NavLink key={to} to={to} end={end} className={tabClass}>
@@ -218,6 +226,7 @@ export default function Layout() {
 
       {sheet && <ActionSheet onClose={() => setSheet(false)} onPick={pick} />}
       {form && <TransactionForm initial={form} onClose={() => setForm(null)} />}
+      <DialogHost />
     </div>
   );
 }
