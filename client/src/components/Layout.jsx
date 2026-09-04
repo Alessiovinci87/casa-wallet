@@ -146,7 +146,7 @@ export default function Layout() {
     `flex items-center gap-3 px-3 py-2.5 rounded-xl min-h-[44px] ${isActive ? "bg-brand-50 text-brand-700 font-semibold" : "text-ink-600 hover:bg-paper"}`;
 
   return (
-    <div className="app-shell bg-paper text-ink-900 md:flex">
+    <div className="app-shell text-ink-900 md:flex">
       {/* Sidebar desktop */}
       <aside className="hidden md:flex md:flex-col w-56 shrink-0 border-r border-card-line bg-white h-full p-3 gap-1">
         <button
@@ -163,7 +163,7 @@ export default function Layout() {
       </aside>
 
       <div className="flex-1 min-w-0 h-full flex flex-col">
-        <header className="shrink-0 z-20 bg-paper pt-[env(safe-area-inset-top)]">
+        <header className="shrink-0 z-20 pt-[env(safe-area-inset-top)]">
           <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
             <div className="flex items-center min-w-0">
               {!ROOTS.has(location.pathname) && (
@@ -184,7 +184,7 @@ export default function Layout() {
               aria-label="Impostazioni"
               title={user?.name}
             >
-              <span className="w-8 h-8 rounded-full bg-brand-600 text-white text-[13px] font-semibold flex items-center justify-center">
+              <span className="w-8 h-8 rounded-full bg-brand-600 text-white text-[13px] font-semibold flex items-center justify-center avatar">
                 {user?.name?.[0]?.toUpperCase() || "?"}
               </span>
             </button>

@@ -36,9 +36,41 @@ body { overflow: hidden; overscroll-behavior: none; }
 }
 .page-scroll { height: 100dvh; height: var(--vvh, 100dvh); overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
+/* Fondo verde Awareness: la pagina è verde brand, le card bianche sopra.
+   Fuori dalle card (titoli, testi, chip, segmentati) i colori diventano chiari. */
+:root { --ground: #0a6847; }
+.app-shell, .page-scroll { background-color: var(--ground); }
+header { background-color: var(--ground) !important; color: #fff; }
+header h1, header button { color: #fff; }
+header .bg-brand-600 { background: #fff !important; color: var(--ground) !important; }
+.section-title, main h2:not(.card *):not(.list *):not([role="dialog"] *):not(.modal-panel *) { color: rgb(255 255 255 / 0.75) !important; }
+main .text-ink-900:not(.card):not(.list):not(.bg-tax-50):not(.bg-rose-50):not(.bg-brand-50):not(.bg-amber-50):not(.card *):not(.list *):not(.seg *):not(.chip):not(.modal-panel *):not([role="dialog"] *):not(.sheet-panel *) { color: #fff; }
+main .text-ink-600:not(.card):not(.list):not(.bg-tax-50):not(.bg-rose-50):not(.bg-brand-50):not(.bg-amber-50):not(.card *):not(.list *):not(.seg *):not(.chip):not(.modal-panel *):not([role="dialog"] *):not(.sheet-panel *) { color: rgb(255 255 255 / 0.82); }
+main .text-ink-400:not(.card):not(.list):not(.bg-tax-50):not(.bg-rose-50):not(.bg-brand-50):not(.bg-amber-50):not(.card *):not(.list *):not(.seg *):not(.chip):not(.modal-panel *):not([role="dialog"] *):not(.sheet-panel *) { color: rgb(255 255 255 / 0.65); }
+main .text-brand-600:not(.card):not(.list):not(.bg-tax-50):not(.bg-rose-50):not(.bg-brand-50):not(.bg-amber-50):not(.card *):not(.list *):not(.modal-panel *):not([role="dialog"] *):not(.sheet-panel *),
+main .text-brand-700:not(.card):not(.list):not(.bg-tax-50):not(.bg-rose-50):not(.bg-brand-50):not(.bg-amber-50):not(.card *):not(.list *):not(.modal-panel *):not([role="dialog"] *):not(.sheet-panel *) { color: #fff; }
+main > div > p, main > div > div > p:not(.card *) { color: rgb(255 255 255 / 0.85); }
+/* Controlli fuori dalle card: su verde diventano bianchi/traslucidi */
+main .seg:not(.card *):not(.modal-panel *):not([role="dialog"] *) { background: rgb(255 255 255 / 0.18); }
+main .seg:not(.card *):not(.modal-panel *):not([role="dialog"] *) .seg-item { color: rgb(255 255 255 / 0.85); }
+main .seg:not(.card *):not(.modal-panel *):not([role="dialog"] *) .seg-active { background: #fff; color: var(--ground); }
+main .chip:not(.card *):not(.modal-panel *):not([role="dialog"] *) { background: rgb(255 255 255 / 0.14); color: #fff; box-shadow: none; }
+main .chip-active:not(.card *):not(.modal-panel *):not([role="dialog"] *) { background: #fff; color: var(--ground); }
+main .btn-primary:not(.card *):not(.list *):not(.modal-panel *):not([role="dialog"] *):not(.action-bar *),
+main button.bg-brand-600:not(.card *):not(.list *):not(.modal-panel *):not([role="dialog"] *):not(.action-bar *) { background: #fff !important; color: var(--ground) !important; }
+main .btn-ghost:not(.card *):not(.list *):not(.modal-panel *):not([role="dialog"] *) { color: #fff; }
+main button[class*="border-card-line"]:not(.card *):not(.list *):not(.modal-panel *):not([role="dialog"] *):not(.action-bar *) { background: rgb(255 255 255 / 0.14); color: #fff; }
+main .text-rose-600:not(.card):not(.list):not(.bg-tax-50):not(.bg-rose-50):not(.bg-brand-50):not(.bg-amber-50):not(.card *):not(.list *):not(.modal-panel *):not([role="dialog"] *):not(.sheet-panel *):not(.bg-rose-50 *) { color: #ffd6de; }
+main .text-tax-600:not(.card):not(.list):not(.bg-tax-50):not(.bg-rose-50):not(.bg-brand-50):not(.bg-amber-50):not(.card *):not(.list *):not(.modal-panel *):not([role="dialog"] *):not(.sheet-panel *):not(.bg-tax-50 *) { color: #ffd9a3; }
+main .bg-brand-50:not(.card):not(.card *):not(.list *):not(.modal-panel *):not([role="dialog"] *) { background: rgb(255 255 255 / 0.14) !important; color: #fff; }
+main .divide-card-line:not(.card *) > * + *, main .border-card-line:not(.card *):not(button):not(input) { border-color: rgb(255 255 255 / 0.2); }
+/* FAB e tab bar restano bianchi sopra il verde */
+button[aria-label="Nuovo movimento"] { background: #fff !important; color: var(--ground) !important; box-shadow: 0 6px 20px rgb(0 0 0 / 0.25); }
+nav.md\:hidden { background: #fff; }
+
 /* Base */
 body {
-  background-color: var(--color-paper);
+  background-color: var(--ground);
   color: var(--color-ink-900);
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
