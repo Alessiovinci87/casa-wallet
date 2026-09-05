@@ -77,8 +77,9 @@ export default function OcrPage() {
         })),
       });
       setPhase("confirm");
-    } catch {
-      setError("Analisi non riuscita. Riprova o controlla la foto.");
+    } catch (err) {
+      const msg = err?.response?.data?.error;
+      setError(msg ? `Analisi non riuscita: ${msg}` : "Analisi non riuscita. Riprova o controlla la foto.");
     }
   };
 

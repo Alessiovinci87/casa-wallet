@@ -222,8 +222,20 @@ router.post("/parse", upload.array("images", 12), async (req, res) => {
     let parsed;
     try {
       parsed = await extractReceipt(openai, imageParts, files.length > 1);
-    } catch {
-      return res.status(502).json({ error: "Risposta OCR non in formato JSON" });
+    } catch (err) {
+      // Distinguish an OpenAI failure (bad key, quota, network) from a bad JSON body.
+      const status = err?.status ?? err?.response?.status;
+      console.error("[ocr] PASS 1 fallito:", status ?? "", err?.message);
+      if (status === 401) {
+        return res.status(502).json({ error: "Chiave OpenAI non valida: controlla OPENAI_API_KEY sul server", code: "OPENAI_AUTH" });
+      }
+      if (status === 429) {
+        return res.status(502).json({ error: "Quota OpenAI esaurita o troppe richieste", code: "OPENAI_QUOTA" });
+      }
+      if (err instanceof SyntaxError) {
+        return res.status(502).json({ error: "Risposta OCR non in formato JSON" });
+      }
+      return res.status(502).json({ error: "Errore durante l'analisi OCR", detail: err?.message });
     }
 
     // Normalize items: clamp categories, PRESERVE null prices (never 0), and
