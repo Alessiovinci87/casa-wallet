@@ -110,7 +110,7 @@ export default function AccountsManager({ compact = false }) {
               <AccountForm initial={a} onSave={save} onCancel={() => setEditing(null)} saving={saving} />
             ) : (
               <div className="flex items-start justify-between gap-3 text-sm">
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="font-medium truncate">
                     {a.name}
                     {a.isDefault && <span className="ml-2 text-[13px] text-ink-400">predefinito</span>}
@@ -119,7 +119,7 @@ export default function AccountsManager({ compact = false }) {
                     {a.number ? `…${String(a.number).replace(/\s/g, "").slice(-6)} · ` : ""}
                     {a.openingBalance != null ? `punto zero ${eur(a.openingBalance)} al ${dayjs(a.openingBalanceDate).format("DD/MM/YYYY")}` : "senza saldo iniziale"}
                   </div>
-                  <div className="flex gap-1 -ml-2 mt-1 text-[13px]">
+                  <div className="flex flex-wrap gap-x-1 gap-y-0 -ml-2 mt-1 text-[13px] [&>button]:whitespace-nowrap [&>button]:min-h-[44px]">
                     <button type="button" onClick={() => setEditing(a)} className="px-2 text-ink-600 hover:text-brand-600">Modifica</button>
                     <button type="button" onClick={async () => { if (await adjustAccountBalance(a)) fetchHousehold(); }} className="px-2 text-ink-600 hover:text-brand-600">Rettifica saldo</button>
                     {!a.isDefault && <button type="button" onClick={() => makeDefault(a)} className="px-2 text-ink-600 hover:text-brand-600">Rendi predefinito</button>}

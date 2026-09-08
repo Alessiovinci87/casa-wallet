@@ -116,11 +116,14 @@ export default function Layout() {
     const vv = window.visualViewport;
     if (!vv) return;
     const onResize = () => {
-      setKeyboard(window.innerHeight - vv.height > 150);
-      // Il guscio (e le finestre) si dimensionano sul viewport visuale: con la
-      // tastiera aperta tutto resta scorrevole fino al tasto Salva, e la pagina
-      // non "scappa" verso l'alto (iOS sposta il layout viewport: lo riportiamo a 0).
-      document.documentElement.style.setProperty("--vvh", `${Math.round(vv.height)}px`);
+      const kb = window.innerHeight - vv.height > 150;
+      setKeyboard(kb);
+      // Solo con la tastiera aperta il guscio si dimensiona sul viewport visuale
+      // (tutto resta scorrevole fino al tasto Salva). Senza tastiera si torna a
+      // 100dvh: un valore in px letto da visualViewport può restare stantio
+      // (toolbar di Safari, standalone) e lasciare una fascia vuota sotto la tab bar.
+      if (kb) document.documentElement.style.setProperty("--vvh", `${Math.round(vv.height)}px`);
+      else document.documentElement.style.removeProperty("--vvh");
       if (window.scrollY !== 0 || vv.offsetTop !== 0) window.scrollTo(0, 0);
     };
     onResize();
