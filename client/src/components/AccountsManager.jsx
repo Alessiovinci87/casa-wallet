@@ -5,6 +5,7 @@ import { useAccountStore } from "../store/accountStore.js";
 import { useHouseholdStore } from "../store/householdStore.js";
 
 import { dialog } from "../lib/dialog.js";
+import { adjustAccountBalance } from "../lib/adjustBalance.js";
 // Gestione dei conti della famiglia: nome, numero (o IBAN, per riconoscere gli
 // estratti importati), saldo iniziale alla data, predefinito. Usato in
 // Impostazioni e nel Punto zero. `compact` nasconde l'intestazione.
@@ -95,7 +96,7 @@ export default function AccountsManager({ compact = false }) {
     <div className="space-y-3">
       {!compact && (
         <p className="text-sm text-ink-600">
-          Ogni conto parte dal suo saldo iniziale a una data; con il numero di conto o l'IBAN l'app riconosce da sola a quale conto appartiene un estratto importato. L'ordine qui è l'ordine in Home (↑ su / ↓ giù).
+          Ogni conto parte dal suo saldo iniziale a una data; se il saldo calcolato non torna con la banca usa "Rettifica saldo"; con il numero di conto o l'IBAN l'app riconosce da sola a quale conto appartiene un estratto importato. L'ordine qui è l'ordine in Home (↑ su / ↓ giù).
         </p>
       )}
       {error && <div className="text-sm text-rose-600 bg-rose-50 rounded p-2">{error}</div>}
@@ -120,6 +121,7 @@ export default function AccountsManager({ compact = false }) {
                   </div>
                   <div className="flex gap-1 -ml-2 mt-1 text-[13px]">
                     <button type="button" onClick={() => setEditing(a)} className="px-2 text-ink-600 hover:text-brand-600">Modifica</button>
+                    <button type="button" onClick={async () => { if (await adjustAccountBalance(a)) fetchHousehold(); }} className="px-2 text-ink-600 hover:text-brand-600">Rettifica saldo</button>
                     {!a.isDefault && <button type="button" onClick={() => makeDefault(a)} className="px-2 text-ink-600 hover:text-brand-600">Rendi predefinito</button>}
                     {accounts.length > 1 && <button type="button" onClick={() => remove(a)} className="px-2 text-ink-600 hover:text-rose-600">Elimina</button>}
                     {accounts.length > 1 && (

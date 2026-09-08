@@ -30,7 +30,7 @@ export async function buildAdvisorReport({ householdId, userId, months = 3 }) {
   const from = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - (M - 1), 1));
   const [txs, rules, goals] = await Promise.all([
     prisma.transaction.findMany({
-      where: { householdId, date: { gte: from, lte: new Date(today.getTime() + MS_PER_DAY - 1) } },
+      where: { householdId, category: { not: "Rettifica saldo" }, date: { gte: from, lte: new Date(today.getTime() + MS_PER_DAY - 1) } },
       select: { amount: true, type: true, category: true, merchant: true, what: true, date: true, recurringRuleId: true },
     }),
     prisma.recurringRule.findMany({ where: { householdId, active: true } }),

@@ -35,6 +35,7 @@ router.get("/spending", async (req, res) => {
     if (acc.isDefault) where.OR = [{ accountId: acc.id }, { accountId: null }];
     else where.accountId = acc.id;
   }
+  where.category = { not: "Rettifica saldo" }; // le rettifiche allineano il saldo, non sono spese
   const rows = await prisma.transaction.findMany({ where, select: { amount: true, type: true, category: true, merchant: true, what: true, date: true, recurringRuleId: true } });
 
   // Ricorrenze non ancora registrate nel periodo (da domani in poi).

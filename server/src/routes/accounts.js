@@ -8,6 +8,9 @@ import { prisma } from "../lib/prisma.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { broadcast } from "../lib/ws.js";
 import { computeAccountBalances, normalizeAccountNumber } from "../lib/accounts.js";
+import { todayRomeUTC } from "../lib/recurrence.js";
+
+export const ADJUST_CATEGORY = "Rettifica saldo";
 
 const router = Router();
 router.use(authMiddleware);
@@ -90,6 +93,54 @@ router.put("/reorder", async (req, res) => {
   await prisma.$transaction(ids.filter((id) => allowed.has(id)).map((id, i) => prisma.bankAccount.update({ where: { id }, data: { sortOrder: i } })));
   broadcast(hh, { event: "transaction_update", payload: { action: "account_reordered" } });
   res.json(await computeAccountBalances(hh));
+});
+
+// POST /api/accounts/:id/adjust { balance, note? } → allinea il saldo del conto a
+// quello reale (es. letto in banca). La differenza diventa un movimento
+// "Rettifica saldo" datato oggi (entrata o uscita), così la storia resta
+// leggibile e reversibile. Se il punto zero del conto è oggi o nel futuro (un
+// movimento di oggi non conterebbe), si corregge direttamente il saldo iniziale.
+router.post("/:id/adjust", async (req, res) => {
+  try {
+    const hh = req.user.householdId;
+    const existing = await prisma.bankAccount.findFirst({ where: { id: req.params.id, householdId: hh } });
+    if (!existing) return res.status(404).json({ error: "Conto non trovato" });
+    const target = Number(String(req.body?.balance ?? "").replace(",", "."));
+    if (!Number.isFinite(target)) return res.status(400).json({ error: "Saldo non valido" });
+    const today = todayRomeUTC();
+    const current = (await computeAccountBalances(hh, today)).accounts.find((a) => a.id === existing.id);
+    const diff = Number((target - current.balance).toFixed(2));
+    if (Math.abs(diff) < 0.005) return res.json({ ok: true, diff: 0, balance: current.balance, mode: "none" });
+    const note = String(req.body?.note || "").trim().slice(0, 120);
+    let mode = "transaction";
+    let transaction = null;
+    if (existing.openingBalanceDate && existing.openingBalanceDate.getTime() >= today.getTime()) {
+      mode = "opening";
+      await prisma.bankAccount.update({ where: { id: existing.id }, data: { openingBalance: Number(((existing.openingBalance ?? 0) + diff).toFixed(2)) } });
+      await syncHouseholdOpening(hh);
+    } else {
+      transaction = await prisma.transaction.create({
+        data: {
+          userId: req.user.id,
+          householdId: hh,
+          accountId: existing.id,
+          type: diff > 0 ? "INCOME" : "EXPENSE",
+          amount: Math.abs(diff),
+          category: ADJUST_CATEGORY,
+          method: "TRANSFER",
+          description: note ? `Rettifica saldo · ${note}` : `Rettifica saldo · ${existing.name}`,
+          merchant: null,
+          what: note || null,
+          date: today,
+        },
+      });
+    }
+    broadcast(hh, { event: "transaction_update", payload: { action: "adjust", transaction } });
+    const after = (await computeAccountBalances(hh, today)).accounts.find((a) => a.id === existing.id);
+    res.json({ ok: true, diff, balance: after.balance, mode, transaction });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
 });
 
 router.put("/:id", async (req, res) => {

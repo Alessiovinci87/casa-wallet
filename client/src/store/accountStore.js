@@ -32,6 +32,12 @@ export const useAccountStore = create((set, get) => ({
     await api.delete(`/api/accounts/${id}`);
     await get().fetchAccounts();
   },
+  /** Allinea il saldo del conto a quello reale: la differenza diventa un movimento "Rettifica saldo". */
+  adjustBalance: async (id, balance, note) => {
+    const { data } = await api.post(`/api/accounts/${id}/adjust`, { balance, note });
+    await get().fetchAccounts();
+    return data;
+  },
   reorder: async (ids) => {
     const { data } = await api.put("/api/accounts/reorder", { ids });
     set({ accounts: data.accounts, balance: data.balance });

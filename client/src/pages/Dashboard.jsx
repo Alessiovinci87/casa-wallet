@@ -9,6 +9,7 @@ import api from "../lib/api.js";
 import { eur } from "../lib/format.js";
 import NotificationsToggle from "../components/NotificationsToggle.jsx";
 import { ChevronIcon, XIcon } from "../components/Icons.jsx";
+import { adjustAccountBalance } from "../lib/adjustBalance.js";
 
 // Dashboard a tre livelli (A2):
 //  1. Disponibile reale — unico numero grande, tap → sheet con il breakdown
@@ -50,7 +51,7 @@ function MiniCard({ label, value, sub, tone = "text-ink-900", onClick }) {
   );
 }
 
-function BreakdownSheet({ avail, onClose }) {
+function BreakdownSheet({ avail, onClose, onAdjusted }) {
   return (
     <div className="fixed inset-0 z-40" onClick={onClose}>
       <div className="absolute inset-0 bg-black/40" />
@@ -71,10 +72,16 @@ function BreakdownSheet({ avail, onClose }) {
                 <span className="text-ink-600">{b.label}</span>
                 <span className="font-semibold nums">{b.sign < 0 ? "− " : b.key !== "balance" ? "+ " : ""}{eur(b.amount)}</span>
               </div>
-              {b.key === "balance" && avail.accounts?.length > 1 && (
+              {b.key === "balance" && avail.accounts?.length > 0 && (
                 <ul className="mt-1 text-[13px] text-ink-400">
                   {avail.accounts.map((a) => (
-                    <li key={a.id} className="flex justify-between"><span>{a.name}</span><span className="nums">{eur(a.balance)}</span></li>
+                    <li key={a.id} className="flex items-center justify-between gap-2 min-h-[44px]">
+                      <span className="truncate">{a.name}</span>
+                      <span className="shrink-0 flex items-center gap-3">
+                        <span className="nums">{eur(a.balance)}</span>
+                        <button type="button" onClick={async () => { if (await adjustAccountBalance(a)) onAdjusted?.(); }} className="text-brand-600 font-medium">Rettifica</button>
+                      </span>
+                    </li>
                   ))}
                 </ul>
               )}
@@ -150,9 +157,8 @@ export default function Dashboard() {
   }, []);
 
   // Il Disponibile reale si ricalcola quando cambiano le transazioni del mese (WS incluso).
-  useEffect(() => {
-    api.get("/api/dashboard/available").then(({ data }) => setAvail(data)).catch(() => setAvail(null));
-  }, [transactions]);
+  const loadAvail = () => api.get("/api/dashboard/available").then(({ data }) => setAvail(data)).catch(() => setAvail(null));
+  useEffect(() => { loadAvail(); }, [transactions]);
 
   // Primo accesso: nessun punto zero e nessuna transazione → wizard "Punto zero" (una volta sola).
   useEffect(() => {
@@ -405,7 +411,7 @@ export default function Dashboard() {
         )}
       </section>
 
-      {sheet && avail && <BreakdownSheet avail={avail} onClose={() => setSheet(false)} />}
+      {sheet && avail && <BreakdownSheet avail={avail} onClose={() => setSheet(false)} onAdjusted={loadAvail} />}
     </div>
   );
 }
